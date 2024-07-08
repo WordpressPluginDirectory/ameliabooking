@@ -376,12 +376,15 @@
                     <el-select
                         v-model="selectedEvents"
                         :placeholder="$root.labels.all_events"
+                        :remote-method="query => searchEvents(query, true)"
+                        :loading="loadingEvents"
+                        remote
                         multiple
                         filterable
                         collapse-tags
                     >
                       <el-option
-                          v-for="event in events"
+                          v-for="event in searchedEvents"
                           :key="event.id"
                           :label="event.displayName ? event.displayName : event.name"
                           :value="event.id">
@@ -675,6 +678,20 @@
                         {{ $root.labels.html_mode }}
                       </el-button>
                     </el-button-group>
+                  </el-col>
+                </el-row>
+
+                <el-row v-if="type === 'email'">
+                  <el-col>
+                    <el-alert
+                        type="warning"
+                        show-icon
+                        title=""
+                        :description="$root.labels.content_mode_tooltip"
+                        :closable="false"
+                        style="margin-bottom: 10px"
+                    >
+                    </el-alert>
                   </el-col>
                 </el-row>
 
@@ -1151,6 +1168,7 @@
   import placeholdersMixin from '../../../../js/backend/mixins/placeholdersMixin'
   import priceMixin from '../../../../js/common/mixins/priceMixin'
   import whatsappNotificationMixin from '../../../../js/backend/mixins/whatsappNotificationMixin'
+  import eventMixin from '../../../../js/backend/mixins/eventMixin'
 
   export default {
     mixins: [
@@ -1163,7 +1181,8 @@
       entitiesMixin,
       placeholdersMixin,
       priceMixin,
-      whatsappNotificationMixin
+      whatsappNotificationMixin,
+      eventMixin
     ],
 
     props: {
@@ -1345,6 +1364,7 @@
       this.getNotification(null)
       this.usedLanguages = this.passedUsedLanguages
       this.services = this.getServicesFromCategories(this.categories)
+      this.searchedEvents = this.events
     },
 
     methods: {
@@ -1675,6 +1695,10 @@
 
         if (['provider_cart'].indexOf(notification.name) !== -1) {
           common.push('employeePlaceholders')
+        }
+
+        if (['provider_cart', 'customer_cart'].indexOf(notification.name) !== -1 && notification.type === 'whatsapp') {
+          common.push('cartPlaceholders')
         }
 
         if (['customer_birthday_greeting', 'customer_account_recovery'].indexOf(notification.name) !== -1) {

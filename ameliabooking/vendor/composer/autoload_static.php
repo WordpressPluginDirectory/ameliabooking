@@ -4,7 +4,7 @@
 
 namespace Composer\Autoload;
 
-class ComposerStaticInit0597d4d8535a185ad7341907161fb136
+class ComposerStaticInit958263fb862fe910c38e54a21ea4616f
 {
     public static $files = array (
         '9c67151ae59aff4788964ce8eb2a0f43' => __DIR__ . '/..' . '/clue/stream-filter/src/functions_include.php',
@@ -222,8 +222,8 @@ class ComposerStaticInit0597d4d8535a185ad7341907161fb136
         ),
         'AmeliaHttp\\Message\\' => 
         array (
-            0 => __DIR__ . '/..' . '/php-http/message-factory/src',
-            1 => __DIR__ . '/..' . '/php-http/message/src',
+            0 => __DIR__ . '/..' . '/php-http/message/src',
+            1 => __DIR__ . '/..' . '/php-http/message-factory/src',
         ),
         'AmeliaHttp\\Discovery\\' => 
         array (
@@ -373,10 +373,10 @@ class ComposerStaticInit0597d4d8535a185ad7341907161fb136
     public static function getInitializer(ClassLoader $loader)
     {
         return \Closure::bind(function () use ($loader) {
-            $loader->prefixLengthsPsr4 = ComposerStaticInit0597d4d8535a185ad7341907161fb136::$prefixLengthsPsr4;
-            $loader->prefixDirsPsr4 = ComposerStaticInit0597d4d8535a185ad7341907161fb136::$prefixDirsPsr4;
-            $loader->prefixesPsr0 = ComposerStaticInit0597d4d8535a185ad7341907161fb136::$prefixesPsr0;
-            $loader->classMap = ComposerStaticInit0597d4d8535a185ad7341907161fb136::$classMap;
+            $loader->prefixLengthsPsr4 = ComposerStaticInit958263fb862fe910c38e54a21ea4616f::$prefixLengthsPsr4;
+            $loader->prefixDirsPsr4 = ComposerStaticInit958263fb862fe910c38e54a21ea4616f::$prefixDirsPsr4;
+            $loader->prefixesPsr0 = ComposerStaticInit958263fb862fe910c38e54a21ea4616f::$prefixesPsr0;
+            $loader->classMap = ComposerStaticInit958263fb862fe910c38e54a21ea4616f::$classMap;
 
         }, null, ClassLoader::class);
     }

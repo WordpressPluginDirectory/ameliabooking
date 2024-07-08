@@ -33,7 +33,7 @@ class BackendStrings
             'cancel'                    => __('Cancel', 'wpamelia'),
             'canceled'                  => __('Canceled', 'wpamelia'),
             'capacity'                  => __('Spots', 'wpamelia'),
-            'content_mode_tooltip'      => __('Don\'t use Text mode option if you already have HTML code in the description,<br>since once this option is enabled the existing HTML tags could be lost.', 'wpamelia'),
+            'content_mode_tooltip'      => __('Don\'t use Text mode option if you already have HTML code in the description, since once this option is enabled the existing HTML tags could be lost.', 'wpamelia'),
             'close'                     => __('Close', 'wpamelia'),
             'closed'                    => __('Closed', 'wpamelia'),
             'csv_delimiter'             => __('Select Delimiter', 'wpamelia'),
@@ -71,6 +71,7 @@ class BackendStrings
             'event'                     => __('Event', 'wpamelia'),
             'events'                    => __('Events', 'wpamelia'),
             'export'                    => __('Export', 'wpamelia'),
+            'extra'                     => __('Extra', 'wpamelia'),
             'extras'                    => __('Extras', 'wpamelia'),
             'extras_total_price'        => __('Extras total price', 'wpamelia'),
             'google_calendar'           => __('Google Calendar', 'wpamelia'),
@@ -305,6 +306,8 @@ class BackendStrings
             'limit_events_per_customer_tt'           => __('The limit is checked by customer email', 'wpamelia'),
             'integrations_settings'                  => __('Integrations', 'wpamelia'),
             'integrations_settings_description'      => __("Manage Google Calendar Integration, Outlook Calendar Integration, Zoom Integration and Web Hooks", 'wpamelia'),
+            'iplocate_api_key'                       => __('IPLocate Api Key', 'wpamelia'),
+            'iplocate_api_key_tooltip'               => __('Please sign up for an API key at iplocate.io/signup for 1000 free API requests/day.<br/> The limit for access without an API key has been reduced to 50 requests/day.', 'wpamelia'),
             'h1'                                     => __('1h', 'wpamelia'),
             'h10'                                    => __('10h', 'wpamelia'),
             'h11'                                    => __('11h', 'wpamelia'),
@@ -409,6 +412,7 @@ class BackendStrings
             'space_dot'                              => __('Space-Dot', 'wpamelia'),
             'stash_entities'                         => __('Load Entities on page load', 'wpamelia'),
             'stash_entities_tooltip'                 => __('Enable this option if you want to avoid AJAX calls<br>for fetching entities (services, employees, locations, packages, tags)', 'wpamelia'),
+            'tax_enable'                             => __('Enable Taxes', 'wpamelia'),
             'outlook_ssl_warning'                    => __('SSL (HTTPS) is not enabled. You will not be able to use Outlook Calendar integration until SSL is enabled.', 'wpamelia'),
             'update_for_all'                         => __('Update for all', 'wpamelia'),
             'custom_fields_upload_path'              => __('Attachment upload path', 'wpamelia'),
@@ -844,6 +848,16 @@ class BackendStrings
     }
 
     /**
+     * Returns the array for the stripe
+     *
+     * @return array
+     */
+    public static function getStripeStrings()
+    {
+        return [];
+    }
+
+    /**
      * Returns the array for the customer page
      *
      * @return array
@@ -956,18 +970,16 @@ class BackendStrings
         return [
             'amount'                             => __('Amount', 'wpamelia'),
             'booking_start'                      => __('Booking Start', 'wpamelia'),
-            'coupons'                            => __('Coupons', 'wpamelia'),
             'customer_email'                     => __('Customer Email', 'wpamelia'),
             'employee_email'                     => __('Employee Email', 'wpamelia'),
             'export_tooltip_payments'            => __('You can use this option to export payments in CSV file<br/>for the selected date range.', 'wpamelia'),
             'method'                             => __('Method', 'wpamelia'),
-            'new_coupon'                         => __('New Coupon', 'wpamelia'),
-            'no_coupons_yet'                     => __('You don\'t have any coupons here yet', 'wpamelia'),
             'no_payments_yet'                    => __('You don\'t have any payments here yet', 'wpamelia'),
             'payment_date'                       => __('Payment date', 'wpamelia'),
             'payment_created'                    => __('Payment created', 'wpamelia'),
             'payments'                           => __('Payments', 'wpamelia'),
             'payments_lower'                     => __('payments', 'wpamelia'),
+            'rate'                               => __('Rate', 'wpamelia'),
         ];
     }
 
@@ -1039,6 +1051,7 @@ class BackendStrings
             'select_customers'                  => __('Select Customer(s)', 'wpamelia'),
             'select_customer_warning'           => __('Please select at least one customer', 'wpamelia'),
             'select_max_customer_count_warning' => __('Maximum number of places is', 'wpamelia'),
+            'select_extra'                      => __('Select Extra', 'wpamelia'),
             'select_service'                    => __('Select Service', 'wpamelia'),
             'select_service_warning'            => __('Please select service', 'wpamelia'),
             'select_service_category'           => __('Select Service Category', 'wpamelia'),
@@ -1533,6 +1546,7 @@ class BackendStrings
             'show_all'                         => __('Show All', 'wpamelia'),
             'manually_loading'                 => __('Load booking form manually', 'wpamelia'),
             'manually_loading_description'     => __('Add element (button, link...) ID, that will manually load amelia shortcode content', 'wpamelia'),
+            'multiselect_note'                 => __('For multiselect: hold CTRL / Command (⌘).', 'wpamelia'),
             'show_all_categories'              => __('Show all categories', 'wpamelia'),
             'show_all_employees'               => __('Show all employees', 'wpamelia'),
             'show_all_locations'               => __('Show all locations', 'wpamelia'),

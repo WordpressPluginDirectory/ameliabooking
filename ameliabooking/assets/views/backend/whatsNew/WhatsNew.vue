@@ -56,7 +56,7 @@
                 <img v-if="item.type" :src="$root.getUrl+`public/img/am-${getIconType(item.type)}.svg`" />
               </div>
 
-              <div v-if="item.text" class="am-whats-new-blog-subtitle-text">{{item.text.replace(':','')}}</div>
+              <div v-if="item.text" class="am-whats-new-blog-subtitle-text" v-html="item.text.replace(':','')"></div>
             </div>
 
             <p class="am-whats-new-changelog-list-title" v-if="!$root.licence.isDeveloper && getLicencesItems(getHigherLicences()).length">{{$root.labels.included_plan_higher}}</p>
@@ -65,7 +65,7 @@
                 <img v-if="item.type" :src="$root.getUrl+`public/img/am-${getIconType(item.type)}.svg`" />
               </div>
 
-              <div v-if="item.text" class="am-whats-new-blog-subtitle-text">{{item.text.replace(':','')}}</div>
+              <div v-if="item.text" class="am-whats-new-blog-subtitle-text" v-html="item.text.replace(':','')"></div>
             </div>
 
             <a class="am-whats-new-changelog-link" href="https://wpamelia.com/changelog/" target="_blank" rel="nofollow">
@@ -202,18 +202,20 @@ export default {
        isValidEmail: true,
        blogPosts: [],
        changelog: {
-         version: '7.5.1',
+         version: '7.6.2',
          starter: {
            feature: [],
-           improvement: [
-             'Added option on Customize page to remove scroll from Catalog 2.0 booking form'
-           ],
-           translations: [
-             'Updated Dutch and Hebrew languages\n'
-           ],
+           improvement: [],
+           translations: [],
            bugfix: [
-             'Fixed issue with HTML notifications and \'quill\' editor',
-             'Fixed issue with time slots when timezone is hidden on the new customer panel'
+             'Fixed issue with Events filter on the Finance page',
+             'Fixed issue with creating events and setting start event time after the end time in the employee panel',
+             'Fixed issue with notifications when a customer cancels an appointment',
+             'Fixed issue with extras and persons disappearing when de-selecting date',
+             'Fixed issue with Customer filter on Appointment page',
+             'Fixed issue with event periods editing and the event list form',
+             'Fixed issue with loading the forms when \'Load entities on page load\' is enabled',
+             'Fixed vulnerability issue'
            ],
            other: [
              'Other small bug fixes and stability improvements'
@@ -221,30 +223,27 @@ export default {
          },
          basic: {
            feature: [],
-           improvement: [
-             'Added \'Fifth\' as a recurrence option for the Monthly recurring events'
-           ],
+           improvement: [],
            translations: [],
-           bugfix:[],
+           bugfix: [
+             'Fixed issue with event price when it is not included in the tax',
+             'Fixed issue with events with the \'Allow the same customer to book more than once\' option disabled and WooCommerce'
+           ],
            other: []
          },
          pro: {
            feature: [],
-           improvement: [
-             'Added sorting option for services within packages',
-             'Implemented sorting of packages by validation date on Customer Panel 2.0'
-           ],
+           improvement: [],
            translations: [],
            bugfix: [
-             'Fixed issue with notifications and google sync when duplicating appointment from package'
+             'Fixed issue with cart_appointment_details placeholder in notifications',
+             'Fixed issue with booking packages with services with no employees assigned'
            ],
            other: []
          },
          developer: {
            feature: [],
-           improvement: [
-             'Improved API bookings logic'
-           ],
+           improvement: [],
            translations: [],
            bugfix: [],
            other: []
