@@ -112,6 +112,26 @@
           <!-- /Custom Tickets -->
         </el-form-item>
 
+        <el-form-item :label="$root.labels.status + ':'" v-if="isWaitingList && eventBooking.id === 0">
+          <el-select
+              v-model="eventBooking.status"
+              :popper-append-to-body="popperAppendToBody"
+              :disabled="!writeEvents"
+          >
+            <el-option
+                v-for="item in statuses"
+                :key="item.value"
+                :value="item.value"
+                :label="item.label"
+                class="am-appointment-dialog-status-option"
+            >
+              <span :class="'am-appointment-status-symbol-wl-status am-appointment-status-symbol am-appointment-status-symbol-'+(item.value === 'rejected' ? 'canceled' : item.value)">
+                {{item.label}}
+              </span>
+            </el-option>
+          </el-select>
+        </el-form-item>
+
         <!-- Event Coupon -->
         <el-form-item :label="$root.labels.coupon"
                       v-if="couponsFilteredEvent.length > 0 && showCoupon && ($root.settings.role === 'admin' || $root.settings.role === 'manager')">
@@ -256,6 +276,21 @@
         type: Boolean,
         default: false,
         required: false
+      },
+      popperAppendToBody: {
+        type: Boolean,
+        default: true,
+        required: false
+      },
+      writeEvents: {
+        type: Boolean,
+        default: true,
+        required: false
+      },
+      isWaitingList: {
+        type: Boolean,
+        default: true,
+        required: false
       }
     },
 
@@ -282,7 +317,17 @@
             {required: true, message: this.$root.labels.select_single_customer_warning, trigger: 'submit', type: 'array'},
             {validator: validateCustomerSelection, trigger: 'submit'}
           ]
-        }
+        },
+        statuses: [
+          {
+            value: 'approved',
+            label: this.$root.labels.approved
+          },
+          {
+            value: 'waiting',
+            label: this.$root.labels.waiting_list
+          }
+        ]
       }
     },
 
@@ -437,6 +482,8 @@
 
         let coupon = this.options.entities.coupons ? this.options.entities.coupons.find(c => c.id === couponId) : null
 
+        let bookingStatus = this.isWaitingList ? this.eventBooking.status : 'approved'
+
         return {
           type: 'event',
           eventId: this.eventId,
@@ -448,7 +495,8 @@
               customer: this.customers.find(customer => customer.id === this.eventBooking.customerId),
               coupon: coupon,
               deposit: 0,
-              ticketsData: this.ticketsData
+              ticketsData: this.ticketsData,
+              status: bookingStatus
             }
           ],
           couponCode: coupon ? coupon.code : null,

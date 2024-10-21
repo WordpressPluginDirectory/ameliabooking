@@ -86,11 +86,13 @@ export default {
           },
           {
             value: '%time_zone%',
-            label: this.$root.labels.ph_time_zone
+            label: this.$root.labels.ph_time_zone,
+            type: 'package'
           },
           {
             value: '%coupon_used%',
-            label: this.$root.labels.ph_coupon_used
+            label: this.$root.labels.ph_coupon_used,
+            type: 'package'
           }
         ],
 
@@ -232,7 +234,15 @@ export default {
           {
             value: '%location_phone%',
             label: this.$root.labels.ph_location_phone
-          }
+          },
+          {
+            value: '%location_latitude%',
+            label: this.$root.labels.ph_location_latitude
+          },
+          {
+            value: '%location_longitude%',
+            label: this.$root.labels.ph_location_longitude
+          },
         ],
 
         appointmentPlaceholders: [
@@ -309,7 +319,8 @@ export default {
           },
           {
             value: '%coupon_used%',
-            label: this.$root.labels.ph_coupon_used
+            label: this.$root.labels.ph_coupon_used,
+            type: 'appointment'
           },
           {
             value: '%number_of_persons%',
@@ -341,15 +352,18 @@ export default {
           },
           {
             value: '%reservation_name%',
-            label: this.$root.labels.ph_reservation_name
+            label: this.$root.labels.ph_reservation_name,
+            type: 'appointment'
           },
           {
             value: '%reservation_description%',
-            label: this.$root.labels.ph_reservation_description
+            label: this.$root.labels.ph_reservation_description,
+            type: 'appointment'
           },
           {
             value: '%time_zone%',
-            label: this.$root.labels.ph_time_zone
+            label: this.$root.labels.ph_time_zone,
+            type: 'appointment'
           }
         ],
 
@@ -360,7 +374,8 @@ export default {
           },
           {
             value: '%coupon_used%',
-            label: this.$root.labels.ph_coupon_used
+            label: this.$root.labels.ph_coupon_used,
+            type: 'event'
           },
           {
             value: '%event_cancel_url%',
@@ -497,15 +512,18 @@ export default {
           },
           {
             value: '%reservation_name%',
-            label: this.$root.labels.ph_reservation_name
+            label: this.$root.labels.ph_reservation_name,
+            type: 'event'
           },
           {
             value: '%reservation_description%',
-            label: this.$root.labels.ph_reservation_description
+            label: this.$root.labels.ph_reservation_description,
+            type: 'event'
           },
           {
             value: '%time_zone%',
-            label: this.$root.labels.ph_time_zone
+            label: this.$root.labels.ph_time_zone,
+            type: 'event'
           }
         ],
 

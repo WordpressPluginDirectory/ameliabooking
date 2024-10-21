@@ -647,7 +647,7 @@ export default {
       showDialogEditPackageAppointment (id, packageCustomer) {
         this.packageServices = this.getAvailableServicesForPurchase(packageCustomer)
 
-        this.showDialogEditAppointment(id)
+        this.showDialogEditAppointment(id, packageCustomer.appointments[0].booking.customerId)
       },
 
       getPurchasedPackageProviders (app) {

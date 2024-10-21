@@ -32,26 +32,44 @@
       <EventListFooter
         v-if="stepsArray[stepIndex].key !== 'list'"
         :customized-labels="globalStepLabels()"
-        :primary-footer-button-type="primBtn"
+        :primary-footer-button-type="isWaiting && stepsArray[stepIndex].name === 'EventInfo' ? waitingBtnType : primBtn"
         :secondary-footer-button-type="secBtn"
         :second-button-show="!licence.isLite ? secBtnVisible : false"
+        :is-waiting-list="isWaiting"
       />
     </template>
   </div>
 </template>
 
 <script setup>
+// * import from Vue
+import {
+  computed,
+  ref,
+  inject,
+  provide,
+  markRaw,
+  onMounted,
+  watchEffect,
+  onBeforeMount
+} from 'vue'
+
+// * Import composables
+import { usePopulateMultiDimensionalObject } from '../../../../assets/js/common/objectAndArrayManipulation.js'
+import { defaultCustomizeSettings } from '../../../../assets/js/common/defaultCustomize.js'
+import { useColorTransparency } from "../../../../assets/js/common/colorManipulation";
+
 // * Form Construction
 import EventListHeader from "../../../common/EventListFormConstruction/Header/Header.vue";
 import EventListFooter from "../../../common/EventListFormConstruction/Footer/Footer.vue";
 
 // * Step Components
-import EventsList from "../steps/EventsList.vue";
-import EventInfo from "../steps/EventInfo.vue";
-import EventTickets from "../steps/EventTickets.vue";
-import EventCustomerInfo from "../steps/EventCustomerInfo.vue";
-import EventPayment from "../steps/EventPayment.vue";
-import EventCongratulations from "../steps/EventCongratulations.vue";
+import EventsList from "../steps/Events/EventList/EventsList.vue";
+import EventInfo from "../steps/Events/common/EventInfo/EventInfo.vue";
+import EventTickets from "../steps/Events/common/EventTickets/EventTickets.vue";
+import EventCustomerInfo from "../steps/Events/common/EventCustomerInfo/EventCustomerInfo.vue";
+import EventPayment from "../steps/Events/common/EventPayment/EventPayment.vue";
+import EventCongratulations from "../steps/Events/common/Congratulations/EventCongratulations.vue";
 
 // * Form Component Collection
 const eventsList = markRaw(EventsList)
@@ -61,24 +79,8 @@ const eventCustomerInfo = markRaw(EventCustomerInfo)
 const eventPayment = markRaw(EventPayment)
 const eventCongratulations = markRaw(EventCongratulations)
 
-// * import from Vue
-import {
-  computed,
-  ref,
-  inject,
-  provide,
-  markRaw,
-  nextTick,
-  watch,
-  onMounted,
-  watchEffect,
-  onBeforeMount
-} from 'vue'
-
-// * Import composables
-import { usePopulateMultiDimensionalObject } from '../../../../assets/js/common/objectAndArrayManipulation.js'
-import { defaultCustomizeSettings } from '../../../../assets/js/common/defaultCustomize.js'
-import {useColorTransparency} from "../../../../assets/js/common/colorManipulation";
+// * Root Settings
+let amSettings = inject('settings')
 
 // * Plugin Licence
 let licence = inject('licence')
@@ -86,7 +88,11 @@ let licence = inject('licence')
 // * Base Urls
 const baseUrls = inject('baseUrls')
 
-const amLabels = inject('labels')
+// * is waiting
+let isWaiting = computed(() => {
+  return amSettings.appointments.waitingListEvents.enabled && !licence.isBasic && !licence.isStarter && !licence.isLite
+})
+
 let amTranslations = inject('translations')
 let langKey = inject('langKey')
 let stepName = inject('stepName')
@@ -128,7 +134,15 @@ let secBtnVisible = computed(() => {
   return true
 })
 
-let bookableType = inject('bookableType')
+let waitingBtnType = computed(() => {
+  if (
+    amCustomize.value[pageRenderKey.value][stepName.value]
+    && 'waitingBtn' in amCustomize.value[pageRenderKey.value][stepName.value].options
+  ) {
+    return amCustomize.value[pageRenderKey.value][stepName.value].options.waitingBtn.buttonType
+  }
+  return 'filled'
+})
 
 // * Step index
 let stepIndex = inject('stepIndex')
@@ -233,19 +247,6 @@ function globalStepLabels () {
   }
 
   return stepLabels
-}
-
-// * Label computed function
-function labelsDisplay (label, stepKey) {
-  let computedLabel = computed(() => {
-    return amCustomize.value[pageRenderKey.value][stepKey].translations
-    && amCustomize.value[pageRenderKey.value][stepKey].translations[label]
-    && amCustomize.value[pageRenderKey.value][stepKey].translations[label][langKey.value]
-      ? amCustomize.value[pageRenderKey.value][stepKey].translations[label][langKey.value]
-      : amLabels[label]
-  })
-
-  return computedLabel.value
 }
 
 // * Colors

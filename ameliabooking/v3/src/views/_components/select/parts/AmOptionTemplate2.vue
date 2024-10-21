@@ -208,7 +208,7 @@ export default {
   align-items: center;
 
   * {
-    font-family: var(--am-font-family);;
+    font-family: var(--am-font-family);
   }
 
   &__wrapper {

@@ -60,22 +60,15 @@
         </el-row>
       </div>
 
-      <div v-if="bookings.length === 0" class="am-empty-state am-section">
-        <img :src="$root.getUrl + 'public/img/emptystate.svg'">
-        <h2>{{ $root.labels.no_attendees_yet }}</h2>
-      </div>
-
-      <div v-show="!hasResult && bookings.length > 0" class="am-empty-state am-section">
-        <img :src="$root.getUrl + 'public/img/emptystate.svg'">
-        <h2>{{ $root.labels.no_results }}</h2>
-      </div>
-
       <!-- Attendees -->
-      <div class="am-attendees">
-        <el-collapse>
+      <el-tabs v-model="activeTab">
+
+      <el-tab-pane :label="$root.labels.event_attendees" name="Approved">
+        <div class="am-attendees">
+          <el-collapse>
           <el-collapse-item
               v-for="(booking, index) in bookings"
-              v-show="booking.show"
+              v-show="booking.show && booking.status !== 'waiting'"
               :key="index"
               :name="booking.id"
               class="am-attendee">
@@ -129,7 +122,8 @@
                             :value="item.value"
                             class="am-appointment-dialog-status-option"
                         >
-                          <span :class="'am-appointment-status-symbol am-appointment-status-symbol-'+(item.value === 'rejected' ? 'canceled' : item.value)"></span>
+                          <span :class="'am-appointment-status-symbol am-appointment-status-symbol-'+(item.value === 'rejected' ? 'canceled' : item.value)">
+                          </span>
                         </el-option>
                       </el-select>
                     </div>
@@ -192,7 +186,150 @@
             </div>
           </el-collapse-item>
         </el-collapse>
-      </div>
+        </div>
+
+        <div v-if="bookings.filter(b => b.status !== 'waiting').length === 0" class="am-empty-state am-section">
+          <img :src="$root.getUrl + 'public/img/emptystate.svg'">
+          <h2>{{ $root.labels.no_attendees_yet }}</h2>
+        </div>
+        <div v-show="!hasResult && bookings.filter(b => b.status !== 'waiting').length > 0" class="am-empty-state am-section">
+          <img :src="$root.getUrl + 'public/img/emptystate.svg'">
+          <h2>{{ $root.labels.no_results }}</h2>
+        </div>
+      </el-tab-pane>
+
+      <el-tab-pane
+        :label="$root.labels.waiting_list"
+        name="WaitingList"
+        v-if="event.settings.waitingList.enabled && $root.settings.appointments.waitingListEvents.enabled"
+      >
+        <div class="am-attendees">
+          <el-collapse>
+            <el-collapse-item
+              v-for="(booking, index) in bookings"
+              v-show="booking.show && booking.status === 'waiting'"
+              :key="index"
+              :name="booking.id"
+              class="am-attendee"
+            >
+              <template slot="title">
+                <div class="am-attendee-data" style="width: 100%">
+                  <el-row :gutter="10">
+                    <el-col v-if="$root.settings.capabilities.canDelete === true" :sm="2">
+                  <span class="am-attendee-checkbox" @click.stop>
+                    <el-checkbox
+                        v-if="$root.settings.capabilities.canDelete === true"
+                        v-model="booking.checked">
+                    </el-checkbox>
+                  </span>
+                    </el-col>
+                    <el-col :sm="$root.settings.capabilities.canDelete === true ? 17 : 19">
+                      <div class="am-attendee-name">
+                        <h3>
+                          {{ ((user = getCustomer(booking)) !== null ? user.firstName + ' ' + user.lastName : '') +
+                          (booking.token ? ' (' + booking.token.substring(0, 5) + ')' : '') }}
+                          <span v-if="booking.persons > 1" class="am-attendees-plus">+{{ booking.persons - 1 }}</span>
+                        </h3>
+                        <a class="am-attendee-email" :href="`mailto:${booking.customer.email}`">{{ booking.customer.email }}</a>
+                        <a class="am-attendee-phone" :href="`tel:${((user = getCustomer(booking)) !== null ? user.phone : '')}`">{{ ((user = getCustomer(booking)) !== null ? user.phone : '') }}</a>
+                        <span
+                            class="am-attendees-plus"
+                            :style="{ marginLeft: 0}"
+                            v-if="customTickets.length"
+                            v-for="ticket in booking.ticketsData"
+                        >
+                      {{ getTicketsSoldString(ticket) }}
+                    </span>
+                      </div>
+                    </el-col>
+                    <el-col :sm="5">
+                      <div class="am-appointment-status small">
+                        <span :class="'am-appointment-status-symbol am-appointment-status-symbol-' + getBookingStatus(booking)"></span>
+                        <el-select
+                            :value="booking.status"
+                            :popper-append-to-body="popperAppendToBody"
+                            :disabled="!writeEvents"
+                            @change="updateBookingStatus(booking, $event)"
+                        >
+                          <el-option
+                              v-for="item in statuses"
+                              v-show="item.value !== 'no-show'"
+                              :key="item.value"
+                              :value="item.value"
+                              class="am-appointment-dialog-status-option"
+                          >
+                            <span :class="'am-appointment-status-symbol am-appointment-status-symbol-'+(item.value === 'rejected' ? 'canceled' : item.value)">
+                            </span>
+                          </el-option>
+                        </el-select>
+                      </div>
+                    </el-col>
+                  </el-row>
+                </div>
+              </template>
+              <div class="am-attendee-collapse">
+                <el-row :gutter="10" v-if="booking.payments.length" class="am-attendee-collapse-payments">
+                  <el-col :span="6">
+                    <span>{{ $root.labels.payment }}</span>
+                  </el-col>
+                  <el-col :span="18">
+                    <p v-for="payment in booking.payments">
+                      <img class="svg-amelia" :style="{width: getPaymentIconWidth(payment.gateway)}"
+                           :src="$root.getUrl + 'public/img/payments/' + payment.gateway + '.svg'"/>
+                      {{ getPaymentGatewayNiceName(payment.gateway) }}
+                    </p>
+                  </el-col>
+                </el-row>
+                <el-row :gutter="10" v-if="booking.payments.filter(p => p.wcOrderId).length > 0" class="am-attendee-collapse-payments">
+                  <el-col :span="6">
+                    <span>{{ $root.labels.wc_order }}:</span>
+                  </el-col>
+                  <el-col :span="18">
+                    <p v-for="payment in booking.payments" :key="payment.id">
+                      <a :href="payment.wcOrderUrl" target="_blank">
+                        #{{ payment.wcOrderId }}
+                      </a>
+                    </p>
+                  </el-col>
+                </el-row>
+                <el-row :gutter="10">
+                  <el-col :span="12">
+                    <div class="">
+                      <el-button
+                          :loading="booking.removing"
+                          @click="removeAttendee(index)">
+                        {{ $root.labels.event_attendee_remove }}
+                      </el-button>
+                    </div>
+                  </el-col>
+                  <el-col :span="12">
+                    <div class="">
+                      <el-button
+                          v-if="writeEvents"
+                          @click="editAttendee(index)">
+                        {{ $root.labels.event_edit_attendee }}
+                      </el-button>
+                    </div>
+                  </el-col>
+                </el-row>
+              </div>
+            </el-collapse-item>
+          </el-collapse>
+        </div>
+
+        <div v-if="bookings.filter(b => b.status === 'waiting').length === 0" class="am-empty-state am-section">
+          <img :src="$root.getUrl + 'public/img/emptystate.svg'">
+          <h2>{{ $root.labels.waiting_list_empty }}</h2>
+        </div>
+
+        <div v-show="!hasResult && bookings.filter(b => b.status === 'waiting').length > 0" class="am-empty-state am-section">
+          <img :src="$root.getUrl + 'public/img/emptystate.svg'">
+          <h2>{{ $root.labels.no_results }}</h2>
+        </div>
+
+      </el-tab-pane>
+
+      </el-tabs>
 
     </div>
 
@@ -257,6 +394,7 @@
     ],
 
     props: {
+      event: null,
       eventStatus: null,
       customTickets: null,
       options: null,
@@ -321,7 +459,8 @@
             value: 'no-show',
             label: this.$root.labels['no-show']
           }
-        ]
+        ],
+        activeTab: 'Approved'
       }
     },
 
@@ -350,11 +489,62 @@
         this.$emit('showDialogAttendee', this.getInitAttendeeObject())
       },
 
+      hasCapacity (bookingToTransfer) {
+        let takenSpots = 0
+        if (this.event.customPricing && !this.event.maxCustomCapacity) {
+          let canBeTransferred = true
+          let freeTickets = {}
+          this.event.customTickets.forEach(ticket => {
+            freeTickets[ticket.id] = ticket.spots
+          })
+          this.event.bookings.forEach(booking => {
+            if (booking.status === 'approved') {
+              booking.ticketsData.forEach(item => {
+                freeTickets[item.eventTicketId] -= item.persons
+              })
+            }
+          })
+          bookingToTransfer.ticketsData.forEach(bookedTicket => {
+            if (freeTickets[bookedTicket.eventTicketId] < bookedTicket.persons) canBeTransferred = false
+          })
+
+          return canBeTransferred
+        } else if (this.event.maxCustomCapacity) {
+          this.event.bookings.forEach(booking => {
+            if (booking.status === 'approved') {
+              booking.ticketsData.forEach(item => {
+                takenSpots += item.persons
+              })
+            }
+          })
+          return this.event.maxCustomCapacity > takenSpots
+        } else {
+          this.event.bookings.forEach(b => {
+            if (b.status === 'approved') {
+              takenSpots += b.persons
+            }
+          })
+          return this.event.maxCapacity > takenSpots
+        }
+      },
+
       updateBookingStatus (booking, newStatus) {
+        let exceededCapacityWarning = false
+        if (booking.status === 'waiting' && newStatus === 'approved') {
+          exceededCapacityWarning = !this.hasCapacity(booking)
+        }
         this.$http.post(`${this.$root.getAjaxUrl}/events/bookings/` + booking.id, {
           status: newStatus,
           bookings: [{status: newStatus}]
         }).then(() => {
+          if (exceededCapacityWarning) {
+            this.notify(
+              this.$root.labels.warning,
+              this.$root.labels.waiting_list_capacity_warning,
+              'warning'
+            )
+          }
+
           this.notify(
             this.$root.labels.success,
             this.$root.labels.event_status_changed + (this.$root.labels[newStatus]).toLowerCase(),
@@ -372,6 +562,7 @@
                   (newStatus === 'no-show' ? 1 : -1)
             }
           }
+          this.$emit('updateAttendeesCallback')
         }).catch(e => {
           this.notify(this.$root.labels.error, e.message, 'error')
         })
@@ -391,6 +582,13 @@
           this.bookings = this.eventBookings
           this.bookings.tickets = []
           this.dialogLoading = false
+        }
+
+        if (this.$root.settings.appointments.waitingListEvents.enabled && this.event.settings.waitingList.enabled) {
+          this.statuses.push({
+            value: 'waiting',
+            label: this.$root.labels.waiting_list
+          })
         }
       },
 
@@ -484,6 +682,10 @@
         })
 
         this.hasResult = this.bookings.filter(booking => booking.show === true).length > 0
+
+        if (this.hasResult) {
+          this.activeTab = this.bookings.filter(booking => booking.show === true)[0].status === 'waiting' ? 'WaitingList' : 'Approved'
+        }
       },
 
       openExportAttendeesDialog () {

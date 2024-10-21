@@ -195,6 +195,7 @@ import {
   provide,
   ref,
   computed,
+  onMounted
 } from 'vue'
 
 // * Import from Vuex
@@ -205,6 +206,7 @@ import {
   useFormattedPrice,
 } from '../../../../../assets/js/common/formatting.js'
 import { useColorTransparency } from '../../../../../assets/js/common/colorManipulation.js'
+import { useWaitingListAvailability } from '../../../../../assets/js/public/events.js'
 import {
   useAmount,
   useEntityTax,
@@ -305,6 +307,15 @@ const emits = defineEmits(['setOnSitePayment'])
 function couponApplied () {
   emits('setOnSitePayment', amountData.value.price + amountData.value.tax - amountData.value.discount <= 0)
 }
+
+onMounted(() => {
+  if (selectedEvent.value.full && !useWaitingListAvailability(selectedEvent)) {
+    emits(
+        'setOnSitePayment',
+        true
+    )
+  }
+})
 
 // * Collapse visualisation
 let segmentCollapseState = ref(true)

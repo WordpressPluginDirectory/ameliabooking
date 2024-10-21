@@ -163,11 +163,11 @@ export default {
       }, 500)
     },
 
-    showDialogEditAppointment (id) {
+    showDialogEditAppointment (id, customerId = null) {
       this.dialogAppointment = true
 
       setTimeout(() => {
-        this.getAppointment(id)
+        this.getAppointment(id, customerId)
       }, 500)
     },
 
@@ -250,7 +250,7 @@ export default {
       this.bookings = bookings
     },
 
-    getAppointment (id) {
+    getAppointment (id, customerId) {
       let config = null
 
       let timeZone = ''
@@ -261,11 +261,20 @@ export default {
         config = Object.assign(this.getAuthorizationHeaderObject(), {params: {source: 'cabinet-' + this.$store.state.cabinet.cabinetType, timeZone: timeZone}})
       }
 
+      if (this.$store === undefined && this.$root.settings.role === 'provider' &&
+          this.options.entities.employees.length === 1 && this.options.entities.employees[0].timeZone) {
+        config = Object.assign({params: {timeZone: this.options.entities.employees[0].timeZone}})
+      }
+
       this.$http.get(
         `${this.$root.getAjaxUrl}/appointments/` + id,
         config
       )
         .then(response => {
+          if (customerId) {
+            response.data.data.appointment.bookings = response.data.data.appointment.bookings.filter(i => parseInt(i.customerId) === parseInt(customerId))
+          }
+
           let $this = this
           this.savedAppointment = JSON.parse(JSON.stringify(response.data.data.appointment))
           this.savedAppointment.categoryId = this.getServiceById(this.savedAppointment.serviceId).categoryId

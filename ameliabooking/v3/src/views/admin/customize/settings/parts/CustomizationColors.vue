@@ -27,7 +27,7 @@
       </AmCollapseItem>
 
       <!-- Sidebar -->
-      <AmCollapseItem v-if="pageRenderKey !== 'elf'" borderless :side="true">
+      <AmCollapseItem v-if="pageRenderKey !== 'elf' && pageRenderKey !== 'ecf'" borderless :side="true">
         <template #heading>
           <div class="am-cs-colors__heading">
             <img :src="`${baseUrls.wpAmeliaPluginURL}v3/src/assets/img/admin/customize/sidebar.svg`" alt="Sidebar"> {{amLabels.sidebar}}
@@ -115,7 +115,7 @@
       </AmCollapseItem>
 
       <!-- Cards -->
-      <AmCollapseItem v-if="pageRenderKey === 'cbf' || pageRenderKey === 'elf'" borderless :side="true">
+      <AmCollapseItem v-if="pageRenderKey === 'cbf' || pageRenderKey === 'elf' || pageRenderKey === 'ecf'" borderless :side="true">
         <template #heading>
           <div class="am-cs-colors__heading">
             <img :src="`${baseUrls.wpAmeliaPluginURL}v3/src/assets/img/admin/customize/cards.svg`" alt="Input Fields & Dropdowns"> {{amLabels.cards}}
@@ -137,7 +137,7 @@
       </AmCollapseItem>
 
       <!-- Calendar -->
-      <AmCollapseItem v-if="pageRenderKey !== 'cbf'" borderless :side="true">
+      <AmCollapseItem v-if="pageRenderKey !== 'cbf' && pageRenderKey !== 'ecf'" borderless :side="true">
         <template #heading>
           <div class="am-cs-colors__heading">
             <img :src="`${baseUrls.wpAmeliaPluginURL}v3/src/assets/img/admin/customize/calendar.svg`" alt="Calendar"> {{amLabels.calendar}}
@@ -188,11 +188,29 @@
             <div class="am-cs-colors__item">
               <span>{{amLabels.secondary_text}}</span> <AmColorPicker v-model="amCustomize[pageRenderKey].colors.colorBtnSecText"></AmColorPicker>
             </div>
-            <div class="am-cs-colors__item">
+            <div
+              v-if="pageRenderKey !== 'sbsNew' && pageRenderKey !== 'cbf' && pageRenderKey !== 'elf' && pageRenderKey !== 'ecf'"
+              class="am-cs-colors__item"
+            >
               <span>{{amLabels.danger_background}}</span> <AmColorPicker v-model="amCustomize[pageRenderKey].colors.colorBtnDanger"></AmColorPicker>
             </div>
-            <div class="am-cs-colors__item">
+            <div
+              v-if="pageRenderKey !== 'sbsNew' && pageRenderKey !== 'cbf' && pageRenderKey !== 'elf' && pageRenderKey !== 'ecf'"
+              class="am-cs-colors__item"
+            >
               <span>{{amLabels.danger_text}}</span> <AmColorPicker v-model="amCustomize[pageRenderKey].colors.colorBtnDangerText"></AmColorPicker>
+            </div>
+            <div
+              v-if="pageRenderKey !== 'sbsNew' && pageRenderKey !== 'cbf' && pageRenderKey !== 'capc' && isWaiting"
+              class="am-cs-colors__item"
+            >
+              <span>{{amLabels.waiting_background}}</span> <AmColorPicker v-model="amCustomize[pageRenderKey].colors.colorBtnWaiting"></AmColorPicker>
+            </div>
+            <div
+              v-if="pageRenderKey !== 'sbsNew' && pageRenderKey !== 'cbf' && pageRenderKey !== 'capc' && isWaiting"
+              class="am-cs-colors__item"
+            >
+              <span>{{amLabels.waiting_text}}</span> <AmColorPicker v-model="amCustomize[pageRenderKey].colors.colorBtnWaitingText"></AmColorPicker>
             </div>
           </div>
         </template>
@@ -210,9 +228,12 @@ import AmColorPicker from '../../../_components/color-picker/AmColorPicker.vue'
 // * Import from Vue
 import {
   inject,
-  ref
+  ref,
+  computed
 } from 'vue'
 
+let amSettings = inject('settings')
+let licence = inject('licence')
 const baseUrls = inject('baseUrls')
 let pageRenderKey = inject('pageRenderKey')
 let amCustomize = inject('customize')
@@ -222,6 +243,10 @@ let { goBackPath, parentPath } = inject('sidebarFunctionality', {
 })
 
 goBackPath.value = parentPath.value
+
+let isWaiting = computed(() => {
+  return amSettings.appointments.waitingListEvents.enabled && !licence.isBasic && !licence.isStarter && !licence.isLite
+})
 
 // * Labels
 let amLabels = inject('labels')

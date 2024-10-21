@@ -187,7 +187,6 @@ import {
 
 // * import from Vuex
 import { useStore } from 'vuex'
-// * Define store
 
 // * import composable
 import {
@@ -195,6 +194,7 @@ import {
 } from '../../../../assets/js/common/defaultCustomize.js'
 import { useColorTransparency } from '../../../../assets/js/common/colorManipulation.js'
 import { useCurrentTimeZone } from "../../../../assets/js/common/helper";
+import { useElementSize } from "@vueuse/core";
 
 // * Form Component Collection
 import Auth from "../common/Authentication/Auth.vue";
@@ -238,7 +238,7 @@ provide('originKey', originKey)
 let ameliaContainer = ref(null)
 
 // * Plugin wrapper width
-let containerWidth = ref()
+let { width: containerWidth } = useElementSize(ameliaContainer)
 provide('containerWidth', containerWidth)
 
 // * Root Settings
@@ -313,7 +313,7 @@ let sidebarFooterRef = ref(null)
 let sidebarFooterHeight = ref(0)
 
 // * Form Sidebar Visibility
-let sidebarVisibility = ref(true)
+let sidebarVisibility = computed(() => containerWidth.value > 480)
 
 onMounted(() => {
   if(sidebarFooterRef.value) {
@@ -321,25 +321,16 @@ onMounted(() => {
       sidebarFooterHeight.value = sidebarFooterRef.value.offsetHeight
     }, 200)
   }
-
-  if (ameliaContainer.value) {
-    containerWidth.value = ameliaContainer.value.offsetWidth
-    sidebarCollapsed.value = !amCustomize.value.sidebar.options.toggle.visibility ? ameliaContainer.value.offsetWidth <= 600 : amCustomize.value.sidebar.options.toggle.visibility
-    sidebarVisibility.value = ameliaContainer.value.offsetWidth > 480
-  }
 })
 
-// * window resize listener
-window.addEventListener('resize', resize);
-// * resize function
-function resize() {
-  if (ameliaContainer.value) {
-    containerWidth.value = ameliaContainer.value.offsetWidth
-    sidebarCollapsed.value = !amCustomize.value.sidebar.options.toggle.visibility ? ameliaContainer.value.offsetWidth <= 600 : amCustomize.value.sidebar.options.toggle.visibility
-    sidebarVisibility.value = ameliaContainer.value.offsetWidth > 480
-    menuVisibility.value = ameliaContainer.value.offsetWidth > 481 ? false : menuVisibility.value
-  }
-}
+let widthChange = ref(null)
+watch(containerWidth, (current) => {
+  clearTimeout(widthChange.value)
+  widthChange.value = setTimeout(() => {
+    sidebarCollapsed.value = !amCustomize.value.sidebar.options.toggle.visibility ? current <= 600 : amCustomize.value.sidebar.options.toggle.visibility
+    menuVisibility.value = current > 481 ? false : menuVisibility.value
+  }, 200)
+})
 
 // * Root Urls
 const baseUrls = inject('baseUrls')
@@ -614,6 +605,7 @@ export default {
       font-family: var(--am-font-family);
       font-style: initial;
       box-sizing: border-box;
+      word-break: break-word;
     }
 
     // cap - cabinet panel

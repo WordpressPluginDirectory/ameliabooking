@@ -248,6 +248,10 @@ function useBookingData (store, formData, mandatoryJson = false, paymentData = {
 
       jsonData.bookings[0].utcOffset = settings.general.showClientTimeZone ? useUtcValueOffset(null) : null
 
+      if (store.getters['eventWaitingListOptions/getAvailability']) {
+        jsonData.bookings[0].status = 'waiting'
+      }
+
       break
   }
 
@@ -301,7 +305,8 @@ function useEventsStoreData (store) {
     tickets: store.getters['tickets/getAllData'],
     persons: store.getters['persons/getAllData'],
     pagination: store.getters['pagination/getAllData'],
-    params: store.getters['params/getAllData']
+    params: store.getters['params/getAllData'],
+    eventsDisplay: store.getters['eventEntities/getEventsDisplay']
   }
 }
 
@@ -525,7 +530,8 @@ function getAppointmentNotifyData (store, response) {
       packageId: null,
       customer: response.customer,
       paymentId: 'paymentId' in response && response.paymentId ? response.paymentId : null,
-      packageCustomerId: null
+      packageCustomerId: null,
+      isPackageAppointment: response.isPackageAppointment
     }
   }
 }
@@ -557,6 +563,7 @@ function getPackageNotifyData (response) {
       customer: response.customer,
       paymentId: 'paymentId' in response && response.paymentId ? response.paymentId : null,
       packageCustomerId: response.packageCustomerId,
+      isPackageAppointment: true
     }
   }
 }

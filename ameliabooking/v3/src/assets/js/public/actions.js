@@ -152,6 +152,10 @@ function useAction (store, additionalData, action, type, successCallback, errorC
         store.getters['booking/getEmployeeId']
       ) : null
 
+      if (data.employee) {
+        data.employee.fullName = data.employee.firstName + ' ' + data.employee.lastName
+      }
+
       data.location = store.getters['booking/getLocationId'] ? store.getters['entities/getLocation'](
         store.getters['booking/getLocationId']
       ) : null
@@ -164,9 +168,12 @@ function useAction (store, additionalData, action, type, successCallback, errorC
         let cartItem = useCartItem(store)
 
         if (cartItem && 'services' in cartItem && data.service.id in cartItem.services && cartItem.services[data.service.id].list.length) {
-          data.employee = cartItem.services[data.service.id].list[0].providerId ? store.getters['entities/getEmployee'](
-            cartItem.services[data.service.id].list[0].providerId
-          ) : null
+
+          if (!data.employee) {
+            data.employee = cartItem.services[data.service.id].list[0].providerId ? store.getters['entities/getEmployee'](
+                cartItem.services[data.service.id].list[0].providerId
+            ) : null
+          }
 
           if (data.employee) {
             data.employee.fullName = data.employee.firstName + ' ' + data.employee.lastName

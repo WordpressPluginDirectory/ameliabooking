@@ -10,9 +10,23 @@
         {{ props.labels.congratulations }}
       </p>
 
-      <p v-if="props.booked.type === 'event'" class="am-congrats__main-heading">
-        {{ props.booked.data[0].title }}
-      </p>
+      <div v-if="props.booked.type === 'event'" class="am-congrats__main-heading-waiting-list">
+
+        <!-- Waiting List info -->
+        <p v-if="event" class="am-congrats__main-heading">
+          {{ props.labels.your_position_on_waiting_list }} {{ '#' + (event.waitingList.peopleWaiting + 1) }}
+          <br/>
+          <span>
+            {{ props.labels.waiting_list_notify_message }}
+          </span>
+        </p>
+        <!-- /Waiting List info -->
+
+        <p class="am-congrats__main-heading">
+          {{ props.booked.data[0].title }}
+        </p>
+
+      </div>
 
       <span v-if="itemIdLabel">
         {{ itemIdLabel }}
@@ -62,6 +76,9 @@ import {
   markRaw
 } from "vue";
 import CustomerCongratsInfo from "../Parts/CustomerCongratsInfo.vue";
+import { useStore } from "vuex";
+
+let store = useStore()
 
 let props = defineProps({
   baseUrls: {
@@ -88,6 +105,14 @@ let props = defineProps({
     type: Boolean,
     default: false
   }
+})
+
+let event = computed(() => {
+  if (props.booked.type === 'event' && props.booked.event.bookings[0].status === 'waiting') {
+    return store.getters['eventEntities/getEvent'](props.booked.event.id)
+  }
+
+  return null
 })
 
 const componentTypes = {
@@ -154,6 +179,10 @@ export default {
         font-size: 18px;
         line-height: 28px;
         color: var(--am-c-atc-heading-text);
+
+        &-waiting-list {
+          text-align: center;
+        }
       }
 
       &-atc {

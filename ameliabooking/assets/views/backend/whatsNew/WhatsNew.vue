@@ -202,19 +202,18 @@ export default {
        isValidEmail: true,
        blogPosts: [],
        changelog: {
-         version: '7.7.1',
+         version: '7.8.2',
          starter: {
-           feature: [],
+           feature: [
+             'Customer Activity - Now you can easily view all appointments and events booked by specific customers in one place'
+           ],
            improvement: [
-             'Added the possibility to choose the logic for the total number of people in one booking calculation'
+             'Added possibility to show “All” services and packages on the Catalog Booking form 2.0'
            ],
-           translations: [
-             'Updated Italian translation and Spanish translation for Chile and Mexico\n'
-           ],
+           translations: [],
            bugfix: [
-             'Fixed issue with showing events on the booking forms and the back-end',
-             'Fixed issue with double booking when the appointment is canceled and rescheduled',
-             'Fix full path disclosure vulnerability issue',
+             'Fixed issue with removing dates on the back-end Events page for Group view',
+             'Fixed issue with capacity per employee when on SBS is hidden employee selection field'
            ],
            other: [
              'Other small bug fixes and stability improvements'
@@ -222,12 +221,12 @@ export default {
          },
          basic: {
            feature: [],
-           improvement: [
-             'Improved Stripe integration - connection to Stripe users and option for address fields'
-           ],
+           improvement: [],
            translations: [],
            bugfix: [
-             'Fixed issue with booking recurring appointments on the back-end when there are a lot of time slots available'
+             'Fixed issue with Zoom when employee panel is disabled',
+             'Fixed issue on WooCommerce Checkout page when WooCommerce Product is in cart with Amelia Booking',
+             'Fixed issue with the error messages that appear on coupon validation'
            ],
            other: []
          },
@@ -236,7 +235,7 @@ export default {
            improvement: [],
            translations: [],
            bugfix: [
-             'Fixed issue with resources and appointments ending at 24:00'
+             'Fixed issue with duplicating events with custom pricing and waiting list'
            ],
            other: []
          },

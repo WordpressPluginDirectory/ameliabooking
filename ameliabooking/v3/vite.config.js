@@ -60,6 +60,12 @@ export default defineConfig({
           catalogForm: [
             'src/views/public/CatalogForm/CatalogForm.vue',
           ],
+          eventListForm: [
+            'src/views/public/EventForm/EventListForm/EventsListForm.vue'
+          ],
+          eventCalendarForm: [
+            'src/views/public/EventForm/EventCalendarForm/EvensCalendarForm.vue'
+          ],
           customerPanel: [
             'src/views/public/Cabinet/CustomerPanel/CustomerPanel.vue',
           ],

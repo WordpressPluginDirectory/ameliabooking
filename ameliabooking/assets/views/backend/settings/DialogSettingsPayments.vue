@@ -978,6 +978,7 @@
                 :step="0.1"
                 :max="100"
                 @input="clearValidation()"
+                :placeholder="settings.stripe.connect.amount ? settings.stripe.connect.amount.toString() : '0.00'"
               >
               </el-input-number>
             </el-form-item>
@@ -1407,6 +1408,9 @@
                 this.squareCollapse = 'square'
                 return
               }
+            }
+            if (!this.settings.stripe.connect.amount) {
+              this.settings.stripe.connect.amount = 0
             }
             this.$emit('closeDialogSettingsPayments')
             this.$emit('updateSettings', {'payments': this.settings})

@@ -417,7 +417,7 @@ export default {
 
         &__label {
           display: inline-block;
-          font-family: var(--am-font-family);;
+          font-family: var(--am-font-family);
           font-weight: 500;
           color: var(--am-c-main-text);
           margin-bottom: 4px;

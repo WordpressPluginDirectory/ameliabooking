@@ -39,10 +39,10 @@
     >
       <div class="am-fs-dt__rec_popup">
         <p>
-          {{amLabels.repeat_appointment}}
+          {{recurringLabels.repeat_appointment}}
         </p>
         <p v-if="amCustomize.recurringPopup.options.content.visibility">
-          {{amLabels.repeat_appointment_quest}}
+          {{recurringLabels.repeat_appointment_quest}}
         </p>
       </div>
       <template #footer>
@@ -51,13 +51,13 @@
           :type="amCustomize.recurringPopup.options.secondaryButton.buttonType"
           @click="recurringStep(false)"
         >
-          {{amLabels.no}}
+          {{recurringLabels.no}}
         </AmButton>
         <AmButton
           :type="amCustomize.recurringPopup.options.primaryButton.buttonType"
           @click="recurringStep(true)"
         >
-          {{amLabels.yes}}
+          {{recurringLabels.yes}}
         </AmButton>
       </template>
     </AmSlidePopup>
@@ -153,6 +153,22 @@ let amLabels = computed(() => {
 
   if (amSettings.customizedData && amSettings.customizedData.sbsNew && amSettings.customizedData.sbsNew.dateTimeStep.translations) {
     let customizedLabels = amSettings.customizedData.sbsNew.dateTimeStep.translations
+    Object.keys(customizedLabels).forEach(labelKey => {
+      if (customizedLabels[labelKey][localLanguage.value] && langDetection.value) {
+        computedLabels[labelKey] = customizedLabels[labelKey][localLanguage.value]
+      } else if (customizedLabels[labelKey].default) {
+        computedLabels[labelKey] = customizedLabels[labelKey].default
+      }
+    })
+  }
+  return computedLabels
+})
+
+let recurringLabels = computed(() => {
+  let computedLabels = reactive({...globalLabels})
+
+  if (amSettings.customizedData && amSettings.customizedData.sbsNew && amSettings.customizedData.sbsNew.recurringPopup.translations) {
+    let customizedLabels = amSettings.customizedData.sbsNew.recurringPopup.translations
     Object.keys(customizedLabels).forEach(labelKey => {
       if (customizedLabels[labelKey][localLanguage.value] && langDetection.value) {
         computedLabels[labelKey] = customizedLabels[labelKey][localLanguage.value]

@@ -136,7 +136,7 @@
                 <!-- Segments -->
                 <el-col :lg="3" :md="8" :sm="12" :xs="12">
                   <p class="am-col-title">{{ $root.labels.segments_colon }}</p>
-                  <span>{{ notification.segments }}</span>
+                  <span>{{ notification.segments ? notification.segments : '-' }}</span>
                 </el-col>
                 <!-- /Segments -->
 

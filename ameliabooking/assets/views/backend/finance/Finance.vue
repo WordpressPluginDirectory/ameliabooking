@@ -152,7 +152,7 @@
                             <el-option
                                 v-for="item in searchedEvents"
                                 :key="item.id"
-                                :label="item.name"
+                                :label="item.name + ( item.periods && item.periods.length ? ' (' + getFrontedFormattedDate(item.periods[0].periodStart.split(' ')[0]) + ')' : '')"
                                 :value="item.id"
                             >
                             </el-option>

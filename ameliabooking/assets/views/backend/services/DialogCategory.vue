@@ -106,7 +106,7 @@
       v-if="!dialogLoading"
       formName="category"
       urlName="categories"
-      :isNew="passedCategory.id === 0"
+      :isNew="!passedCategory.id"
       :entity="category"
       :hasIcons="true"
       :updateStash="true"

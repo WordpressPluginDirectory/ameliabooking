@@ -169,6 +169,11 @@ export default {
         config = Object.assign(this.getAuthorizationHeaderObject(), {params: {source: 'cabinet-' + this.$store.state.cabinet.cabinetType, timeZone: timeZone}})
       }
 
+      if (this.$store === undefined && this.$root.settings.role === 'provider' && this.options.entities.employees.length === 1 &&
+          this.options.entities.employees[0].timeZone) {
+        config = Object.assign({params: {timeZone: this.options.entities.employees[0].timeZone}})
+      }
+
       this.$http.get(`${this.$root.getAjaxUrl}/events/` + id, config)
         .then(response => {
           let event = Object.assign(this.getInitEventObject(), response.data.data.event)

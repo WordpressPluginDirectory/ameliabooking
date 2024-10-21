@@ -9,7 +9,7 @@
       :suffix-icon="iconEnd"
       :prefix-icon="iconStart"
       :class="[
-        type !== 'text' ? 'am-textarea textarea' : 'am-input',
+        type === 'text' || type === 'email' ? 'am-input' : 'am-textarea textarea',
         size ? (type === 'text-area' ? 'am-textarea__size' : 'am-input') + '__' + size : '',
         {'is-icon-start': iconStart},
         {'is-icon-end': iconEnd}
@@ -166,6 +166,8 @@ const amInput = ref(null)
 
       .el-input {
         &__inner {
+          min-height: unset;
+
           &:not([type='text-area']) {
             width: 100%;
             height: var(--am-input-height);

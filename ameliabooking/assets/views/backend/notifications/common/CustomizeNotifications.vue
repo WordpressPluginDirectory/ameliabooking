@@ -886,7 +886,7 @@
               </el-row>
 
 
-              <div v-if="notification.timeBefroe || (notification.time && notification.customName === null) || (notification.customName !== null && notificationTimed === 'before' && notificationType === 'scheduled')">
+              <div v-if="notification.timeBefroe || notification.timeAfter || (notification.time && notification.customName === null) || (notification.customName !== null && notificationTimed === 'before' && notificationType === 'scheduled')">
 
                 <div v-if="notification.name !== 'customer_birthday_greeting'">
                   <el-row style="display: flex; align-items: center">
@@ -966,6 +966,19 @@
 
               </el-row>
               <!-- /Cancel & Save Buttons -->
+
+
+              <el-alert
+                  class="am-sms-warning"
+                  v-if="type === 'sms'"
+                  type="warning"
+                  show-icon
+                  title=""
+                  v-html="$root.labels.sms_warning"
+                  :closable="false"
+                  style="margin-bottom: 10px; margin-top: 16px; display: block"
+              >
+              </el-alert>
 
             </el-form>
           </transition>
@@ -1050,7 +1063,7 @@
 
       <!-- SMS Balance Warning -->
       <el-alert
-          v-if="type === 'sms' && type === 'sms' && !user.balance"
+          v-if="type === 'sms' && !user.balance"
           type="warning"
           show-icon
           title=""
@@ -1608,7 +1621,6 @@
             ].indexOf(notification.name) !== -1
         ) {
           excludedPlaceholders.appointmentPlaceholders.push('%appointment_price%')
-          excludedPlaceholders.appointmentPlaceholders.push('%time_zone%')
         }
 
         if (this.type === 'sms') {
@@ -1773,7 +1785,9 @@
           name === 'customer_package_purchased' ||
           name === 'customer_package_canceled' ||
           name === 'provider_package_purchased' ||
-          name === 'provider_package_canceled'
+          name === 'provider_package_canceled' ||
+          name === 'customer_event_waiting' ||
+          name === 'provider_event_waiting'
         )) {
           return 'pro'
         }
@@ -1972,7 +1986,7 @@
               this.notification.id = id
             }
             if (this.type === 'whatsapp') {
-              this.notification.subject = this.whatsAppPlaceholders.header.map(h => h.value).join(' ')
+              this.notification.subject = (this.whatsAppPlaceholders.header.length > 0 && this.whatsAppPlaceholders.header[0].whatsappType === 'location' ? 'location:' : '') + this.whatsAppPlaceholders.header.map(h => h.value).join(' ')
               this.notification.content = this.whatsAppPlaceholders.body.map(h => h.value).join(' ')
             }
             if (!this.minimumTimeEnabled) {

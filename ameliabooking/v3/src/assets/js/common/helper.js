@@ -90,7 +90,7 @@ function useUrlQueryParam (param) {
 }
 
 function useDescriptionVisibility (text) {
-  if (text !== null && text.length) {
+  if (text && text.length) {
     return !text.includes('<!-- Content -->') || (text.includes('<!-- Content -->') && text.length > 16)
   }
 

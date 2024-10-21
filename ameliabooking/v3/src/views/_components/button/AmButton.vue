@@ -90,7 +90,7 @@ const props = defineProps({
     type: String,
     default: 'primary',
     validator(value) {
-      return ['primary', 'secondary', 'success', 'warning', 'danger', 'error'].includes(value)
+      return ['primary', 'secondary', 'success', 'warning', 'danger', 'error', 'waiting'].includes(value)
     }
   },
   type: {
@@ -189,6 +189,8 @@ let amColors = inject('amColors', ref({
   colorBtnPrimText: '#FFFFFF',
   colorBtnSec: '#1A2C37',
   colorBtnSecText: '#FFFFFF',
+  colorBtnWaiting: '#CCA20C',
+  colorBtnWaitingText: '#FFFFFF',
   colorBtnDanger: '#B4190F',
   colorBtnDangerText: '#FFFFFF',
 }))
@@ -212,6 +214,19 @@ const cssVars = computed(() => {
       '--am-c-btn-first-op80': useColorTransparency(amColors.value.colorBtnSec, 0.8),
       '--am-c-btn-first-op30': useColorTransparency(amColors.value.colorBtnSec, 0.3),
       '--am-c-btn-first-op20': useColorTransparency(amColors.value.colorBtnSec, 0.1),
+    }
+  }
+
+  if (props.category === 'waiting') {
+    let bgr = amColors.value?.colorBtnWaiting ?? '#CCA20C'
+    let text = amColors.value?.colorBtnWaitingText ?? '#FFFFFF'
+
+    cssVariables = {
+      '--am-c-btn-first': bgr,
+      '--am-c-btn-second': text,
+      '--am-c-btn-first-op80': useColorTransparency(bgr, 0.8),
+      '--am-c-btn-first-op30': useColorTransparency(bgr, 0.3),
+      '--am-c-btn-first-op20': useColorTransparency(bgr, 0.1),
     }
   }
 
@@ -439,6 +454,9 @@ const cssVars = computed(() => {
       // Disabled
       &.is-disabled {
         opacity: 0.7;
+      }
+
+      &--waiting-list { // TODO
       }
     }
 

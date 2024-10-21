@@ -682,6 +682,7 @@
               :packageCustomer="null"
               :current-user="currentUser"
               :customersNoShowCount="customersNoShowCount"
+              :selectedTimeZone="selectedTimeZone"
               @sortBookings="sortBookings"
               @saveCallback="saveAppointmentCallback"
               @duplicateCallback="duplicateAppointmentCallback"
@@ -766,7 +767,7 @@
   import priceMixin from '../../../js/common/mixins/priceMixin'
   import customFieldMixin from '../../../js/common/mixins/customFieldMixin'
   import PaginationBlock from '../parts/PaginationBlock.vue'
-  //import DialogNewCustomize from '../parts/DialogNewCustomize.vue'
+  // import DialogNewCustomize from '../parts/DialogNewCustomize.vue'
   import AmSurvey from '../parts/AmSurvey.vue'
 
   export default {
@@ -836,6 +837,7 @@
         toaster: false,
         updateBookingStatusId: 0,
         updateBookingStatusLoading: false,
+        selectedTimeZone: '',
         count: {
           success: 0,
           error: 0
@@ -861,6 +863,11 @@
       if (urlParams['status']) { this.params.status = urlParams['status'] }
 
       if (urlParams['bookingId']) { this.params.bookingId = urlParams['bookingId'] }
+
+      if (urlParams['customerId']) {
+        this.params.dates = { start: '', end: '' }
+        this.params.customerId = urlParams['customerId']
+      }
 
       this.getAppointmentOptions(true)
     },
@@ -1076,6 +1083,10 @@
             this.getAppointments()
           }
 
+          if (this.$root.settings.role === 'provider' && this.$root.settings.roles.allowWriteAppointments) {
+            this.selectedTimeZone = this.options.entities.employees[0].timeZone ? this.options.entities.employees[0].timeZone : ''
+          }
+
           this.fetched = true
           this.options.fetched = true
         }, {
@@ -1109,6 +1120,10 @@
         if (this.$root.settings.role === 'admin') {
           params.skipServices = 1
           params.skipProviders = 1
+        }
+
+        if (this.$root.settings.role === 'provider' && this.options.entities.employees.length === 1) {
+          params.timeZone = this.options.entities.employees[0].timeZone ? this.options.entities.employees[0].timeZone : null
         }
 
         Object.keys(params).forEach((key) => (!params[key] && params[key] !== 0) && delete params[key])
@@ -1153,7 +1168,7 @@
                 })
               })
 
-              /*this.useSortedDateStrings(Object.keys(appointmentDays)).forEach(function (dateKey) {
+              /* this.useSortedDateStrings(Object.keys(appointmentDays)).forEach(function (dateKey) {
                 appointmentDays[dateKey].appointments.forEach(function (app) {
                   if (app.bookings[0].status === 'approved') {
                     $this.appointmentStatusCount.approved++
@@ -1163,7 +1178,7 @@
                     $this.appointmentStatusCount.pending++
                   }
                 })
-              })*/
+              }) */
             } else {
               appointmentDays = response.data.data.appointments
 
@@ -1391,7 +1406,7 @@
       DialogPayment,
       DialogExport,
       AppointmentListCollapsed
-      /*DialogNewCustomize*/
+      /* DialogNewCustomize */
     }
   }
 </script>

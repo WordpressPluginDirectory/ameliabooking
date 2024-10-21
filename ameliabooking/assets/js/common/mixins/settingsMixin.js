@@ -79,6 +79,14 @@ export default {
             enabled: this.$root.settings.googleCalendar.enabled && this.$root.settings.googleCalendar.googleMeetEnabled
           }
 
+          entitySettings.waitingList = {
+            enabled: false,
+            addingMethod: this.$root.settings.appointments.waitingListEvents.addingMethod,
+            maxCapacity: 1,
+            maxExtraPeopleEnabled: false,
+            maxExtraPeople: 0
+          }
+
           break
         case ('package'):
           entitySettings.general = {

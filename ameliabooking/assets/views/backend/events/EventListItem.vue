@@ -111,6 +111,9 @@
             <span :class="'am-customer-status ' + getEventStatus(evt).class">
               {{ getEventStatus(evt).label }}
             </span>
+            <span v-if="evt.status === 'full' && waitingListEnabled && evt.waitingList.enabled" class="am-customer-status waiting-list">
+              {{ $root.labels.waiting_list }}
+            </span>
           </el-col>
 
           <!-- Event Actions -->
@@ -176,8 +179,13 @@ export default {
   data () {
     return {
       event: null,
-      customer: null
+      customer: null,
+      waitingListEnabled: false
     }
+  },
+
+  mounted () {
+    this.waitingListEnabled = this.$root.settings.appointments.waitingListEvents.enabled
   },
 
   methods: {

@@ -748,8 +748,6 @@ let defaultCustomizeSettings = {
       colorDropBgr: '#FFFFFF',
       colorDropBorder: '#FFFFFF',
       colorDropText: '#0E1920',
-      colorSbBgr: '#FFFFFF',
-      colorSbText: '#1A2C37',
       colorMainBgr: '#FFFFFF',
       colorMainHeadingText: '#33434C',
       colorMainText: '#1A2C37',
@@ -766,6 +764,8 @@ let defaultCustomizeSettings = {
       colorBtnPrimText: '#FFFFFF',
       colorBtnSec: '#1A2C37',
       colorBtnSecText: '#FFFFFF',
+      colorBtnWaiting: '#CCA20C',
+      colorBtnWaitingText: '#FFFFFF'
     },
     list: {
       options: {
@@ -814,6 +814,11 @@ let defaultCustomizeSettings = {
         infoBtn: {
           name: globalLabels.learn_more_button_type,
           buttonType: 'plain',
+          typeOptions: ['filled', 'plain', 'text']
+        },
+        waitingBtn: {
+          name: globalLabels.booking_waiting_btn,
+          buttonType: 'filled',
           typeOptions: ['filled', 'plain', 'text']
         },
       },
@@ -866,6 +871,11 @@ let defaultCustomizeSettings = {
           name: globalLabels.close_event_btn,
           visibility: true,
           buttonType: 'plain',
+          typeOptions: ['filled', 'plain', 'text']
+        },
+        waitingBtn: {
+          name: globalLabels.booking_waiting_btn,
+          buttonType: 'filled',
           typeOptions: ['filled', 'plain', 'text']
         },
       },
@@ -1367,6 +1377,245 @@ let defaultCustomizeSettings = {
         newPassBtn: {
           name: globalLabels.new_pass_button_type,
           buttonType: 'filled',
+          typeOptions: ['filled', 'plain', 'text']
+        },
+      },
+      translations: null
+    }
+  },
+  ecf: {
+    colors: {
+      colorPrimary: '#1246D6',
+      colorSuccess: '#019719',
+      colorError: '#B4190F',
+      colorWarning: '#CCA20C',
+      colorInpBgr: '#FFFFFF',
+      colorInpBorder: '#D1D5D7',
+      colorInpText: '#1A2C37',
+      colorInpPlaceHolder: '#808A90',
+      colorDropBgr: '#FFFFFF',
+      colorDropBorder: '#FFFFFF',
+      colorDropText: '#0E1920',
+      colorSbBgr: '#FFFFFF',
+      colorSbText: '#1A2C37',
+      colorMainBgr: '#FFFFFF',
+      colorMainHeadingText: '#33434C',
+      colorMainText: '#1A2C37',
+      colorCardBgr: '#FFFFFF',
+      colorCardBorder: '#D1D5D7',
+      colorCardText: '#1A2C37',
+      colorBtnPrim: '#265CF2',
+      colorBtnPrimText: '#FFFFFF',
+      colorBtnSec: '#1A2C37',
+      colorBtnSecText: '#FFFFFF',
+      colorBtnWaiting: '#CCA20C',
+      colorBtnWaitingText: '#FFFFFF'
+    },
+    calendar: {
+      options: {
+        upcomingBlock: {
+          name: globalLabels.upcoming_events_block,
+          visibility: true
+        },
+        search: {
+          name: globalLabels.step_search,
+          visibility: true
+        },
+        filters: {
+          name: globalLabels.step_filters,
+          visibility: true
+        },
+        capacity: {
+          name: globalLabels.event_slots_capacity,
+          visibility: true
+        },
+        price: {
+          name: globalLabels.event_price,
+          visibility: true
+        },
+        tax: {
+          name: globalLabels.tax_visibility,
+          visibility: true
+        },
+        location: {
+          name: globalLabels.event_location,
+          visibility: true
+        },
+        status: {
+          name: globalLabels.event_status,
+          visibility: true
+        }
+      },
+      translations: null
+    },
+    info: {
+      options: {
+        gallery: {
+          name: globalLabels.event_gallery,
+          visibility: true
+        },
+        location: {
+          name: globalLabels.event_location,
+          visibility: true
+        },
+        slots: {
+          name: globalLabels.event_slots_capacity,
+          visibility: true
+        },
+        price: {
+          name: globalLabels.event_price,
+          visibility: true
+        },
+        tax: {
+          name: globalLabels.tax_visibility,
+          visibility: true
+        },
+        status: {
+          name: globalLabels.event_status,
+          visibility: true
+        },
+        eventDescription: {
+          name: globalLabels.event_description,
+          visibility: true
+        },
+        eventOrganizer: {
+          name: globalLabels.event_organizer,
+          visibility: true
+        },
+        eventEmployees: {
+          name: globalLabels.event_employees,
+          visibility: true
+        },
+        primBtn: {
+          name: globalLabels.booking_event_btn,
+          buttonType: 'filled',
+          typeOptions: ['filled', 'plain', 'text']
+        },
+        waitingBtn: {
+          name: globalLabels.booking_waiting_btn,
+          buttonType: 'filled',
+          typeOptions: ['filled', 'plain', 'text']
+        },
+        secBtn: {
+          name: globalLabels.close_event_btn,
+          visibility: true,
+          buttonType: 'plain',
+          typeOptions: ['filled', 'plain', 'text']
+        },
+      },
+      translations: null
+    },
+    bringingAnyone: {
+      options: {
+        primBtn: {
+          name: globalLabels.booking_event_btn,
+          buttonType: 'filled',
+          typeOptions: ['filled', 'plain', 'text']
+        },
+        secBtn: {
+          name: globalLabels.close_event_btn,
+          buttonType: 'plain',
+          typeOptions: ['filled', 'plain', 'text']
+        },
+      },
+      translations: null
+    },
+    tickets: {
+      options: {
+        primBtn: {
+          name: globalLabels.booking_event_btn,
+          buttonType: 'filled',
+          typeOptions: ['filled', 'plain', 'text']
+        },
+        secBtn: {
+          name: globalLabels.close_event_btn,
+          visibility: true,
+          buttonType: 'plain',
+          typeOptions: ['filled', 'plain', 'text']
+        },
+      },
+      translations: null
+    },
+    customerInfo: {
+      order: [
+        {
+          name: globalLabels.first_name,
+          id: 'firstName'
+        },
+        {
+          name: globalLabels.last_name,
+          id: 'lastName'
+        },
+        {
+          name: globalLabels.email,
+          id: 'email'
+        },
+        {
+          name: globalLabels.phone,
+          id: 'phone'
+        }
+      ],
+      options: {
+        lastName: {
+          name: globalLabels.last_name_input_field,
+          required: true,
+          visibility: true
+        },
+        email: {
+          name: globalLabels.email_input_field,
+          required: false,
+          visibility: true
+        },
+        phone: {
+          name: globalLabels.phone_input_field,
+          required: false,
+          visibility: true
+        },
+        primBtn: {
+          name: globalLabels.booking_event_btn,
+          buttonType: 'filled',
+          typeOptions: ['filled', 'plain', 'text']
+        },
+        secBtn: {
+          name: globalLabels.close_event_btn,
+          visibility: true,
+          buttonType: 'plain',
+          typeOptions: ['filled', 'plain', 'text']
+        },
+      },
+      translations: null
+    },
+    payment: {
+      options: {
+        coupon: {
+          name: globalLabels.coupon_input_field,
+          required: false
+        },
+        primBtn: {
+          name: globalLabels.booking_event_btn,
+          buttonType: 'filled',
+          typeOptions: ['filled', 'plain', 'text']
+        },
+        secBtn: {
+          name: globalLabels.close_event_btn,
+          visibility: true,
+          buttonType: 'plain',
+          typeOptions: ['filled', 'plain', 'text']
+        },
+      },
+      translations: null
+    },
+    congrats: {
+      options: {
+        primBtn: {
+          name: globalLabels.finish_event_btn,
+          buttonType: 'filled',
+          typeOptions: ['filled', 'plain', 'text']
+        },
+        secBtn: {
+          name: globalLabels.customer_panel_btn,
+          visibility: true,
+          buttonType: 'plain',
           typeOptions: ['filled', 'plain', 'text']
         },
       },
@@ -2110,7 +2359,10 @@ let defaultTranslations = {
           closed: null,
           canceled: null,
           total_tax_colon: null,
-          incl_tax:null
+          incl_tax:null,
+          person_waiting: null,
+          people_waiting: null,
+          join_waiting_list: null
         }
       },
       pagination: {
@@ -2135,7 +2387,9 @@ let defaultTranslations = {
           closed: null,
           canceled: null,
           total_tax_colon: null,
-          incl_tax:null
+          incl_tax:null,
+          person_waiting: null,
+          people_waiting: null,
         }
       },
       tabInfo: {
@@ -2162,7 +2416,8 @@ let defaultTranslations = {
         name: globalLabels.footer_buttons,
         labels: {
           event_book_event: null,
-          event_close: null
+          event_close: null,
+          join_waiting_list: null
         }
       }
     },
@@ -2201,13 +2456,16 @@ let defaultTranslations = {
         labels: {
           event_ticket_left: null,
           event_tickets_left: null,
+          person_waiting: null,
+          people_waiting: null,
         }
       },
       footer: {
         name: globalLabels.footer_buttons,
         labels: {
           continue: null,
-          event_close: null
+          event_close: null,
+          join_waiting_list: null,
         }
       }
     },
@@ -2299,7 +2557,9 @@ let defaultTranslations = {
       heading: {
         name: globalLabels.step_title,
         labels: {
-          event_congrats: null
+          event_congrats: null,
+          your_position_on_waiting_list: null,
+          waiting_list_notify_message: null
         }
       },
       content: {
@@ -2852,6 +3112,274 @@ let defaultTranslations = {
         name: globalLabels.footer_content,
         labels: {
           new_password_set_action: null
+        }
+      }
+    }
+  },
+  ecf: {
+    calendar: {
+      filters: {
+        name: globalLabels.step_filters,
+        labels: {
+          event_search: null,
+          event_filters: null,
+          event_type: null,
+          event_location: null,
+          event_employee: null,
+          event_status: null,
+          open: null,
+          full: null,
+          upcoming: null,
+          closed: null,
+          canceled: null,
+        }
+      },
+      heading: {
+        name: globalLabels.step_heading,
+        labels: {
+          event_today: null
+        }
+      },
+      page: {
+        name: globalLabels.step_content,
+        labels: {
+          event_slot_left: null,
+          event_slots_left: null,
+          event_no_spots: null,
+          join_waiting_list: null,
+          waiting_list:  null,
+          person_waiting: null,
+          people_waiting: null,
+          events: null,
+          event_upcoming_events: null,
+          upcoming: null,
+          event_begins: null,
+          event_at: null,
+          event_free: null,
+          from: null,
+          total_tax_colon: null,
+          incl_tax:null,
+          evt_empty_message: null
+        }
+      }
+    },
+    info: {
+      header: {
+        name: globalLabels.step_header,
+        labels: {
+          event_begins: null,
+          from: null,
+          event_free: null,
+          event_slot_left: null,
+          event_slots_left: null,
+          open: null,
+          full: null,
+          upcoming: null,
+          closed: null,
+          canceled: null,
+          total_tax_colon: null,
+          incl_tax:null,
+          person_waiting: null,
+          people_waiting: null,
+        }
+      },
+      tabInfo: {
+        name: globalLabels.step_info_tab,
+        labels: {
+          event_info: null,
+          event_timetable: null,
+          description: null,
+          show_more: null,
+          show_less: null,
+          event_organizer: null,
+          about: null,
+        }
+      },
+      tabTickets: {
+        name: globalLabels.step_tickets_tab,
+        labels: {
+          event_tickets: null,
+          event_tickets_left: null,
+          event_ticket_left: null,
+          person_waiting: null,
+          people_waiting: null,
+        }
+      },
+      footer: {
+        name: globalLabels.footer_buttons,
+        labels: {
+          event_book_event: null,
+          event_close: null,
+          join_waiting_list: null,
+        }
+      }
+    },
+    bringingAnyone: {
+      header: {
+        name: globalLabels.step_title,
+        labels: {
+          event_bringing: null
+        }
+      },
+      footer: {
+        name: globalLabels.footer_buttons,
+        labels: {
+          back_btn: null,
+          continue: null,
+        }
+      }
+    },
+    tickets: {
+      header: {
+        name: globalLabels.step_title,
+        labels: {
+          event_select_tickets: null
+        }
+      },
+      heading: {
+        name: globalLabels.step_heading,
+        labels: {
+          event_tickets: null,
+          event_tickets_context: null,
+          event_ticket_types: null
+        }
+      },
+      content: {
+        name: globalLabels.step_content,
+        labels: {
+          event_ticket_left: null,
+          event_tickets_left: null,
+          person_waiting: null,
+          people_waiting: null,
+        }
+      },
+      footer: {
+        name: globalLabels.footer_buttons,
+        labels: {
+          continue: null,
+          event_close: null,
+          join_waiting_list: null,
+        }
+      }
+    },
+    customerInfo: {
+      header: {
+        name: globalLabels.step_title,
+        labels: {
+          event_customer_info: null
+        }
+      },
+      input: {
+        name: globalLabels.input_fields,
+        labels: {
+          first_name_colon: null,
+          enter_first_name: null,
+          enter_first_name_warning: null,
+          last_name_colon: null,
+          enter_last_name: null,
+          enter_last_name_warning: null,
+          email_colon: null,
+          enter_email: null,
+          enter_valid_email_warning: null,
+          phone_colon: null,
+          enter_phone: null,
+          enter_phone_warning: null,
+        }
+      },
+      footer: {
+        name: globalLabels.footer_buttons,
+        labels: {
+          continue: null,
+          event_close: null
+        }
+      }
+    },
+    payment: {
+      header: {
+        name: globalLabels.step_title,
+        labels: {
+          event_payment: null
+        }
+      },
+      summarySegment: {
+        name: globalLabels.summary_segment,
+        labels: {
+          summary: null,
+          summary_event: null,
+          summary_person: null,
+          summary_persons: null,
+          subtotal: null,
+          discount_amount_colon: null,
+          total_amount_colon: null,
+          paying_now: null,
+          paying_later: null,
+          full_amount_consent: null,
+          total_tax_colon: null,
+          incl_tax:null
+        }
+      },
+      coupon: {
+        name: globalLabels.coupon_segment,
+        labels: {
+          coupon: null,
+          add_coupon_btn: null,
+          coupons_used: null,
+        }
+      },
+      paymentSegment: {
+        name: globalLabels.payment_segment,
+        labels: {
+          payment_method: null,
+          on_site: null,
+          card_number_colon: null,
+          expires_date_colon: null,
+          payment_protected_policy: null,
+          payment_onsite_sentence: null,
+          payment_wc_mollie_sentence: null
+        }
+      },
+      footer: {
+        name: globalLabels.footer_buttons,
+        labels: {
+          event_book_event: null,
+          event_close: null
+        }
+      }
+    },
+    congrats: {
+      heading: {
+        name: globalLabels.step_title,
+        labels: {
+          event_congrats: null,
+          your_position_on_waiting_list: null,
+          waiting_list_notify_message: null
+        }
+      },
+      content: {
+        name: globalLabels.content,
+        labels: {
+          event_id: null,
+          event_about_list: null,
+          event_start: null,
+          event_end: null,
+          event_at: null,
+          event_location: null,
+          event_tickets: null,
+          event_show_more: null,
+          event_show_less: null,
+          congrats_total_amount: null,
+          congrats_payment: null,
+          your_name_colon: null,
+          email_address_colon: null,
+          phone_number_colon: null,
+          add_to_calendar: null
+        }
+      },
+      footer: {
+        name: globalLabels.footer_buttons,
+        labels: {
+          finish_appointment: null,
+          congrats_panel: null
         }
       }
     }

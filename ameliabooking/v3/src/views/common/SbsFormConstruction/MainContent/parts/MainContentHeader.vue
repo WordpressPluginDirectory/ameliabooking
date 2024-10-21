@@ -136,7 +136,7 @@ let cssVars = computed(() => {
           align-items: center;
 
           &-title {
-            font-family: var(--am-font-family);;
+            font-family: var(--am-font-family);
             font-size: 18px;
             font-weight: 500;
             font-style: normal;

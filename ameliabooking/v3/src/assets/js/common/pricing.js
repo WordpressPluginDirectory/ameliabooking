@@ -7,6 +7,10 @@ function useAmount (entity, coupon, entityTax, subTotal, includedTaxInTotal) {
     discount = entityTax && !excludedTax
       ? usePercentageAmount(useTaxedAmount(subTotal, entityTax), coupon.discount) + coupon.deduction
       : usePercentageAmount(subTotal, coupon.discount) + coupon.deduction
+
+    if (discount >= subTotal) {
+      discount = subTotal
+    }
   }
 
   let tax = 0
@@ -59,7 +63,7 @@ function useTaxAmount (tax, amount) {
     case ('percentage'):
       return usePercentageAmount(amount, tax.amount)
     case ('fixed'):
-      return tax.amount
+      return amount > 0 ? tax.amount : 0
   }
 }
 

@@ -19,6 +19,7 @@
         :href="!$root.licence.isLite ? 'https://wpamelia.com/pricing/?utm_source=amelia-lite&utm_medium=lite-upgrade&utm_content=amelia&utm_campaign=amelia-lite' : '?page=wpamelia-lite-vs-premium'"
         target="_blank"
         rel="nofollow"
+        style="color: #ffffff;"
       >
         {{ $root.labels.licence_button_text }}
       </a>

@@ -21,6 +21,7 @@
       v-if="props.paymentGateway !== 'payPal' || isCongratzStep"
       :class="mainBtnClass"
       :type="props.primaryFooterButtonType"
+      :category="isWaitingList() ? 'waiting' : 'primary'"
       size="medium"
       :disabled="footerBtnDisabled"
       @click="footerButtonClick"
@@ -70,6 +71,10 @@ let props = defineProps({
     type: String,
     default: 'plain'
   },
+  waitingFooterButtonType: {
+    type: String,
+    default: 'filled',
+  },
   paymentGateway: {
     type: String,
     default: ''
@@ -78,6 +83,10 @@ let props = defineProps({
     type: Boolean,
     default: true
   },
+  isWaitingList: {
+    type: Boolean,
+    default: false
+  }
 })
 
 // * Step Functions
@@ -97,6 +106,10 @@ const steps = inject('stepsArray')
 const currentStep = inject('stepIndex')
 
 let primaryBtnLabel = computed(() => {
+  if (isWaitingList()) { // TODO - check from where to pass waitingList settings
+    return 'join_waiting_list'
+  }
+
   if (steps.value[currentStep.value].name === 'EventInfo' || steps.value[currentStep.value].name === 'EventPayment') {
     return 'event_book_event'
   }
@@ -132,6 +145,10 @@ const shortcodeData = inject('shortcodeData', ref({
 const amLabels = inject('labels')
 function displayLabels (label) {
   return Object.keys(props.customizedLabels).length && props.customizedLabels[label] ? props.customizedLabels[label] : amLabels[label]
+}
+
+function isWaitingList () {
+  return (steps.value[currentStep.value].name === 'EventInfo' || steps.value[currentStep.value].name === 'EventTickets') && props.isWaitingList
 }
 </script>
 

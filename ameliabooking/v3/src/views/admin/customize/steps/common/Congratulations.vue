@@ -43,7 +43,7 @@
 import CongratsInfo from "../../../../public/Parts/Congratulations/Parts/CongratsInfo.vue";
 import PaymentCongratsInfo from "../parts/PaymentCongratsInfo.vue";
 import CustomerCongratsInfo from "../parts/CustomerCongratsInfo.vue";
-import EventCongratsInfo from "../parts/EventCongratsInfo.vue";
+import EventCongratsInfo from "../Events/common/EventCustomerInfo/parts/EventCongratsInfo.vue";
 
 // * Import from Vue
 import {

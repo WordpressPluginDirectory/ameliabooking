@@ -10,10 +10,6 @@ export default {
   }),
 
   getters: {
-    getTickets (state) {
-      return state.tickets
-    },
-
     getMaxCustomCapacity (state) {
       return state.maxCustomCapacity
     },
@@ -57,7 +53,6 @@ export default {
   mutations: {
     setTickets (state, payload) {
       state.tickets = payload
-
       payload.forEach(item => {
         if (item.enabled) {
           let obj = {
@@ -67,7 +62,9 @@ export default {
             price: item.dateRangePrice ? item.dateRangePrice : item.price,
             name: item.name,
             id: item.id,
-            eventTicketId: item.id
+            eventTicketId: item.id,
+            waiting: item.waiting,
+            waitingListSpots: item.waitingListSpots
           }
           state.ticketsData.push(obj)
         }

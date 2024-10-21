@@ -52,8 +52,9 @@
               :second-button-show="secondBtnVisibility && secBtnShow && amSettings.roles.customerCabinet.enabled && amSettings.roles.customerCabinet.pageUrl !== null"
               :payment-gateway="store.getters['payment/getPaymentGateway']"
               :customized-labels="customizedStepLabels"
-              :primary-footer-button-type="customizedStepOptions.primBtn.buttonType"
+              :primary-footer-button-type="isWaitingList && stepsArray[stepIndex].name === 'EventInfo' ? waitingButtonTypeEnabled : customizedStepOptions.primBtn.buttonType"
               :secondary-footer-button-type="customizedStepOptions.secBtn.buttonType"
+              :is-waiting-list="isWaitingList"
             />
           </div>
         </template>
@@ -83,6 +84,20 @@ import {
 // * Import from Vuex
 import { useStore } from 'vuex'
 
+// * import composable
+import {
+  defaultCustomizeSettings
+} from '../../../../assets/js/common/defaultCustomize'
+import useAction from '../../../../assets/js/public/actions'
+import useRestore from "../../../../assets/js/public/restore";
+import { useColorTransparency } from '../../../../assets/js/common/colorManipulation'
+import { useScrollTo } from "../../../../assets/js/common/scrollElements";
+import { useWaitingListAvailability } from "../../../../assets/js/public/events";
+
+// * Parts
+import EventListSkeleton from './Parts/EventListSkeleton.vue'
+import BackLink from '../../Parts/BackLink'
+
 // * Structure Components
 import AmDialog from '../../../_components/dialog/AmDialog.vue'
 
@@ -90,11 +105,11 @@ import AmDialog from '../../../_components/dialog/AmDialog.vue'
 import EventsList from './EventsList/EventsList.vue'
 
 // * Dialog Steps
-import EventInfo from './EventInfo/EventInfo.vue'
-import EventTickets from './EventTickets/EventTickets.vue'
-import EventCustomerInfo from './EventCustomerInfo/EventCustomerInfo.vue'
-import EventPayment from './EventPayment/EventPayment.vue'
-import EventCongratulations from './Congratulations/Congratulations.vue'
+import EventInfo from '../Common/EventInfo/EventInfo.vue'
+import EventTickets from '../Common/EventTickets/EventTickets.vue'
+import EventCustomerInfo from '../Common/EventCustomerInfo/EventCustomerInfo.vue'
+import EventPayment from '../Common/EventPayment/EventPayment.vue'
+import EventCongratulations from '../Common/Congratulations/Congratulations.vue'
 import EventListFooter from '../../../common/EventListFormConstruction/Footer/Footer.vue'
 import EventListHeader from '../../../common/EventListFormConstruction/Header/Header.vue'
 
@@ -104,19 +119,6 @@ const eventTickets = markRaw(EventTickets)
 const eventCustomerInfo = markRaw(EventCustomerInfo)
 const eventPayment = markRaw(EventPayment)
 const eventCongratulations = markRaw(EventCongratulations)
-
-// * Parts
-import EventListSkeleton from './Parts/EventListSkeleton.vue'
-import BackLink from '../../Parts/BackLink'
-
-// * import composable
-import {
-  defaultCustomizeSettings
-} from '../../../../assets/js/common/defaultCustomize'
-import useAction from '../../../../assets/js/public/actions'
-import useRestore from "../../../../assets/js/public/restore";
-import { useColorTransparency } from '../../../../assets/js/common/colorManipulation'
-import { useScrollTo } from "../../../../assets/js/common/scrollElements";
 
 // * Emits
 const emits = defineEmits(['isRestored'])
@@ -237,6 +239,16 @@ watch(eventFluidStepKey ,(current) => {
   }
 
 }, {deep: true})
+
+// * Waiting list availability and options
+let isWaitingList = computed(() => useWaitingListAvailability(store.getters['eventEntities/getEvent'](store.getters['eventBooking/getSelectedEventId'])))
+watch(isWaitingList, (current) => {
+  if (current) {
+    let waitingOptions = JSON.parse(JSON.stringify(store.getters['eventEntities/getEvent'](store.getters['eventBooking/getSelectedEventId']).waitingList))
+    store.commit('eventWaitingListOptions/setAllData', {...waitingOptions, isAvailable: isWaitingList.value})
+  }
+})
+
 
 // * Bringing anyone with you - popup visibility
 let bringingAnyoneVisibility = ref(false)
@@ -374,9 +386,11 @@ function onCloseEventDialog () {
 
 function onClosedEventDialog () {
   nextTick(() => {
+    store.commit('eventBooking/setEventId', null)
     store.dispatch('persons/resetPersons')
     store.dispatch('coupon/resetCoupon')
     store.dispatch('tickets/resetCustomTickets')
+    store.dispatch('eventWaitingListOptions/resetWaitingOptions')
   })
 }
 
@@ -489,6 +503,10 @@ let secBtnShow = computed(() => {
   }
 
   return true
+})
+
+let waitingButtonTypeEnabled = computed(() => {
+  return 'waitingBtn' in customizedStepOptions.value ? customizedStepOptions.value.waitingBtn.buttonType : 'filled'
 })
 
 // * Fonts
@@ -684,6 +702,12 @@ export default {
       background-color: var(--am-c-main-bgr);
       padding: 16px;
       border-radius: 12px
+    }
+
+    * {
+      font-family: var(--am-font-family);
+      box-sizing: border-box;
+      word-break: break-word;
     }
 
     // el - event list

@@ -5,6 +5,7 @@ namespace AmeliaBooking\Application\Commands;
 use AmeliaBooking\Application\Commands\Booking\Appointment\AddBookingCommand;
 use AmeliaBooking\Application\Commands\Booking\Appointment\SuccessfulBookingCommand;
 use AmeliaBooking\Application\Commands\Notification\GetSMSNotificationsHistoryCommand;
+use AmeliaBooking\Application\Commands\Notification\UpdateSMSNotificationHistoryCommand;
 use AmeliaBooking\Application\Commands\Payment\CalculatePaymentAmountCommand;
 use AmeliaBooking\Application\Commands\Square\DisconnectFromSquareAccountCommand;
 use AmeliaBooking\Application\Commands\Square\FetchAccessTokenSquareCommand;
@@ -189,7 +190,8 @@ abstract class Command
             !($this instanceof DisconnectFromSquareAccountCommand) &&
             !($this instanceof SuccessfulBookingCommand) &&
             !($this instanceof FetchAccessTokenSquareCommand) &&
-            !($this instanceof GetSMSNotificationsHistoryCommand)
+            !($this instanceof GetSMSNotificationsHistoryCommand) &&
+            !($this instanceof UpdateSMSNotificationHistoryCommand)
         ) {
             $queryParams = $request->getQueryParams();
 

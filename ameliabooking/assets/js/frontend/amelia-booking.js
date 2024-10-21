@@ -12,6 +12,8 @@ import VueFacebookPixel from 'vue-facebook-pixel'
 import marketingMixin from '../../js/frontend/mixins/marketingMixin'
 import store from './store'
 import VueGtag from 'vue-gtag'
+import LicenceBlock from '../../views/backend/parts/LicenceBlock'
+import LicenceBlockHeader from '../../views/backend/parts/LicenceBlockHeader'
 
 const Vue = require('vue')
 
@@ -38,6 +40,8 @@ if (window.wpAmeliaNonce) {
   }
 }
 
+Vue.component('LicenceBlock', LicenceBlock)
+Vue.component('LicenceBlockHeader', LicenceBlockHeader)
 Vue.use(VueMomentJS, moment)
 Vue.use(ElementUI, {locale})
 Vue.use(VCalendar, {

@@ -4,7 +4,7 @@ export default {
   state: () => ({
     persons: 1,
     max: 1,
-    min: 1
+    min: 1,
   }),
 
   getters: {

@@ -165,6 +165,18 @@
           <!-- /Change Password -->
 
         </el-row>
+
+
+        <el-alert
+            class="am-sms-warning"
+            type="warning"
+            show-icon
+            title=""
+            v-html="$root.labels.sms_warning"
+            :closable="false"
+            style="margin-bottom: 10px; margin-top: 16px; display: block"
+        >
+        </el-alert>
       </el-form>
     </div>
     <!-- /Security Title -->

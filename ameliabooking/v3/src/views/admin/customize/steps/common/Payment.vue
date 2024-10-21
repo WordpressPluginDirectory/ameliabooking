@@ -65,7 +65,7 @@
 import AmCheckbox from "../../../../_components/checkbox/AmCheckbox.vue";
 
 // * Parts
-import EventPaymentInfo from "../parts/EventPaymentInfo.vue";
+import EventPaymentInfo from "../Events/common/EventPayment/parts/EventPaymentInfo.vue";
 
 // * Import from Vue
 import {

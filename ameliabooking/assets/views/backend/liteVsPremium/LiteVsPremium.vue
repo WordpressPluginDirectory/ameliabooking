@@ -331,6 +331,15 @@ export default {
           elite: true
         },
         {
+          feature: 'Waiting List',
+          lite: false,
+          starter: false,
+          standard: false,
+          pro: true,
+          elite: true,
+          tag: 'New'
+        },
+        {
           feature: 'WhatsApp integration',
           lite: false,
           starter: false,
@@ -391,15 +400,7 @@ export default {
           pro: false,
           elite: true,
           tag: 'New'
-        }
-        /*{
-          feature: 'Waiting List',
-          lite: false,
-          standard: false,
-          pro: true,
-          elite: true,
-          tag: 'Soon'
-        },
+        }/*
         {
           feature: 'Reviews',
           lite: false,

@@ -148,7 +148,7 @@ class UserApplicationService
      * @throws InvalidArgumentException
      * @throws QueryExecutionException
      */
-    public function setWpUserIdForNewUser($userId, $user)
+    public function setWpUserIdForNewUser($userId, $user, $password = null)
     {
         do_action('amelia_set_wp_user_for_new_customer', $user ? $user->toArray() : null);
 
@@ -165,6 +165,10 @@ class UserApplicationService
             $user->getLastName() ? $user->getLastName()->getValue() : '',
             'wpamelia-' . $user->getType()
         );
+
+        if ($password) {
+            wp_set_password($password, $externalId);
+        }
 
         /** @var UserRepository $userRepository */
         $userRepository = $this->container->get('domain.users.repository');
@@ -551,9 +555,14 @@ class UserApplicationService
      */
     public function isCustomerBooking($booking, $user, $bookingToken)
     {
-        $isValidToken = $bookingToken !== null && $bookingToken === $booking->getToken()->getValue();
+        $isValidToken = $booking && $bookingToken !== null && $bookingToken === $booking->getToken()->getValue();
 
-        $isValidUser = $user && $user->getId() && $user->getId()->getValue() === $booking->getCustomerId()->getValue();
+        $isValidUser = $user &&
+            $booking &&
+            $user->getId() &&
+            $booking->getCustomerId() &&
+            $booking->getCustomerId()->getValue() &&
+            $user->getId()->getValue() === $booking->getCustomerId()->getValue();
 
         if (!($isValidToken || $isValidUser)) {
             return false;

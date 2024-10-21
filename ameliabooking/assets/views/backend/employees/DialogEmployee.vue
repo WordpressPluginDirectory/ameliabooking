@@ -204,7 +204,7 @@
                   <el-form-item
                     :class="licenceClass()"
                     label="placeholder"
-                    v-if="$root.settings.capabilities.canWriteOthers === true"
+                    v-if="$root.settings.capabilities.canWriteOthers === true || (this.$root.settings.role == 'provider' && employee.externalId)"
                     :label="$root.labels.timezone + ':'"
                   >
                     <el-select
@@ -523,6 +523,7 @@
                     :step="0.1"
                     :max="100"
                     @input="clearValidation()"
+                    @change="changeStripeConnectAmount"
                     :placeholder="employee.stripeConnect.amount ? employee.stripeConnect.amount.toString() : $root.settings.payments.stripe.connect.amount.toString()"
                   >
                   </el-input-number>
@@ -651,7 +652,7 @@
           confirm: {
             status: {
               yes: employee.status === 'visible' ? $root.labels.visibility_hide : $root.labels.visibility_show,
-              no: $root.labels.no
+              no: $root.labels.visibility_show
             }
           }
         }"
@@ -750,11 +751,7 @@
         stripeLoading: false,
         stripeProvider: null,
         stripeProviders: null,
-        stripeConnectMethods: [{value: 'transfer', label: this.$root.labels.use_transfers_payment}, {value: 'direct', label: this.$root.labels.use_direct_payment}],
-        stripeConnect: {
-          account: null,
-          amount: null
-        },
+        isStripeConnectAmountDefault: false,
         rules: {
           firstName: [
             {required: true, message: this.$root.labels.enter_first_name_warning, trigger: 'submit'}
@@ -831,20 +828,24 @@
             this.getZoomUsers()
           }
 
+          if (!this.employee.stripeConnect) {
+            this.employee.stripeConnect = {
+              id: null,
+              amount: null
+            }
+          }
+
           if (this.$root.settings.payments.stripe.enabled && this.$root.settings.payments.stripe.connect.enabled) {
             if (this.$root.settings.role === 'admin' || this.$root.settings.role === 'manager') {
+              if (this.employee.stripeConnect.amount === null) {
+                this.isStripeConnectAmountDefault = true
+              }
+
               this.getStripeProviders()
             }
 
             if (this.$root.settings.role !== 'admin' && this.$root.settings.role !== 'manager') {
               this.getStripeProvider()
-            }
-          }
-
-          if (!this.employee.stripeConnect) {
-            this.employee.stripeConnect = {
-              id: null,
-              amount: 0
             }
           }
 
@@ -913,20 +914,31 @@
 
         if (this.employee.stripeConnect.id === '' || this.employee.stripeConnect.id === null) {
           employee.stripeConnect = null
-        } else if (!employee.stripeConnect.amount) {
+        } else if (employee.stripeConnect.amount === '' || this.isStripeConnectAmountDefault) {
           employee.stripeConnect.amount = null
         }
 
         return employee
       },
 
+      changeStripeConnectAmount () {
+        this.isStripeConnectAmountDefault =
+            typeof this.employee.stripeConnect.amount === 'undefined' ||
+            this.employee.stripeConnect.amount === '' ||
+            this.employee.stripeConnect.amount === null
+      },
+
       setStripeConnectAmount () {
-        if (!this.employee.stripeConnect.amount) {
+        if (this.isStripeConnectAmountDefault || this.employee.stripeConnect.amount === null || this.employee.stripeConnect.amount === '') {
           let elements = document.getElementsByClassName('am-stripe-amount')
 
           for (let i = 0; i < elements.length; i++) {
             elements[i].getElementsByClassName('el-input__inner')[0].value = ''
           }
+
+          this.employee.stripeConnect.amount = null
+        } else {
+          this.isStripeConnectAmountDefault = false
         }
       },
 

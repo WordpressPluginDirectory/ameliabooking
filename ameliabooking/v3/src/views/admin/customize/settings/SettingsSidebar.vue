@@ -61,8 +61,12 @@ import CustomizeCategoryItems from './parts/CustomizationCategoryItems.vue'
 import CustomizeCategoryService from './parts/CustomizationCategoryService.vue'
 import CustomizeCategoryPackage from './parts/CustomizationCategoryPackage.vue'
 
+// Events
 // Event list
 import CustomizationEventsList from "./parts/CustomizationEventsList.vue";
+// Event calendar
+import CustomizationEventsCalendar from "./parts/CustomizationEventsCalendar.vue";
+// Event common steps
 import CustomizationEventInfo from "./parts/CustomizationEventInfo.vue";
 import CustomizationEventTickets from "./parts/CustomizationEventTickets.vue";
 import CustomizationEventCustomerInfo from "./parts/CustomizationEventCustomerInfo.vue";
@@ -543,10 +547,90 @@ let capcSettingsObj = ref({
   }
 })
 
+let ecfSettingsObj = ref({
+  menu: {
+    component: markRaw(CustomizationMenu),
+    backBtnVisibility: false
+  },
+  global: {
+    headingText: amLabels.cb_global_settings_heading,
+    component: markRaw(CustomizationGlobal),
+    backBtnVisibility: true
+  },
+  fonts: {
+    headingText: amLabels.fonts,
+    component: markRaw(CustomizationFonts),
+    backBtnVisibility: true
+  },
+  colors: {
+    headingText: amLabels.colors,
+    component: markRaw(CustomizationColors),
+    backBtnVisibility: true
+  },
+  order: {
+    headingText: amLabels.cb_field_order_heading,
+    component: markRaw(CustomizationOrder),
+    backBtnVisibility: true
+  },
+  options: {
+    headingText: amLabels.options,
+    component: markRaw(CustomizationOptions),
+    backBtnVisibility: true
+  },
+  labels: {
+    headingText: amLabels.labels,
+    component: markRaw(CustomizationLabels),
+    backBtnVisibility: true
+  },
+  calendar: {
+    headingText: amLabels.csb_events_calendar,
+    component: markRaw(CustomizationEventsCalendar),
+    backBtnVisibility: true,
+    globalColors: true,
+  },
+  info: {
+    headingText: amLabels.csb_event_info,
+    component: markRaw(CustomizationEventInfo),
+    backBtnVisibility: true,
+    globalColors: true,
+  },
+  bringing: {
+    headingText: amLabels.bringing_anyone,
+    component: markRaw(CustomizationBringing),
+    backBtnVisibility: true,
+    globalColors: true,
+  },
+  tickets: {
+    headingText: amLabels.csb_event_tickets,
+    component: markRaw(CustomizationEventTickets),
+    backBtnVisibility: true,
+    globalColors: true,
+  },
+  customerInfo: {
+    headingText: amLabels.csb_event_customer,
+    component: markRaw(CustomizationEventCustomerInfo),
+    backBtnVisibility: true,
+    globalColors: true,
+  },
+  payment: {
+    headingText: amLabels.csb_event_payment,
+    component: markRaw(CustomizationEventPayment),
+    backBtnVisibility: true,
+    globalColors: true,
+  },
+  congrats: {
+    headingText: amLabels.csb_event_congratulations,
+    component: markRaw(CustomizationEventCongratulations),
+    backBtnVisibility: true,
+    globalColors: true,
+  }
+})
+
 let settingsComponents = computed(() => {
   if (pageRenderKey.value === 'cbf') return cbfSettingsObj.value
   if (pageRenderKey.value === 'elf') return elfSettingsObj.value
   if (pageRenderKey.value === 'capc') return capcSettingsObj.value
+  if (pageRenderKey.value === 'ecf') return ecfSettingsObj.value
 
   return sbsNewSettingsObj.value
 })

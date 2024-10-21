@@ -282,7 +282,7 @@
                 filterable
                 clearable
                 :placeholder="$root.labels.select_service + ':'"
-                :popper-class="'am-dropdown-cabinet'"
+                :popper-class="'am-dropdown-cabinet am-appointment-services'"
                 :disabled="$root.settings.role === 'customer'"
                 @change="handleServiceChange"
               >
@@ -341,7 +341,7 @@
                 filterable
                 clearable
                 :placeholder="$root.labels.select_employee"
-                :popper-class="'am-dropdown-cabinet'"
+                :popper-class="'am-dropdown-cabinet am-appointment-employees'"
                 :disabled="$root.settings.role === 'customer'"
                 @change="handleEmployeeChange"
               >
@@ -482,7 +482,7 @@
                     value-key="time"
                     filterable
                     :placeholder="$root.labels.select_time"
-                    :popper-class="'am-dropdown-cabinet'"
+                    :popper-class="'am-dropdown-cabinet am-appointment-slots'"
                     @change="selectedTime()"
                   >
                     <el-option
@@ -827,7 +827,7 @@
         haveRemove: $root.settings.capabilities.canDelete === true,
         haveRemoveEffect: false,
         haveDuplicate: haveDuplicate,
-        haveSaveWarning: isPriceChanged() ? false : haveSaveWarning()
+        haveSaveWarning: isPriceChanged() ? false : (isExistingAppointment() || (this.activeRecurring && this.enabledRecurring))
       }"
 
       :buttonText="isPriceChanged() ? {
@@ -980,7 +980,7 @@
 
       return {
         saveConfirmMessage: null,
-        packageBookingAcknowledged: false,
+        existingAppointmentAcknowledged: false,
         calendarNavigating: false,
         slotsIndexCounter: 0,
         startDateTime: null,
@@ -1368,7 +1368,7 @@
       selectedTime () {
         let $this = this
 
-        this.packageBookingAcknowledged = false
+        this.existingAppointmentAcknowledged = false
 
         let selectedDateString = this.getStringFromDate(this.appointment.selectedDate)
 
@@ -2161,10 +2161,12 @@
               providerIds: appointment.providerId ? [appointment.providerId] : [],
               extras: JSON.stringify(extras),
               excludeAppointmentId: appointment.id,
-              group: this.$root.settings.role === 'customer' ? 1 : (this.packageCustomer ? 1 : 0),
+              group: 1,
               timeZone: this.selectedTimeZone,
               monthsLoad: this.monthsLoad,
-              startDateTime: this.startDateTime,
+              startDateTime: this.startDateTime
+                ? this.startDateTime
+                : (this.appointment.selectedDate && this.appointment.selectedPeriod && this.appointment.selectedPeriod.time ? moment(this.getBookingStart(), 'YYYY-MM-DD HH:mm').subtract('1', 'days').format('YYYY-MM-DD HH:mm') : null),
               endDateTime: this.endDateTime,
               page: 'appointments',
               persons: this.packageCustomer ? 1 : persons
@@ -2201,7 +2203,7 @@
       dateSelected () {
         this.calendarNavigating = false
 
-        this.packageBookingAcknowledged = false
+        this.existingAppointmentAcknowledged = false
 
         this.dateChange()
       },
@@ -2257,7 +2259,7 @@
         }
       },
 
-      isGroupBooking () {
+      isExistingAppointment () {
         if (this.appointment.selectedDate && this.appointment.selectedPeriod && this.appointment.selectedPeriod.time) {
           let selectedDateString = this.getStringFromDate(this.appointment.selectedDate)
 
@@ -2304,21 +2306,11 @@
         return priceChanged
       },
 
-      haveSaveWarning () {
-        if (this.packageCustomer) {
-          return this.isGroupBooking()
-        } else if (this.activeRecurring && this.enabledRecurring) {
-          return true
-        }
-
-        return false
-      },
-
       haveSaveConfirmation () {
-        if (this.packageCustomer !== null && !this.packageBookingAcknowledged && this.isGroupBooking()) {
-          this.packageBookingAcknowledged = true
+        if (this.isExistingAppointment() && !this.existingAppointmentAcknowledged) {
+          this.existingAppointmentAcknowledged = true
 
-          this.saveConfirmMessage = this.$root.labels.package_group_booking_message
+          this.saveConfirmMessage = this.$root.labels.group_booking_message
 
           return true
         }

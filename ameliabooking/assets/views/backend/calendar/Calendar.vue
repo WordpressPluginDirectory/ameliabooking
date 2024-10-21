@@ -616,6 +616,10 @@
       },
 
       getAppointments (counter) {
+        if (this.$root.settings.role === 'provider' && this.options.entities.employees.length === 1 && this.options.entities.employees[0].timeZone) {
+          this.params.timeZone = this.options.entities.employees[0].timeZone
+        }
+
         this.$http.get(`${this.$root.getAjaxUrl}/appointments`, {
           params: this.getAppropriateUrlParams(this.params)
         })
@@ -1066,9 +1070,18 @@
               let rescheduleUrlPart = this.$root.settings.role === 'customer' ? '/bookings/reassign/' : '/appointments/time/'
               let rescheduleUrlId = this.$root.settings.role === 'customer' ? draggedEvent.bookings[0].id : draggedEvent.id
 
-              this.$http.post(`${this.$root.getAjaxUrl}${rescheduleUrlPart}${rescheduleUrlId}`, {
+              let params = {
                 'bookingStart': draggedEvent.start.format('YYYY-MM-DD HH:mm')
-              })
+              }
+
+              if (this.$root.settings.role === 'provider' &&
+                  this.$root.settings.roles.allowWriteAppointments &&
+                  this.options.entities.employees[0].timeZone
+              ) {
+                params.timeZone = this.options.entities.employees[0].timeZone
+              }
+
+              this.$http.post(`${this.$root.getAjaxUrl}${rescheduleUrlPart}${rescheduleUrlId}`, params)
                 .then(response => {
                   this.appointmentsFetchedFiltered = true
                   this.notify(this.$root.labels.success, this.$root.labels.appointment_rescheduled, 'success')

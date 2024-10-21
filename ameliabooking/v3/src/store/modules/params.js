@@ -14,8 +14,10 @@ export default {
       tag: null,
       search: null,
       recurring: null,
-      dates: moment().toDate(),
+      dates: [moment().toDate()],
+      upcomingDates: [moment().toDate()],
       locationId: null,
+      locations: null,
       providers: null,
     },
     shortcodeParams: {
@@ -38,20 +40,57 @@ export default {
       return state.params.locationId
     },
 
+    getLocations (state) {
+      return state.params.locations
+    },
+
+    getEmployees (state) {
+      return state.params.providers
+    },
+
     getDates (state) {
       return state.params.dates
     },
 
+    getUpcomingDates (state) {
+      return state.params.upcomingDates
+    },
+
     getEventParams (state) {
+      let locations = state.params.locationId && !state.params.locations
+        ? { locationId: state.params.locationId }
+        : state.params.locations && !state.params.locationId
+          ? { locations: state.params.locations }
+          : { locations: state.shortcodeParams.locations };
+
       return Object.assign({
-          dates: [getDateString(state.params.dates)],
+          dates: state.params.dates[1] ? [getDateString(state.params.dates[0]), getDateString(state.params.dates[1])] : [getDateString(state.params.dates[0])],
           id: state.params.id ? state.params.id : state.shortcodeParams.ids,
           search: state.params.search,
           tag: state.params.tag ? state.params.tag : state.shortcodeParams.tags,
           recurring: state.params.recurring,
           providers: state.params.providers
         },
- state.params.locationId ? {locationId: state.params.locationId} : {locations: state.shortcodeParams.locations}
+        locations
+      )
+    },
+
+    getUpcomingEventParams (state) {
+      let locations = state.params.locationId && !state.params.locations
+        ? { locationId: state.params.locationId }
+        : state.params.locations && !state.params.locationId
+          ? { locations: state.params.locations }
+          : { locations: state.shortcodeParams.locations };
+
+      return Object.assign({
+          dates: state.params.upcomingDates[1] ? [getDateString(state.params.upcomingDates[0]), getDateString(state.params.upcomingDates[1])] : [getDateString(state.params.upcomingDates[0])],
+          id: state.params.id ? state.params.id : state.shortcodeParams.ids,
+          search: state.params.search,
+          tag: state.params.tag ? state.params.tag : state.shortcodeParams.tags,
+          recurring: state.params.recurring,
+          providers: state.params.providers
+        },
+        locations
       )
     },
 
@@ -66,6 +105,7 @@ export default {
     getAllData (state) {
       return {
         dates: state.params.dates,
+        upcomingDates: state.params.upcomingDates,
         id: state.params.id,
         search: state.params.search,
         locationId: state.params.locationId,
@@ -83,6 +123,14 @@ export default {
 
     setLocationIdParam (state, payload) {
       state.params.locationId = payload ? payload : null
+    },
+
+    setLocations (state, payload) {
+      state.params.locations = payload ? payload : null
+    },
+
+    setEmployees (state, payload) {
+      state.params.providers = payload ? payload : null
     },
 
     setId (state, payload) {
@@ -128,9 +176,14 @@ export default {
       state.params.dates = payload
     },
 
+    setUpcomingDates (state, payload) {
+      state.params.upcomingDates = payload
+    },
+
     setAllData (state, payload) {
       state.params = {
         dates: payload.dates,
+        upcomingDates: payload.upcomingDates,
         id: payload.id ? parseInt(payload.id) : null,
         search: payload.search,
         locationId: payload.locationId ? parseInt(payload.locationId) : null,

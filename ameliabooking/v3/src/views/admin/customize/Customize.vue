@@ -4,7 +4,7 @@
       <PageHeader></PageHeader>
     </template>
 
-    <template v-if="pageRenderKey !== 'main' && pageRenderKey !== 'cbf' && pageRenderKey !== 'elf'" #filter>
+    <template v-if="pageRenderKey !== 'main' && pageRenderKey !== 'cbf' && pageRenderKey !== 'elf' && pageRenderKey !== 'ecf'" #filter>
       <!-- Step by step select for page type -->
       <div
         class="am-customize__fs-flow"
@@ -88,6 +88,7 @@ import CustomizeStepNew from "./pages/CustomizeStepNew.vue";
 import CustomizeCatalog from "./pages/CustomizeCatalog.vue";
 import CustomizeEventList from "./pages/CustomizeEventList.vue";
 import CustomizeCustomerPanel from "./pages/CustomizeCustomerPanel.vue";
+import CustomizeEventCalendar from "./pages/CustomizeEventCalendar.vue";
 
 // * Import form Vue
 import {
@@ -223,7 +224,8 @@ let pagesObject = {
   sbsNew: markRaw(CustomizeStepNew),
   cbf: markRaw(CustomizeCatalog),
   elf: markRaw(CustomizeEventList),
-  capc: markRaw(CustomizeCustomerPanel)
+  capc: markRaw(CustomizeCustomerPanel),
+  ecf: markRaw(CustomizeEventCalendar)
 }
 
 let urlParams = new URLSearchParams(window.location.search)
@@ -241,7 +243,7 @@ provide('pageFunctions', {
 })
 
 watchEffect(() => {
-  if (pageRenderKey.value === 'elf') {
+  if (pageRenderKey.value === 'elf' || pageRenderKey.value === 'ecf') {
     bookableType.value = 'event'
   }
 })

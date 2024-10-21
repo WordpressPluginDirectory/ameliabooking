@@ -58,7 +58,7 @@
               </div>
             </div>
             <div
-              v-if="(props.booking.status === 'approved' || props.booking.status === 'pending')
+              v-if="(props.booking.status === 'approved' || props.booking.status === 'pending' || props.booking.status === 'waiting')
               && ((!props.isPackageBooking && props.booking.price > 0
               && usePaymentFromCustomerPanel(props.reservation, props.bookable.settings))
               || !!(props.reservation.cancelable
@@ -67,7 +67,7 @@
               :class="props.responsiveClass"
             >
               <PaymentButton
-                v-if="!props.isPackageBooking && props.booking.price > 0 && usePaymentFromCustomerPanel(props.reservation, props.bookable.settings)"
+                v-if="props.booking.status !== 'waiting' && !props.isPackageBooking && props.booking.price > 0 && usePaymentFromCustomerPanel(props.reservation, props.bookable.settings)"
                 :reservation="props.reservation"
                 :bookable="props.bookable"
               >
@@ -647,6 +647,15 @@ export default {
 
         &:before {
           background-color: var(--am-c-cc-success);
+        }
+      }
+
+      &-waiting {
+        color: var(--am-c-cc-warning);
+        background-color: var(--am-c-cc-warning-op15);
+
+        &:before {
+          background-color: var(--am-c-cc-warning);
         }
       }
     }

@@ -92,6 +92,7 @@ function useRestore (store, shortcodeData) {
   }
 
   if ('bookableType' in data.request.state && data.request.state.bookableType === 'event') {
+    store.commit('eventEntities/setEventsDisplay', data.request.state.eventsDisplay)
     store.commit('bookableType/setType', data.request.state.bookableType)
     store.commit('pagination/setAllData', data.request.state.pagination)
     store.commit('params/setAllData', data.request.state.params)
@@ -104,7 +105,12 @@ function useRestore (store, shortcodeData) {
     store.commit('tickets/setAllData', data.request.state.tickets)
 
     // * Request because event params and pagination
-    store.dispatch('eventEntities/requestEvents')
+    if (data.request.state.eventsDisplay === 'calendar') {
+      store.dispatch('eventEntities/requestEvents', 'calendar')
+      store.dispatch('eventEntities/requestEvents', 'upcoming')
+    } else {
+      store.dispatch('eventEntities/requestEvents')
+    }
   } else {
     store.state.booking = {...data.request.state }
   }

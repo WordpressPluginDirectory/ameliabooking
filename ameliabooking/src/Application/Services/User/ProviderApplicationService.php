@@ -318,7 +318,7 @@ class ProviderApplicationService
             $userId = $this->add($user);
 
             if ($fields['externalId'] === 0) {
-                $userAS->setWpUserIdForNewUser($userId, $user);
+                $userAS->setWpUserIdForNewUser($userId, $user, $fields['password']);
             }
 
             if (!empty($fields['password'])) {

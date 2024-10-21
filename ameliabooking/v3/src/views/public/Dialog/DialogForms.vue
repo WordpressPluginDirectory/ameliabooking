@@ -4,6 +4,7 @@ import AmDialog from "../../_components/dialog/AmDialog.vue"
 import SbsForm from "../StepForm/BookingStepForm.vue"
 import CbfForm from "../CatalogForm/CatalogForm.vue"
 import ElfForm from "../EventForm/EventListForm/EventsListForm.vue"
+import EcfForm from "../EventForm/EventCalendarForm/EvensCalendarForm.vue"
 
 // * Import from Vue
 import {
@@ -33,7 +34,8 @@ let shortcodeData = inject('shortcodeData')
 let formList = reactive({
   sbsNew: markRaw(SbsForm),
   cbf: markRaw(CbfForm),
-  elf: markRaw(ElfForm)
+  elf: markRaw(ElfForm),
+  ecf: markRaw(EcfForm)
 })
 
 let dialogWrapperWidth = ref(0)
@@ -196,6 +198,12 @@ export default {
     }
 
     #amelia-container {
+      * {
+        font-family: var(--am-font-family);
+        box-sizing: border-box;
+        word-break: break-word;
+      }
+
       &.am-fs {
         &__wrapper {
           margin: 0;

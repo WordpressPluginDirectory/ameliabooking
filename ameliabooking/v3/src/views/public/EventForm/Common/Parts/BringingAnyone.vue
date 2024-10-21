@@ -28,7 +28,6 @@
 <script setup>
 // * Import from Vue
 import {
-  ref,
   reactive,
   computed,
   inject
@@ -47,9 +46,11 @@ import { useResponsiveClass } from "../../../../../assets/js/common/responsive";
 let store = useStore()
 
 // * Options
-let options = ref({
-  min: store.getters['persons/getMinPersons'],
-  max: store.getters['persons/getMaxPersons']
+let options = computed(() => {
+  return {
+    min: store.getters['persons/getMinPersons'],
+    max:  store.getters['persons/getMaxPersons']
+  }
 })
 
 let persons = computed({

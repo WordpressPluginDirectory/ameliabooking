@@ -377,6 +377,7 @@
               :locations="options.entities.locations"
               :tags="options.entities.tags"
               :settings="options.entities.settings"
+              :selectedTimeZone="selectedTimeZone"
               @closeDialog="closeDialogEvent"
               @saveCallback="saveEventCallback"
               @showDialogTranslate="showDialogTranslate"
@@ -405,7 +406,7 @@
               :eventStatus="event.status"
               :customersNoShowCount="customersNoShowCount"
               :aggregated-price="event.aggregatedPrice"
-
+              :event="event"
               @closeDialog="closeDialogAttendees"
               @updateAttendeesCallback="updateAttendeesCallback"
               @showDialogAttendee="showDialogAttendee"
@@ -437,6 +438,8 @@
               :eventId="event.id"
               :options="options"
               :customerCreatedCount="customerCreatedCount"
+              :popperAppendToBody="true"
+              :isWaitingList="event.settings.waitingList.enabled"
               @closeDialog="closeDialogAttendee"
               @showDialogNewCustomer="showDialogNewCustomer"
               @saveCallback="saveAttendeeCallback"
@@ -541,7 +544,7 @@
   import customerMixin from '../../../js/backend/mixins/customerMixin'
   import DialogExport from '../parts/DialogExport.vue'
   import DialogTranslate from '../parts/DialogTranslate'
-  import VueCookies from "vue-cookies"
+  import VueCookies from 'vue-cookies'
   // import DialogNewCustomize from '../parts/DialogNewCustomize.vue'
 
   export default {
@@ -613,6 +616,7 @@
         dialogTranslate: false,
         dialogTranslateType: 'name',
         eventTickets: null,
+        selectedTimeZone: '',
         languagesData: []
       }
     },
@@ -630,6 +634,11 @@
           start: moment(urlParams['dateFrom']).toDate(),
           end: moment(urlParams['dateTo']).toDate()
         }
+      }
+
+      if (urlParams['customerId']) {
+        this.params.dates = null
+        this.params.customerId = urlParams['customerId']
       }
 
       this.getEventOptions(true)
@@ -844,6 +853,10 @@
             this.options.entities.coupons = response.data.data.coupons
             this.languagesData = response.data.data.settings.languages
 
+            if (this.$root.settings.role === 'provider' && this.$root.settings.roles.allowWriteEvents) {
+              this.selectedTimeZone = this.options.entities.employees[0].timeZone ? this.options.entities.employees[0].timeZone : ''
+            }
+
             this.fetched = true
             this.options.fetched = true
 
@@ -896,6 +909,7 @@
 
         if (this.$root.settings.role === 'provider' && this.$root.settings.roles.allowWriteEvents) {
           params.providers = this.options.entities.employees.map(employee => employee.id)
+          params.timeZone = this.options.entities.employees[0].timeZone ? this.options.entities.employees[0].timeZone : null
         }
 
         let $this = this
@@ -916,7 +930,8 @@
                 while (startDate.isBefore(endDate)) {
                   let dateString = startDate.format('YYYY-MM-DD')
 
-                  if (!(dateString in eventsDay)) {
+                  let isInRange = $this.params.dates === null || startDate.isBetween($this.params.dates.start, $this.params.dates.end, 'days', '[]')
+                  if (!(dateString in eventsDay) && isInRange) {
                     eventsDay[dateString] = {
                       date: dateString,
                       events: []
@@ -931,30 +946,42 @@
                     })
                   }
 
+                  let eventSettings = JSON.parse(event.settings)
+
+                  event.waitingList = eventSettings && eventSettings.waitingList ? eventSettings.waitingList
+                    : {
+                      ...$this.$root.settings.appointments.waitingListEvents,
+                      enabled: false
+                    }
+
                   if (event.full && event.status === 'approved') event.status = 'full'
                   else if (event.upcoming && event.status === 'approved') event.status = 'upcoming'
                   let location = event.customLocation ? event.customLocation : (event.locationId ? $this.options.entities.locations.find(l => l.id === event.locationId).name : null)
-                  eventsDay[dateString].events.push({
-                    id: event.id,
-                    name: event.name,
-                    periodStart: eventPeriod.periodStart,
-                    periodEnd: eventPeriod.periodEnd,
-                    bookingOpens: event.bookingOpens,
-                    bookingCloses: event.bookingCloses,
-                    location: location,
-                    recurring: event.recurring,
-                    maxCapacity: event.maxCapacity,
-                    status: event.status,
-                    places: event.places,
-                    created: event.created,
-                    opened: event.opened,
-                    closed: event.closed,
-                    checked: false,
-                    zoomMeeting: eventPeriod.zoomMeeting,
-                    translations: event.translations,
-                    customTickets: event.customTickets,
-                    organizerId: event.organizerId
-                  })
+
+                  if (dateString in eventsDay) {
+                    eventsDay[dateString].events.push({
+                      id: event.id,
+                      name: event.name,
+                      periodStart: eventPeriod.periodStart,
+                      periodEnd: eventPeriod.periodEnd,
+                      bookingOpens: event.bookingOpens,
+                      bookingCloses: event.bookingCloses,
+                      location: location,
+                      recurring: event.recurring,
+                      maxCapacity: event.maxCapacity,
+                      status: event.status,
+                      places: event.places,
+                      created: event.created,
+                      opened: event.opened,
+                      closed: event.closed,
+                      checked: false,
+                      zoomMeeting: eventPeriod.zoomMeeting,
+                      translations: event.translations,
+                      customTickets: event.customTickets,
+                      organizerId: event.organizerId,
+                      waitingList: event.waitingList
+                    })
+                  }
 
                   startDate.add(1, 'days')
                 }

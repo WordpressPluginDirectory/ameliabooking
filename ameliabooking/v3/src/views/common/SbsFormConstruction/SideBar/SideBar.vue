@@ -179,7 +179,7 @@ export default {
 
         // Sidebar Step Heading
         &-heading {
-          font-family: var(--am-font-family);;
+          font-family: var(--am-font-family);
           font-size: 14px;
           font-weight: 500;
           line-height: 1.43;
@@ -392,7 +392,7 @@ export default {
 
         // Sidebar Step Heading
         &-heading {
-          font-family: var(--am-font-family);;
+          font-family: var(--am-font-family);
           font-size: 14px;
           font-weight: 500;
           line-height: 1.43;
@@ -450,7 +450,7 @@ export default {
         flex-direction: column;
 
         &-heading {
-          font-family: var(--am-font-family);;
+          font-family: var(--am-font-family);
           font-size: 14px;
           font-weight: 500;
           font-style: normal;

@@ -1,7 +1,15 @@
-import { createApp, defineAsyncComponent } from 'vue/dist/vue.esm-bundler'
+import {
+  createApp,
+  defineAsyncComponent
+} from 'vue/dist/vue.esm-bundler'
+import {
+  provide,
+  ref,
+  reactive,
+  readonly
+} from "vue";
+import { useLicence } from "../common/licence";
 import store from '../../../store'
-import {provide, ref, reactive, readonly} from "vue";
-import {useLicence} from "../common/licence";
 
 const CustomizeWrapper = defineAsyncComponent({
   loader: () => import('../../../views/admin/customize/Customize.vue')

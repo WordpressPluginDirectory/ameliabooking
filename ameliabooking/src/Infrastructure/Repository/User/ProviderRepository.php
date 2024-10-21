@@ -182,6 +182,7 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
                     u.zoomUserId AS user_zoom_user_id,
                     u.stripeConnect AS user_stripeConnect,
                     u.translations AS user_translations,
+                    u.timeZone AS user_timeZone,
                     u.badgeId AS badge_id,
                     gd.id AS google_calendar_id,
                     gd.token AS google_calendar_token,

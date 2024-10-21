@@ -81,6 +81,77 @@ let basicLabelsTreatment = {
         'congrats_cart'
       ]
     }
+  },
+  elf: {
+    list: {
+      card: [
+        'person_waiting',
+        'people_waiting',
+        'join_waiting_list',
+      ]
+    },
+    info: {
+      header: [
+        'person_waiting',
+        'people_waiting'
+      ],
+      footer: [
+        'join_waiting_list'
+      ]
+    },
+    tickets: {
+      content: [
+        'person_waiting',
+        'people_waiting'
+      ],
+      footer: [
+        'join_waiting_list'
+      ]
+    },
+    congrats: {
+      heading: [
+        'your_position_on_waiting_list',
+        'waiting_list_notify_message'
+      ]
+    }
+  },
+  ecf: {
+    calendar: {
+      page: [
+        'join_waiting_list',
+        'waiting_list',
+        'person_waiting',
+        'people_waiting',
+      ]
+    },
+    info: {
+      header: [
+        'person_waiting',
+        'people_waiting'
+      ],
+      tabTickets: [
+        'person_waiting',
+        'people_waiting'
+      ],
+      footer: [
+        'join_waiting_list'
+      ]
+    },
+    tickets: {
+      content: [
+        'person_waiting',
+        'people_waiting'
+      ],
+      footer: [
+        'join_waiting_list'
+      ]
+    },
+    congrats: {
+      heading: [
+        'your_position_on_waiting_list',
+        'waiting_list_notify_message'
+      ]
+    }
   }
 }
 
@@ -168,6 +239,10 @@ let starterLabelsTreatment = deepMerge(
         ],
       },
       info: {
+        header: [
+          'total_tax_colon',
+          'incl_tax'
+        ],
         tabTickets: [
           'remove',
         ],
@@ -210,6 +285,29 @@ let starterLabelsTreatment = deepMerge(
           'zoom_link',
           'event_tickets',
           'event_ticket'
+        ]
+      }
+    },
+    ecf: {
+      calendar: {
+        page: [
+          'total_tax_colon',
+          'incl_tax',
+        ]
+      },
+      info: {
+        header: [
+          'total_tax_colon',
+          'incl_tax'
+        ],
+        tabTickets: [
+          'remove',
+        ]
+      },
+      payment: {
+        summarySegment: [
+          'total_tax_colon',
+          'incl_tax',
         ]
       }
     }
@@ -356,6 +454,14 @@ let basicOptionsTreatment = {
       'packageLocation',
       'packageServices'
     ],
+  },
+  elf: {
+    list: ['waitingBtn'],
+    info: ['waitingBtn']
+  },
+  ecf: {
+    calendar: ['waitingBtn'],
+    info: ['waitingBtn']
   }
 }
 
@@ -397,6 +503,14 @@ let starterOptionsTreatment = deepMerge(
       ],
       events: [
         'locationsFilter'
+      ]
+    },
+    ecf: {
+      calendar: [
+        'tax'
+      ],
+      info: [
+        'tax'
       ]
     }
   },

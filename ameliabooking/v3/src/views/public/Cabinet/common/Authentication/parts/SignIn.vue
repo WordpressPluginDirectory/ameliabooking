@@ -87,8 +87,8 @@ import {
   computed,
   inject,
   onMounted,
-  defineComponent,
-  markRaw
+  markRaw,
+  onBeforeMount,
 } from 'vue'
 
 // * Import from Vuex
@@ -149,15 +149,15 @@ let amLabels = computed(() => {
 })
 
 // * Icon components
-let emailIcon = defineComponent({
+let emailIcon = {
   components: {IconComponent},
   template: `<IconComponent icon="email"></IconComponent>`
-})
+}
 
-let passwordIcon = defineComponent({
+let passwordIcon = {
   components: {IconComponent},
   template: `<IconComponent icon="password"></IconComponent>`
-})
+}
 
 /********
  * Form *
@@ -336,12 +336,18 @@ function submitForm() {
   })
 }
 
+onBeforeMount(() => {
+  store.commit('setLoading', true)
+})
+
 onMounted(() => {
   if (!store.getters['auth/getLoggedOut']) {
     useAuthenticateUser(
         vueCookies.get('ameliaToken'),
         'changePass' in useUrlQueryParams(window.location.href)
     )
+  } else {
+    useAuthenticateUser()
   }
 })
 
@@ -407,10 +413,10 @@ export default {
     border-radius: 12px;
     padding: 32px 24px 24px;
     margin: 0 auto;
-    font-family: var(--am-font-family);
+    font-family: var(--am-font-family), sans-serif;
 
     * {
-      font-family: var(--am-font-family);
+      font-family: var(--am-font-family), sans-serif;
       box-sizing: border-box;
     }
 

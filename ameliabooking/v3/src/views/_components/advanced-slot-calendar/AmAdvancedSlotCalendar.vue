@@ -103,7 +103,6 @@
 <script setup>
 // * Import Libraries
 import moment from 'moment'
-import '@fullcalendar/core/vdom'
 import FullCalendar from '@fullcalendar/vue3'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import interactionPlugin from '@fullcalendar/interaction'
@@ -467,80 +466,99 @@ function calendarDayClassBuilder (data) {
  * Click on Day Cell handler
  * @param data
  */
-function calendarDateClick (data) {
-  setTimeout(() => {
-    const advCalendar = advCalendarRef.value.getApi()
-    let advCalendarNode = advCalendarRef.value.$el
 
-    const advCalendarType = advCalendar.currentData.currentViewType
+// * bug - single tap on date cause double click on ios devices
+// * bug fix for iOS devices that had to be removed after publishing the event calendar
+let calEvtClicked = ref(false)
 
-    // * Adding or Removing html class that determines selection state
-    let selectedDayClass = `am-advsc__${advCalendarType}-selected`
-    let disabledDayClass = `am-advsc__${advCalendarType}-disabled`
+// * this function must be removed and its content should be placed inside the calendarDateClick function after releasing the event calendar
+function calendarDateClickFunctionality (data) {
+  const advCalendar = advCalendarRef.value.getApi()
+  let advCalendarNode = advCalendarRef.value.$el
 
-    if (data.dayEl.classList.contains(disabledDayClass)) {
-      return
+  const advCalendarType = advCalendar.currentData.currentViewType
+
+  // * Adding or Removing html class that determines selection state
+  let selectedDayClass = `am-advsc__${advCalendarType}-selected`
+  let disabledDayClass = `am-advsc__${advCalendarType}-disabled`
+
+  if (data.dayEl.classList.contains(disabledDayClass)) {
+    return
+  }
+
+  if (data.dayEl.classList.contains(selectedDayClass)) {
+    isDateSelected.value = false
+
+    data.dayEl.classList.remove(selectedDayClass)
+
+    slotsHeading.value = ''
+
+    emits('unselectDate')
+  } else {
+    isDateSelected.value = true
+
+    if (calendarEventSlot.value && !calendarEventSlots.value.includes(calendarEventSlot.value)) {
+      calendarEventSlot.value = calendarEventSlots.value[0]
+      emits('selectedTime', calendarEventSlot.value)
+    } else if (calendarEventSlot.value && calendarEventSlots.value.includes(calendarEventSlot.value)) {
+    } else if (calendarEventSlots.value.length) {
+      calendarEventSlot.value = calendarEventSlots.value[0]
+      emits('selectedTime', calendarEventSlot.value)
     }
 
-    if (data.dayEl.classList.contains(selectedDayClass)) {
-      isDateSelected.value = false
+    slotsHeading.value = (data.dateStr ? getFrontedFormattedDate(data.dateStr) : data.dateStr) + (calendarEventSlots.value.includes(calendarEventSlot.value)  ? ' - ' + getFrontedFormattedTime(calendarEventSlot.value) : '')
 
-      data.dayEl.classList.remove(selectedDayClass)
-
-      slotsHeading.value = ''
-
-      emits('unselectDate')
-    } else {
-      isDateSelected.value = true
-
-      if (calendarEventSlot.value && !calendarEventSlots.value.includes(calendarEventSlot.value)) {
-        calendarEventSlot.value = calendarEventSlots.value[0]
-        emits('selectedTime', calendarEventSlot.value)
-      } else if (calendarEventSlot.value && calendarEventSlots.value.includes(calendarEventSlot.value)) {
-      } else if (calendarEventSlots.value.length) {
-        calendarEventSlot.value = calendarEventSlots.value[0]
-        emits('selectedTime', calendarEventSlot.value)
+    if (advCalendarNode.querySelectorAll(`.${selectedDayClass}`).length) {
+      for (let i = 0; i < advCalendarNode.querySelectorAll(`.${selectedDayClass}`).length; i++) {
+        advCalendarNode.querySelectorAll(`.${selectedDayClass}`)[i].classList.remove(selectedDayClass)
       }
+    }
 
-      slotsHeading.value = (data.dateStr ? getFrontedFormattedDate(data.dateStr) : data.dateStr) + (calendarEventSlots.value.includes(calendarEventSlot.value)  ? ' - ' + getFrontedFormattedTime(calendarEventSlot.value) : '')
+    if (!data.dayEl.classList.contains(disabledDayClass)) {
+      data.dayEl.classList.add(selectedDayClass)
+    }
 
-      if (advCalendarNode.querySelectorAll(`.${selectedDayClass}`).length) {
-        for (let i = 0; i < advCalendarNode.querySelectorAll(`.${selectedDayClass}`).length; i++) {
-          advCalendarNode.querySelectorAll(`.${selectedDayClass}`)[i].classList.remove(selectedDayClass)
-        }
-      }
-
-      if (!data.dayEl.classList.contains(disabledDayClass)) {
-        data.dayEl.classList.add(selectedDayClass)
-      }
-
-      if (iOS()) {
-        setTimeout(() => {
-          if (containerWrapper.value && calendarEventSlots.value.length && slotsWrapper.value) {
-            useScrollTo(containerWrapper.value, slotsWrapper.value, 20, 300, props.nestedItem)
-          }
-        }, 500)
-      } else {
+    if (iOS()) {
+      setTimeout(() => {
         if (containerWrapper.value && calendarEventSlots.value.length && slotsWrapper.value) {
           useScrollTo(containerWrapper.value, slotsWrapper.value, 20, 300, props.nestedItem)
         }
+      }, 500)
+    } else {
+      if (containerWrapper.value && calendarEventSlots.value.length && slotsWrapper.value) {
+        useScrollTo(containerWrapper.value, slotsWrapper.value, 20, 300, props.nestedItem)
       }
     }
+  }
 
 
-    let selectedSlot = {
-      reference: 'slot',
-      position: 1,
-      value: ''
+  let selectedSlot = {
+    reference: 'slot',
+    position: 1,
+    value: ''
+  }
+  selectedSlot.value = slotsHeading.value ? `${slotsHeading.value}` : ''
+  if (!props.notMultiple && props.date) {
+    selectedSlot.reference = 'package-slot ' + props.id + ' ' + props.serviceId
+  }
+
+  sidebarDataCollector(selectedSlot)
+}
+
+// * this function had to return to its previous state after event calendar release
+function calendarDateClick (data) {
+  setTimeout(() => {
+    if (iOS()){
+      if (calEvtClicked.value) {
+        calendarDateClickFunctionality(data)
+        calEvtClicked.value = false
+      }
+    } else {
+      calendarDateClickFunctionality(data)
     }
-    selectedSlot.value = slotsHeading.value ? `${slotsHeading.value}` : ''
-    if (!props.notMultiple && props.date) {
-      selectedSlot.reference = 'package-slot ' + props.id + ' ' + props.serviceId
-    }
-
-    sidebarDataCollector(selectedSlot)
   }, 300)
 }
+
 
 function iOS() {
   return [
@@ -560,6 +578,7 @@ function iOS() {
  * @param eventData
  */
 function calendarEventClick (eventData) {
+  calEvtClicked.value = true
   emits('selectedDate', moment(eventData.event.start).format('YYYY-MM-DD'))
 }
 

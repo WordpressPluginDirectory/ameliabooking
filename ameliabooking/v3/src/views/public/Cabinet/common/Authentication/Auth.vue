@@ -6,7 +6,6 @@
 // * import from Vue
 import {
   ref,
-  reactive,
   computed,
   markRaw,
   inject,
@@ -27,37 +26,6 @@ import {
 
 // * Root Settings
 const amSettings = inject('settings')
-
-// * Customized form data
-let amCustomize = inject('amCustomize')
-
-// * labels
-const labels = inject('labels')
-
-// * local language short code
-const localLanguage = inject('localLanguage')
-
-// * if local lang is in settings lang
-let langDetection = computed(() => amSettings.general.usedLanguages.includes(localLanguage.value))
-
-// * Computed labels
-let amLabels = computed(() => {
-  let computedLabels = reactive({...labels})
-
-  // if (amSettings.customizedData && amSettings.customizedData.cbf && amSettings.customizedData.cbf.categoriesList.translations) {
-  //   let customizedLabels = amSettings.customizedData.cbf.categoriesList.translations
-  //   Object.keys(customizedLabels).forEach(labelKey => {
-  //     if (customizedLabels[labelKey][localLanguage.value] && langDetection.value) {
-  //       computedLabels[labelKey] = customizedLabels[labelKey][localLanguage.value]
-  //     } else if (customizedLabels[labelKey].default) {
-  //       computedLabels[labelKey] = customizedLabels[labelKey].default
-  //     }
-  //   })
-  // }
-  return computedLabels
-})
-
-provide('amLabels', amLabels)
 
 // * Auth pages
 let authPagesObj = ref({

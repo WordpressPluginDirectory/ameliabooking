@@ -49,7 +49,7 @@
             label-position="top"
           >
             <div
-              class="am-csd__filter"
+              class="am-csd__filter am-csd__filter-employee"
               :class="responsiveClass"
             >
               <el-form-item
@@ -194,7 +194,7 @@ import {
   useUtcValueOffset,
 } from "../../../../../assets/js/common/date";
 import { useColorTransparency } from "../../../../../assets/js/common/colorManipulation.js";
-import { useSortedDateStrings } from "../../../../../assets/js/common/helper.js";
+import {useCurrentTimeZone, useSortedDateStrings} from "../../../../../assets/js/common/helper.js";
 import { useScrollTo } from "../../../../../assets/js/common/scrollElements";
 import { useResponsiveClass } from "../../../../../assets/js/common/responsive";
 import {useCreateBookingSuccess} from "../../../../../assets/js/public/booking";
@@ -472,7 +472,7 @@ function processBooking () {
   }
 }
 
-function getDateTimeData () {
+function getDateTimeData (useUtc) {
   let timeZone = store.getters['cabinet/getTimeZone'] ? store.getters['cabinet/getTimeZone'] : 'UTC'
 
   let localBookingStart = appointmentDate.value + ' ' + appointmentTime.value
@@ -481,7 +481,7 @@ function getDateTimeData () {
 
   let utcOffset = null
 
-  if (timeZone === 'UTC' && amSettings.general.showClientTimeZone) {
+  if (useUtc) {
     let utcBookingStart = useUtcValue(localBookingStart)
 
     utcOffset = useUtcValueOffset(utcBookingStart)
@@ -500,9 +500,16 @@ function getDateTimeData () {
 
 function rescheduleBooking () {
   calendarRef.value.calendarSlotsLoading = true
+
+  let bookingData = getDateTimeData(false)
+
+  if (useCurrentTimeZone() === store.getters['cabinet/getTimeZone'] && amSettings.general.showClientTimeZone) {
+    bookingData.utcOffset = useUtcValueOffset(useUtcValue(appointmentDate.value + ' ' + appointmentTime.value))
+  }
+
   httpClient.post(
     '/bookings/reassign/' + props.appointment.bookings.filter(i => i.status === 'approved' || i.status === 'pending')[0].id,
-    getDateTimeData(),
+      bookingData,
     Object.assign(useAuthorizationHeaderObject(store), {params: {source: 'cabinet-' + cabinetType.value}})
   ).then(() => {
     calendarRef.value.calendarSlotsLoading = false
@@ -548,7 +555,8 @@ function rescheduleBooking () {
 
 function packageBookingApp () {
   calendarRef.value.calendarSlotsLoading = true
-  let bookingDateTimeData = getDateTimeData()
+
+  let bookingDateTimeData = getDateTimeData(useCurrentTimeZone() === store.getters['cabinet/getTimeZone'])
 
   let data = JSON.parse(JSON.stringify(props.appointment))
 

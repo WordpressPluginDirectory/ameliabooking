@@ -377,6 +377,27 @@
           </div>
           <!-- /Catalog -->
 
+          <!-- Event Calendar -->
+          <div class="am-customize-main__form-card" v-if="!$root.licence.isLite">
+            <div class="am-customize-main__form-card__content">
+              <img
+                :src="`${$root.getUrl}v3/src/assets/img/admin/customize/amelia-ev-calendar-2-0.png`"
+                :alt="$root.labels.ecf_booking_form"
+                class="am-customize-main__form-card__content-img"
+              >
+              <div class="am-customize-main__form-card__heading">
+                <h3>
+                  <span>{{$root.labels.ecf_booking_form}}</span>
+                </h3>
+                <p>
+                  {{$root.labels.redesigned_ecf_booking_form}}
+                </p>
+              </div>
+            </div>
+            <el-button @click="goToNewCustomize('ecf')" type="primary">{{ $root.labels.continue }}</el-button>
+          </div>
+          <!-- /Event Calendar -->
+
           <!-- Event List -->
           <div class="am-customize-main__form-card">
             <div class="am-customize-main__form-card__content">

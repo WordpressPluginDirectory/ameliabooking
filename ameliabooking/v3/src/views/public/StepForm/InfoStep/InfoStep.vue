@@ -21,8 +21,8 @@
       label-position="top"
       class="am-fs__info-form"
       :class="[
-        {'am-fs__info-form-mobile': checkScreen},
-        {'am-fs__info-form-mobile-s': mobileS}
+        {'am-fs__info-form-mobile': pageWidth < 330},
+        {'am-fs__info-form-mobile-s': pageWidth < 300}
       ]"
     >
       <template v-for="item in amCustomize.infoStep.order" :key="item.id">
@@ -226,6 +226,7 @@ import { saveStats, useAppointmentBookingData } from "../../../../assets/js/publ
 import { useCustomFields } from "../../../../assets/js/public/customFields";
 import VueGoogleAutocomplete from 'vue-google-autocomplete'
 import useAction from "../../../../assets/js/public/actions";
+import { useElementSize } from "@vueuse/core";
 
 let props = defineProps({
   globalClass: {
@@ -244,15 +245,11 @@ const amLabels = inject('amLabels')
 let amCustomize = inject('amCustomize')
 
 let infoFormWrapperRef = ref(null)
+let {width: pageWidth} = useElementSize(infoFormWrapperRef)
 
 let allFieldsRefs = ref([])
 let primeCollectorRef = ref([])
 let customFieldsRefs = ref([])
-
-// Container Width
-let cWidth = inject('containerWidth', 0)
-let checkScreen = computed(() => cWidth.value < 560 || (cWidth.value - 240 < 520))
-let mobileS = computed(() => cWidth.value < 340)
 
 let customFieldsComponents = reactive({
   text: markRaw(AmInput),

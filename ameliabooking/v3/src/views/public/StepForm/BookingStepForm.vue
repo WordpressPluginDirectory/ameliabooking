@@ -1441,10 +1441,10 @@ onMounted(() => {
 </script>
 
 <style lang="scss">
-@import './src/assets/scss/public/overides/overides';
-@import './src/assets/scss/common/reset/reset';
+@import '../../../assets/scss/public/overides/overides';
+@import '../../../assets/scss/common/reset/reset';
 @import '../../../assets/scss/common/icon-fonts/style';
-@import './src/assets/scss/common/skeleton/skeleton.scss';
+@import '../../../assets/scss/common/skeleton/skeleton.scss';
 
 :root {
   // Colors
@@ -1506,6 +1506,7 @@ onMounted(() => {
       font-family: var(--am-font-family);
       font-style: initial;
       box-sizing: border-box;
+      word-break: break-word;
     }
 
     &.am-fs {

@@ -18,6 +18,7 @@ function setTicketsData (event) {
       customerBookingId: null,
       eventTicketId: ticket.id,
       persons: 0,
+      waiting: 0,
       price: ticket.dateRangePrice ? ticket.dateRangePrice : ticket.price
     })
   })
@@ -32,6 +33,21 @@ function setEmployeeBadgesData (employees, providerBadges) {
       employee.badge = null
     }
   })
+}
+
+function setEventWaitingListSettings (event, settings) {
+  let generalSettings = JSON.parse(JSON.stringify(settings.appointments.waitingListEvents))
+  let parsedSettings = JSON.parse(event.settings)
+
+  // * if global waiting list is turned off
+  if (!generalSettings.enabled && parsedSettings !== null && 'waitingList' in parsedSettings) {
+    parsedSettings.waitingList.enabled = generalSettings.enabled
+  }
+
+  // * waiting list is not in use, but it's enabled
+  if (!('peopleWaiting' in generalSettings)) generalSettings.peopleWaiting = 0
+
+  return parsedSettings !== null && parsedSettings?.waitingList ? parsedSettings.waitingList : generalSettings
 }
 
 function getEntitiesVariableName () {
@@ -50,6 +66,10 @@ export default {
     employees: [],
     customFields: [],
     taxes: [],
+    calendarEvents: [],
+    upcomingEvents: [],
+    upcomingLoading: true,
+    eventsDisplay: ''
   }),
 
   getters: {
@@ -87,8 +107,9 @@ export default {
 
     getFilteredTags: (state) => (shortcode) => {
       return state.tags.filter(t =>
-          (shortcode.tags && shortcode.tags.length > 0 ? shortcode.tags.includes(t.name) : true ) &&
-          (shortcode.ids && shortcode.ids.length > 0 ? state.events.map(e => e.tags).flat().filter(tag => tag.name === t.name).length > 0 : true)
+        (shortcode.tags && shortcode.tags.length > 0 ? shortcode.tags.includes(t.name) : true )
+        // ! this cause problems on visibility filter tag field
+        && (shortcode.ids && shortcode.ids.length > 0 ? state.events.map(e => e.tags).flat().filter(tag => tag.name === t.name).length > 0 : true)
       )
     },
 
@@ -99,6 +120,22 @@ export default {
     getTax: (state) => (id) => {
       return state.taxes.find(i => parseInt(i.id) === parseInt(id)) || null
     },
+
+    getCalendarEvents (state) {
+      return state.calendarEvents
+    },
+
+    getUpcomingEvents (state) {
+      return state.upcomingEvents
+    },
+
+    getUpcomingLoading (state) {
+      return state.upcomingLoading
+    },
+
+    getEventsDisplay (state) {
+      return state.eventsDisplay
+    }
   },
 
   mutations: {
@@ -126,22 +163,28 @@ export default {
       state.customFields = [...Object.values(payload)]
     },
 
-    // setPreselectedValues (state, payload) {
-      // if (payload.eventId && !payload.eventRecurring) {
-      //   state.events = state.events.filter(e => e.id === parseInt(payload.eventId))
-      // }
-      //
-      // if (payload.eventTag) {
-      //   state.tags = state.tags.filter(t => t.name === payload.eventTag)
-      //   state.events = state.events.filter(e =>
-      //     e.tags.filter(t => t.name === payload.eventTag).length > 0
-      //   )
-      // }
-      //
-      // if (payload.eventRecurring) {
-      //   state.events = state.events.filter(e => e.recurring !== null)
-      // }
-    // },
+    setCalendarEvents (state, payload) {
+      state.calendarEvents = payload
+    },
+
+    setUpcomingEvents (state, payload) {
+      state.upcomingEvents = payload
+    },
+
+    setArrayPartsToEvents (state, payload) {
+      const eventIds = new Set(state.events.map(item => item.id))
+      const filteredArrayParts = payload.filter(item => !eventIds.has(item.id))
+
+      state.events = [...state.events, ...filteredArrayParts]
+    },
+
+    setUpcomingLoading (state, payload) {
+      state.upcomingLoading = payload
+    },
+
+    setEventsDisplay (state, payload) {
+      state.eventsDisplay = payload
+    }
   },
 
   actions: {
@@ -182,7 +225,7 @@ export default {
       }
     },
 
-    fillingOutData ({ commit, dispatch, rootState }, payload) {
+    fillingOutData ({ commit, dispatch, rootState, getters }, payload) {
       let availableTranslationsShort = rootState.settings.general.usedLanguages.map(
         key => key.length > 2 ? key.slice(0, 2) : key
       )
@@ -212,13 +255,22 @@ export default {
         )
       })
 
-      dispatch('requestEvents')
+      if (getters['getEventsDisplay']) {
+        dispatch('requestEvents', getters['getEventsDisplay'])
+      } else {
+        dispatch('requestEvents')
+      }
     },
 
-    requestEvents ({ commit, rootState, rootGetters }) {
+    requestEvents ({ commit, rootState, rootGetters }, payload) {
       let eventParams = {...rootGetters['params/getEventParams'], page: rootGetters['pagination/getPage']}
 
-      commit('setLoading', true, {root: true})
+      if (payload === 'upcoming') {
+        commit('setUpcomingLoading', true)
+        eventParams = {...rootGetters['params/getUpcomingEventParams'], page: rootGetters['pagination/getPage']}
+      } else {
+        commit('setLoading', true, {root: true})
+      }
 
       httpClient.get(
         '/events',
@@ -253,6 +305,8 @@ export default {
             event.bookingToEventTickets = setTicketsData(event)
           }
 
+          event.waitingList = setEventWaitingListSettings(event, rootState.settings)
+
           events.push(event)
 
           if (rootState.settings.general.showClientTimeZone) {
@@ -275,18 +329,22 @@ export default {
           }
         })
 
-        commit('setEvents', events)
-
-        // ! this need to be considered for removing
-        // if (
-        //   state.events.length === 1
-        //   && Math.ceil(rootGetters['pagination/getCount']/rootGetters['pagination/getShow']) < 2
-        // ) {
-        //   commit('params/setId', (state.events[0].id).toString(), { root: true })
-        // }
+        if (payload === 'calendar') {
+          commit('setCalendarEvents', events)
+          commit('setArrayPartsToEvents', events)
+        } else if (payload === 'upcoming') {
+          commit('setUpcomingEvents', events)
+          commit('setArrayPartsToEvents', events)
+        } else {
+          commit('setEvents', events)
+        }
 
         commit('setReady', true, { root: true })
-        commit('setLoading', false, {root: true})
+        if (payload === 'upcoming') {
+          commit('setUpcomingLoading', false)
+        } else {
+          commit('setLoading', false, { root: true })
+        }
       })
     },
   }

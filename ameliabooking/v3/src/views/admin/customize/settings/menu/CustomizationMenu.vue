@@ -29,8 +29,8 @@
       </div>
       <AmSettingsCard
         v-for="card in settingsCardArray"
-        :class="useLicenceMenuClass(card.trigger, licence)"
         :key="card.heading"
+        :class="useLicenceMenuClass(card.trigger, licence)"
         class="am-cs-menu__card"
         :header="card.heading"
         :content="card.content"
@@ -352,11 +352,55 @@ let capcMenuCards = computed(() => {
   return capcPanelMenuArr.value
 })
 
+// * ecf - Event Calendar Form , csb - customize sidebar
+let ecfMenuArr = ref([
+  {
+    heading: amLabels.csb_events_calendar,
+    content: amLabels.csb_events_calendar_content,
+    trigger: 'calendar',
+    index: 0,
+  },
+  {
+    heading: amLabels.csb_event_info,
+    content: amLabels.csb_event_info_content,
+    trigger: 'info',
+    index: 1
+  },
+  {
+    heading: amLabels.csb_event_tickets,
+    content: amLabels.csb_event_tickets_content,
+    trigger: 'tickets',
+    index: 2
+  },
+  {
+    heading: amLabels.csb_event_customer,
+    content: amLabels.csb_event_customer_content,
+    trigger: 'customerInfo',
+    index: 3
+  },
+  {
+    heading: amLabels.csb_event_payment,
+    content: amLabels.csb_event_payment_content,
+    trigger: 'payment',
+    index: 4
+  },
+  {
+    heading: amLabels.csb_event_congratulations,
+    content: amLabels.csb_event_congratulations_content,
+    trigger: 'congrats',
+    index: 5
+  }
+])
+let ecfMenuCards = computed(() => {
+  return ecfMenuArr.value
+})
+
 // * Cards in customize sidebar
 let settingsCardArray = computed(() => {
   if (pageRenderKey.value === 'cbf') return cbfMenuCards.value
   if (pageRenderKey.value === 'elf') return elfMenuCards.value
   if (pageRenderKey.value === 'capc') return capcMenuCards.value
+  if (pageRenderKey.value === 'ecf') return ecfMenuCards.value
 
   return sbsMenuCards.value
 })

@@ -24,6 +24,10 @@ export default {
         {
           value: 'no-show',
           label: this.$root.labels['no-show']
+        },
+        {
+          value: 'waiting',
+          label: this.$root.labels.waiting_list
         }
       ]
     }

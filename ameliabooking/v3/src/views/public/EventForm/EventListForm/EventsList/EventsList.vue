@@ -92,7 +92,7 @@
               :existing-date="dateFilter"
               :presistant="false"
               :disabled="false"
-              @selected-date="(dateString) => {store.commit('params/setDates', dateString)}"
+              @selected-date="(dateString) => {store.commit('params/setDates', [dateString])}"
             ></AmDatePickerFull>
           </div>
         </div>
@@ -171,7 +171,6 @@ import {
   watch,
   inject,
   computed,
-  defineComponent,
   reactive, onMounted,
 } from "vue"
 
@@ -276,10 +275,10 @@ function changePage () {
   store.dispatch('eventEntities/requestEvents')
 }
 
-let filterIcon = defineComponent({
+let filterIcon = {
   components: {IconComponent},
   template: `<IconComponent icon="filter"/>`
-})
+}
 
 // * Locations array
 let locations = computed(() => store.getters['eventEntities/getFilteredLocations'](store.getters['params/getShortcodeParams']))
@@ -346,10 +345,10 @@ let eventSearch = computed({
   }
 })
 
-let iconSearch = defineComponent({
+let iconSearch = {
   components: {IconComponent},
   template: `<IconComponent icon="search"/>`
-})
+}
 
 let tagFilter = computed({
   get: () => {
@@ -370,7 +369,7 @@ let locationFilter = computed({
 })
 
 let dateFilter = computed(() => {
-  return store.getters['params/getDates']
+  return store.getters['params/getDates'][0]
 })
 
 let typingInSearch = ref(null)
@@ -420,7 +419,7 @@ export default {
 
     * {
       box-sizing: border-box;
-      font-family: var(--am-font-family);
+      font-family: var(--am-font-family), sans-serif;
       word-break: break-word;
     }
 

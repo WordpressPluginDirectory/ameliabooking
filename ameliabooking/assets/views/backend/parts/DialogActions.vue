@@ -89,10 +89,10 @@
         <!-- Dialog Save Confirm -->
         <transition name="slide-vertical">
           <div class="am-dialog-confirmation" v-show="showSaveConfirmation">
-            <h3 v-if="buttonText">{{ message.confirm.save }}
+            <h3 v-if="buttonText" style="display: block;">{{ message.confirm.save }}
               <span v-if="message.confirm.saveDetails">{{ message.confirm.saveDetails }}</span>
             </h3>
-            <div class="align-left" v-if="buttonText">
+            <div class="align-left" style="display: block;" v-if="buttonText">
               <el-button type="primary" size="small" @click="onSubmit(false)">
                 {{ getConfirmSaveButtonText().no }}
               </el-button>
@@ -100,6 +100,7 @@
                 {{ getConfirmSaveButtonText().yes }}
               </el-button>
             </div>
+            <el-col :span="22">
             <el-alert
               v-if="action.haveSaveWarning"
               title=""
@@ -110,6 +111,8 @@
               style="word-break: break-word;"
             >
             </el-alert>
+            </el-col>
+            <el-col :span="2">
             <el-button
               v-if="showSaveConfirmation"
               @click="showSaveConfirmation = false"
@@ -117,6 +120,7 @@
               size="small"
               icon="el-icon-close"
             ></el-button>
+            </el-col>
           </div>
         </transition>
 

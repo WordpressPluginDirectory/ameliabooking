@@ -86,6 +86,13 @@
           {{ props.labels[eventStatus] }}
         </p>
         <p
+          v-if="props.customizedOptions.slots.visibility && useWaitingListAvailability(props.event) && useWaitingListOccupancy(props.event) > 0"
+          class="am-ec__info-waiting-list"
+        >
+          {{ useWaitingListOccupancy(props.event) }}
+          {{ useWaitingListOccupancy(props.event) === 1 ? props.labels.person_waiting : props.labels.people_waiting }}
+        </p>
+        <p
           v-if="props.customizedOptions.slots.visibility && showEventCapacity(eventStatus)"
           class="am-ec__info-capacity"
         >
@@ -131,10 +138,11 @@
       >
         <AmButton
           :size="componentWidth > 500 ? 'small' : 'medium'"
-          :type="eventStatus !== 'open' ? props.customizedOptions.infoBtn.buttonType : props.customizedOptions.bookingBtn.buttonType"
+          :type="bookingBtnType"
+          :category="useWaitingListAvailability(props.event) ? 'waiting' : 'primary'"
           @click="selectEvent(props.event.id)"
         >
-          {{ eventStatus !== 'open' ? props.labels.event_learn_more : props.labels.event_read_more}}
+          {{ useWaitingListAvailability(props.event) ? props.labels.join_waiting_list : eventStatus !== 'open' ? props.labels.event_learn_more : props.labels.event_read_more }}
         </AmButton>
       </p>
     </div>
@@ -160,7 +168,9 @@ import {
   useMinTicketPrice,
   showEventCapacity,
   useEventStatus,
-  useCheckIfEventNotFree
+  useCheckIfEventNotFree,
+  useWaitingListAvailability,
+  useWaitingListOccupancy
 } from "../../../../../assets/js/public/events.js";
 import {
   getEventFrontedFormattedTime,
@@ -276,6 +286,22 @@ let responsiveClass = computed(() => useResponsiveClass(componentWidth.value))
 // * Event Status
 let eventStatus = computed(() => {
   return useEventStatus(props.event)
+})
+
+let bookingBtnType = computed(() => {
+  if (useWaitingListAvailability(props.event)) {
+    if ('waitingBtn' in props.customizedOptions) {
+      return props.customizedOptions.waitingBtn.buttonType
+    }
+
+    return 'filled'
+  }
+
+  if (eventStatus.value !== 'open') {
+    return props.customizedOptions.infoBtn.buttonType
+  }
+
+  return props.customizedOptions.bookingBtn.buttonType
 })
 
 let eventPlaces = computed(() => {
@@ -591,6 +617,14 @@ export default {
           margin: 0 0 0 4px;
           color: var(--am-c-ec-text-op80);
         }
+      }
+
+      &-waiting-list {
+        color: var(--am-c-ec-warning);
+        font-size: 15px;
+        line-height: 1.6;
+        font-weight: 500;
+        margin: 0;
       }
     }
 

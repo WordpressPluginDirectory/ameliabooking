@@ -131,11 +131,11 @@
           <el-col :md="8">
             <div class="am-settings-card">
               <h3><img :src="$root.getUrl + 'public/img/appointment-settings.svg'" class="svg-amelia"/>
-                {{ $root.labels.appointments }}
+                {{ $root.labels.appointments_and_events }}
               </h3>
               <p>{{ $root.labels.appointments_settings_description }}</p>
               <p class="link" @click="showDialogSettingsAppointments">
-                {{ $root.labels.view_appointments_settings }}
+                {{ $root.labels.view_appointments_and_events_settings }}
               </p>
             </div>
           </el-col>

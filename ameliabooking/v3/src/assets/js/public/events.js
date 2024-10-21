@@ -109,11 +109,61 @@ function useEventStatus (evt) {
   }
 }
 
+function useWaitingListAvailability(evt) {
+  if (evt?.closed || !evt?.waitingList?.enabled) {
+    return false;
+  }
+
+  let capacityRule;
+  let waitingAlreadyStarted = 0
+
+  if (evt.customPricing) {
+    let capacityRulePerTicket = []
+    const peoplePerTicket = evt.customTickets.reduce((total, ticket) => {
+      if (!evt.maxCustomCapacity) {
+        capacityRulePerTicket.push(ticket.waitingListSpots > ticket.waiting)
+      } else {
+        total += ticket.waiting;
+      }
+      return total + ticket.waiting;
+    }, 0);
+
+    if (!evt.maxCustomCapacity) {
+      capacityRule = capacityRulePerTicket.some(rule => rule === true)
+    } else {
+      capacityRule = evt.waitingList.maxCapacity > evt.waitingList.peopleWaiting;
+    }
+
+    waitingAlreadyStarted = peoplePerTicket
+  } else {
+    capacityRule = evt.waitingList.maxCapacity > evt.waitingList.peopleWaiting;
+    waitingAlreadyStarted = evt.waitingList.peopleWaiting;
+  }
+
+  return capacityRule && (evt.full || waitingAlreadyStarted !== 0)
+}
+
+function useWaitingListOccupancy (evt) {
+  let spots = 0
+
+  if (evt.customPricing) {
+    evt.customTickets.forEach(ticket => {
+      spots += ticket.waiting
+    })
+  } else {
+    spots = evt.waitingList.peopleWaiting
+  }
+
+  return spots
+}
+
 export {
   // getEventAvailability,
   useEventLocation,
   useMinTicketPrice,
   showEventCapacity,
   useEventStatus,
-  useCheckIfEventNotFree
+  useCheckIfEventNotFree,
+  useWaitingListAvailability,
+  useWaitingListOccupancy
 }

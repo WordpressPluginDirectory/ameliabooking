@@ -1312,6 +1312,163 @@
 
           </el-tab-pane>
 
+          <!-- Waiting List -->
+          <el-tab-pane
+              :label="$root.labels.waiting_list"
+              name="waitingList"
+              v-if="notInLicence('pro') ? licenceVisible() : $root.settings.appointments.waitingListEvents.enabled"
+          >
+            <LicenceBlockHeader :licence="'pro'"/>
+            <div class="am-setting-box am-switch-box" :class="licenceClassDisabled('pro')">
+              <el-row type="flex" align="middle" :gutter="24" style="display: flex;">
+                <el-col :span="20">
+                  <span style="line-height: 1;">{{ $root.labels.events_show_waiting_list_booking_full }}</span>
+                </el-col>
+                <el-col :span="4" class="align-right">
+                  <el-switch
+                    v-model="event.settings.waitingList.enabled"
+                    active-text=""
+                    inactive-text=""
+                  >
+                  </el-switch>
+                </el-col>
+              </el-row>
+              <el-row align="middle" :gutter="24" style="margin-top: 24px" v-if="event.settings.waitingList.enabled">
+
+                <!-- Waiting List adding method -->
+                <!--<el-col :span="24">
+                  {{ $root.labels.waiting_list_adding_method }}:
+                </el-col>
+                <el-col :span="24">
+                  <el-radio
+                      label="Manually"
+                      v-model="event.settings.waitingList.addingMethod"
+                      style="margin-top: 4px;"
+                  >
+                    {{ $root.labels.waiting_list_adding_method_manual }}
+                    <el-tooltip placement="top" :popper-class="'am-tooltip-waiting-list'">
+                      <div slot="content" v-html="$root.labels.waiting_list_adding_method_manual_tt"></div>
+                      <i class="el-icon-question am-tooltip-icon"></i>
+                    </el-tooltip>
+                  </el-radio>
+                </el-col>
+                <el-col :span="24">
+                  <el-radio
+                      label="Automatically"
+                      v-model="event.settings.waitingList.addingMethod"
+                      style="margin-top: 8px;"
+                      :disabled="true"
+                  >
+                    {{ $root.labels.waiting_list_adding_method_auto }}
+                    <el-tooltip placement="top" :popper-class="'am-tooltip-waiting-list'">
+                      <div slot="content" v-html="$root.labels.waiting_list_adding_method_auto_tt"></div>
+                      <i class="el-icon-question am-tooltip-icon"></i>
+                    </el-tooltip>
+                  </el-radio>
+                </el-col>-->
+
+                <!-- Max capacity -->
+                <el-col :span="24" style="margin-top: 24px;">
+                  {{ $root.labels.maximum_capacity }}:
+                </el-col>
+                <el-col :span="24" style="margin-top: 8px;">
+                  <el-input-number
+                    v-model="event.settings.waitingList.maxCapacity"
+                    :min="1"
+                    auto-complete="off"
+                    :disabled="customPricingEnabled && !maxCustomCapacity"
+                  >
+                  </el-input-number>
+                </el-col>
+
+                <!-- waiting list tickets -->
+                <div
+                  v-if="isCabinet ? !notInLicence() : customPricingEnabled"
+                  :class="licenceClass()"
+                  :style="{padding: '12px', display: 'flex', flexDirection: 'column'}"
+                >
+
+                  <el-form-item v-if="customPricingEnabled">
+                    <el-row :style="{flexWrap: 'wrap'}">
+                      <el-col :style="{marginBottom: '12px'}" class="am-event-ticket-row">
+                        <!-- Ticket Categories Header-->
+                        <el-row
+                          type="flex"
+                          :gutter="24"
+                          :style="{borderBottom: '1px solid #E2E6EC', padding: '12px', marginBottom: '8px', wordBreak: 'break-word'}"
+                        >
+                          <el-col :span="7">
+                            <div>
+                              {{ $root.labels.name }}
+                            </div>
+                          </el-col>
+                          <el-col :span="10"></el-col>
+                          <el-col :span="7">{{ $root.labels.event_spots }}</el-col>
+                        </el-row>
+                        <!-- /Ticket Categories Header-->
+
+                        <!-- Ticket Categories List-->
+                        <el-row
+                          type="flex"
+                          align="middle"
+                          :gutter="24"
+                          :style="{padding: '12px', background: '#F9FAFB', marginBottom: '12px'}"
+                          v-for="(ticket, index) in customTickets"
+                          :key="index"
+                          v-model="customTickets[index]"
+                          class="am-section-grey"
+                        >
+                          <el-col :span="7">
+                            <el-input
+                              :style="{marginBottom: '0px'}"
+                              v-model="ticket.name"
+                              :disabled="true"
+                              size="small">
+                            </el-input>
+                          </el-col>
+                          <el-col :span="10"></el-col>
+                          <el-col :span="7">
+                            <el-input-number
+                              v-model="ticket.waitingListSpots"
+                              :style="{marginBottom: '0px', textAlign: 'center'}"
+                              size="small"
+                              :min="0"
+                              :disabled="!ticket.enabled || maxCustomCapacity"
+                            >
+                            </el-input-number>
+                          </el-col>
+                        </el-row>
+                        <!-- /Ticket Categories List-->
+                      </el-col>
+                    </el-row>
+                  </el-form-item>
+                </div>
+                <!-- /waiting list tickets -->
+
+                <!-- Max ticket per person -->
+                  <div class="am-waiting-list-limit-per-ticket-box">
+                    <el-col :span="15">
+                      <el-checkbox
+                        v-model="event.settings.waitingList.maxExtraPeopleEnabled"
+                      >
+                        {{ $root.labels.limit_extra_people }}
+                      </el-checkbox>
+                    </el-col>
+                    <el-col :span="9">
+                      <el-input-number
+                        :disabled="!event.settings.waitingList.maxExtraPeopleEnabled"
+                        v-model="event.settings.waitingList.maxExtraPeople"
+                        :min="0"
+                        size="small"
+                        auto-complete="off"
+                      ></el-input-number>
+                    </el-col>
+                  </div>
+              </el-row>
+            </div>
+          </el-tab-pane>
+          <!-- /Waiting List -->
+
           <el-tab-pane :label="$root.labels.settings" name="settings">
             <entity-settings
               :settings="settings"
@@ -1374,6 +1531,9 @@
             status: originRecurring.until ? {
               yes: event.status === 'rejected' ? $root.labels.open_following : $root.labels.cancel_following,
               no: $root.labels.save_single
+            } : event.status === 'rejected' ? {
+              yes: $root.labels.open_following,
+              no: $root.labels.open_following
             } : null,
             remove: originRecurring.until ? {
               yes: $root.labels.delete_following,
@@ -2014,6 +2174,7 @@
           enabled: true,
           name: '',
           spots: 1,
+          waitingListSpots: 0,
           price: 0
         }
 
@@ -2173,6 +2334,7 @@
               enabled: ticket.enabled,
               name: ticket.name,
               spots: ticket.spots,
+              waitingListSpots: ticket.waitingListSpots,
               price: ticket.price,
               translations: ticket.translations ? ticket.translations : ''
             })
@@ -2304,6 +2466,7 @@
             name: ticket.name,
             price: ticket.price,
             spots: ticket.spots,
+            waitingListSpots: ticket.waitingListSpots,
             enabled: ticket.enabled,
             dateRanges: [],
             translations: ticket.translations
@@ -2331,7 +2494,8 @@
           ticket.dateRanges = JSON.stringify(ticket.dateRanges)
         })
 
-        let providers = this.event.providers
+        let providers = JSON.parse(JSON.stringify(this.event.providers))
+
         if (this.currentUser && this.currentUser.type === 'provider') {
           if (this.event.organizerId === this.currentUser.id) {
             const index = providers.map(p => p.id).indexOf(this.event.organizerId)

@@ -20,6 +20,7 @@ import coupon from "../../../store/modules/coupon.js";
 import auth from "../../../store/modules/auth.js";
 import cabinet from "../../../store/modules/cabinet.js";
 import cabinetFilters from "../../../store/modules/cabinetFilters.js"
+import eventWaitingListOptions from "../../../store/modules/eventWaitingListOptions";
 
 import {
   provide,
@@ -48,6 +49,10 @@ const CatalogFormWrapper = defineAsyncComponent({
 
 const EventsListFormWrapper = defineAsyncComponent({
   loader: () => import('../../../views/public/EventForm/EventListForm/EventsListForm.vue'),
+})
+
+const EventsCalendarFormWrapper = defineAsyncComponent({
+  loader: () => import('../../../views/public/EventForm/EventCalendarForm/EvensCalendarForm.vue'),
 })
 
 const DialogForms = defineAsyncComponent({
@@ -223,6 +228,7 @@ function createAmelia(shortcodeData) {
     .component('StepFormWrapper', StepFormWrapper)
     .component('CatalogFormWrapper', CatalogFormWrapper)
     .component('EventsListFormWrapper', EventsListFormWrapper)
+    .component('EventsCalendarFormWrapper', EventsCalendarFormWrapper)
     .component('DialogForms', DialogForms)
     .component('CustomerPanelWrapper', CustomerPanelWrapper)
     .use(
@@ -302,7 +308,8 @@ function createAmelia(shortcodeData) {
           coupon,
           auth,
           cabinet,
-          cabinetFilters
+          cabinetFilters,
+          eventWaitingListOptions
         },
       })
     )
