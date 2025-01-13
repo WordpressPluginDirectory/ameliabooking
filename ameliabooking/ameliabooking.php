@@ -3,7 +3,7 @@
 Plugin Name: Amelia
 Plugin URI: https://wpamelia.com/
 Description: Amelia is a simple yet powerful automated booking specialist, working 24/7 to make sure your customers can make appointments and events even while you sleep!
-Version: 1.2.12
+Version: 1.2.15
 Author: TMS
 Author URI: https://tmsproducts.io/
 Text Domain: wpamelia
@@ -104,7 +104,7 @@ if (!defined('AMELIA_LOGIN_URL')) {
 
 // Const for Amelia version
 if (!defined('AMELIA_VERSION')) {
-    define('AMELIA_VERSION', '1.2.12');
+    define('AMELIA_VERSION', '1.2.15');
 }
 
 // Const for site URL
@@ -257,15 +257,6 @@ class Plugin
                 ErrorService::setNotices();
             }
 
-            $menuItems = new Menu($settingsService);
-
-            // Init admin menu
-            $wpMenu = new Submenu(
-                new SubmenuPageHandler($settingsService),
-                $menuItems()
-            );
-            $wpMenu->init();
-
             // Add TinyMCE button for shortcode generator
             ButtonService::renderButton();
 
@@ -380,6 +371,21 @@ class Plugin
             return $data;
         }
 
+    }
+
+    public static function initMenu()
+    {
+        $settingsService = new SettingsService(new SettingsStorage());
+
+        $menuItems = new Menu($settingsService);
+
+        // Init admin menu
+        $wpMenu = new Submenu(
+            new SubmenuPageHandler($settingsService),
+            $menuItems()
+        );
+
+        $wpMenu->addOptionsPages();
     }
 
     public static function adminInit()
@@ -544,6 +550,8 @@ add_action('wp_ajax_nopriv_wpamelia_api', array('AmeliaBooking\Plugin', 'wpAmeli
 add_action('plugins_loaded', array('AmeliaBooking\Plugin', 'init'));
 
 add_action('admin_init', array('AmeliaBooking\Plugin', 'adminInit'));
+
+add_action('admin_menu', array('AmeliaBooking\Plugin', 'initMenu'));
 
 /** Activation hooks */
 register_activation_hook(__FILE__, array('AmeliaBooking\Plugin', 'activation'));
