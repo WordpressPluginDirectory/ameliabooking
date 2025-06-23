@@ -177,7 +177,7 @@
               {{ $root.labels.our_support_team }}
             </div>
 
-            <a class="am-whats-new-btn" href="https://tmsplugins.ticksy.com/submit/#100012870" target="_blank">
+            <a class="am-whats-new-btn" href="https://wpamelia.com/contact/" target="_blank">
               {{ $root.labels.contact_our_support }}
             </a>
 
@@ -202,7 +202,7 @@ export default {
        isValidEmail: true,
        blogPosts: [],
        changelog: {
-         version: '8.2.1',
+         version: '8.3.2',
          starter: {
            feature: [
            ],
@@ -211,8 +211,10 @@ export default {
            translations: [
            ],
            bugfix: [
-             'Fixed issue with time slots that include buffer times spanning two days, particularly around midnight',
-             'Fixed issue with adding blocked customers to events'
+             'Fixed issue with certain slots being shown as \'Booked\' on the backend when they are available',
+             'Fixed issue with customers booking the same appointment when rescheduling',
+             'Fixed issue with dates for the “Event closes on” option',
+             'Fixed issue with \'Notify customers\' option when changing status in the edit appointment dialog',
            ],
            other: [
              'Other small bug fixes and stability improvements'
@@ -222,15 +224,16 @@ export default {
            feature: [
            ],
            improvement: [
+             'Enhanced and updated Stripe integration for improved performance and reliability',
+             'Added VAT number display on invoices'
            ],
            translations: [
-             'Updated French translation'
            ],
            bugfix: [
-             'Fixed issue with the Step by step form when Google is connected and different timezones',
-             'Fixed issue with canceled appointments and booking new with different location',
-             'Fixed issue with Stripe 3D Secure payments',
-             'Fixed issue with deleting an employee added as Organizer to an event'
+             'Fixed conflict with Divi theme in connection to Google Maps Api key',
+             'Fixed issue with Outlook and Locations from custom fields',
+             'Fixed issue with payment status when WooCommerce has included taxes',
+             'Fixed issue with description format on the new WooCommerce blocks'
            ],
            other: [
            ]
@@ -243,7 +246,8 @@ export default {
            translations: [
            ],
            bugfix: [
-             'Fixed issue with WooCommerce order details when recurring/cart appointments updated'
+             'Fixed issue with duplicating appointments on the Manage packages page',
+             'Fixed issue with Stripe Connect and 3D secure'
            ],
            other: [
            ]

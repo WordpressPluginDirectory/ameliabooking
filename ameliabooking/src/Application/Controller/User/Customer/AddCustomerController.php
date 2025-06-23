@@ -36,7 +36,8 @@ class AddCustomerController extends Controller
         'externalId',
         'pictureFullPath',
         'pictureThumbPath',
-        'translations'
+        'translations',
+        'customFields'
     ];
 
     /**
@@ -50,7 +51,7 @@ class AddCustomerController extends Controller
      */
     protected function instantiateCommand(Request $request, $args)
     {
-        $command = new AddCustomerCommand($args);
+        $command     = new AddCustomerCommand($args);
         $requestBody = $request->getParsedBody();
         $this->setCommandFields($command, $requestBody);
         $command->setToken($request);

@@ -47,9 +47,6 @@ class UpdateCustomerCommandHandler extends CommandHandler
         /** @var UserApplicationService $userAS */
         $userAS = $this->getContainer()->get('application.user.service');
 
-        /** @var Customer $oldUser */
-        $oldUser = null;
-
         /** @var UserRepository $userRepository */
         $userRepository = $this->getContainer()->get('domain.users.repository');
 
@@ -60,13 +57,16 @@ class UpdateCustomerCommandHandler extends CommandHandler
         if (!$command->getPermissionService()->currentUserCanWrite(Entities::CUSTOMERS)) {
             if ($command->getToken()) {
                 /** @var AbstractUser $provider */
-                $provider = $userAS->getAuthenticatedUser($command->getToken(), false, 'providerCabinet');
+                $provider = $command->getCabinetType() === 'provider'
+                    ? $userAS->getAuthenticatedUser($command->getToken(), false, 'providerCabinet')
+                    : null;
 
                 $oldUser = $provider === null
                     ? $userAS->getAuthenticatedUser($command->getToken(), false, 'customerCabinet')
                     : $userRepository->getById($customerData['id']);
 
-                if ($provider === null &&
+                if (
+                    $provider === null &&
                     ($oldUser === null || $oldUser->getId()->getValue() !== intval($command->getArg('id')))
                 ) {
                     $result->setResult(CommandResult::RESULT_ERROR);
@@ -96,7 +96,8 @@ class UpdateCustomerCommandHandler extends CommandHandler
         /** @var AbstractUser $currentUser */
         $currentUser = $this->container->get('logged.in.user');
 
-        if ($command->getField('email') === '' &&
+        if (
+            $command->getField('email') === '' &&
             !$settingsService->getSetting('roles', 'allowCustomerDeleteProfile') &&
             (!$currentUser || $currentUser->getType() === AbstractUser::USER_ROLE_CUSTOMER)
         ) {
@@ -119,14 +120,7 @@ class UpdateCustomerCommandHandler extends CommandHandler
         /** @var Customer $newUser */
         $newUser = UserFactory::create($newUserData);
 
-        if (!($newUser instanceof AbstractUser)) {
-            $result->setResult(CommandResult::RESULT_ERROR);
-            $result->setMessage('Could not update user.');
-
-            return $result;
-        }
-
-        if ($oldUser &&
+        if (
             $userRepository->getByEmail($newUser->getEmail()->getValue()) &&
             $oldUser->getEmail()->getValue() !== $newUser->getEmail()->getValue()
         ) {
@@ -150,7 +144,7 @@ class UpdateCustomerCommandHandler extends CommandHandler
             }
         }
 
-        do_action('amelia_before_customer_updated', $newUser? $newUser->toArray() : null);
+        do_action('amelia_before_customer_updated', $newUser ? $newUser->toArray() : null);
 
         if (!$userRepository->update($command->getArg('id'), $newUser)) {
             $userRepository->rollback();
@@ -166,7 +160,7 @@ class UpdateCustomerCommandHandler extends CommandHandler
             $userAS = $this->getContainer()->get('application.user.service');
 
             $userAS->setWpUserIdForNewUser($command->getArg('id'), $newUser);
-        } else if ($newUser->getExternalId() && $newUser->getExternalId()->getValue()) {
+        } elseif ($newUser->getExternalId() && $newUser->getExternalId()->getValue()) {
             add_filter('amelia_user_profile_updated', '__return_true');
             wp_update_user(
                 [

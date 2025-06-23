@@ -64,10 +64,10 @@ class UserFactory
                 );
                 break;
             case 'provider':
-                $weekDayList = [];
-                $dayOffList = [];
-                $specialDayList = [];
-                $serviceList = [];
+                $weekDayList     = [];
+                $dayOffList      = [];
+                $specialDayList  = [];
+                $serviceList     = [];
                 $appointmentList = [];
 
                 Licence\DataModifier::userFactory($data);
@@ -248,6 +248,10 @@ class UserFactory
                     $user->setTranslations(new Json($data['translations']));
                 }
 
+                if (!empty($data['customFields'])) {
+                    $user->setCustomFields(new Json($data['customFields']));
+                }
+
                 break;
         }
 
@@ -266,7 +270,7 @@ class UserFactory
         if (!empty($data['birthday'])) {
             if (is_string($data['birthday'])) {
                 $user->setBirthday(new Birthday(\DateTime::createFromFormat('Y-m-d', $data['birthday'])));
-            } else if (is_array($data['birthday'])) {
+            } elseif (is_array($data['birthday'])) {
                 $user->setBirthday(new Birthday(\DateTime::createFromFormat('Y-m-d', explode(' ', $data['birthday']['date'])[0])));
             } else {
                 $user->setBirthday(new Birthday($data['birthday']));

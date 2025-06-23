@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @copyright © TMS-Plugins. All rights reserved.
  * @licence   See LICENCE.md for license details.
@@ -20,7 +21,6 @@ use AmeliaBooking\Domain\Entity\CustomField\CustomField;
 use AmeliaBooking\Domain\Entity\Entities;
 use AmeliaBooking\Domain\Entity\User\AbstractUser;
 use AmeliaBooking\Domain\Entity\User\Customer;
-use AmeliaBooking\Domain\Factory\Booking\Event\EventFactory;
 use AmeliaBooking\Domain\Factory\User\UserFactory;
 use AmeliaBooking\Domain\Services\DateTime\DateTimeService;
 use AmeliaBooking\Domain\Services\Settings\SettingsService;
@@ -137,13 +137,24 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
 
         return array_merge(
             [
-            'booked_customer'     => $paragraphStart . BackendStrings::getNotificationsStrings()['ph_customer_full_name'] .': John Micheal Doe ' . $paragraphEnd .
-                                     $paragraphStart . BackendStrings::getNotificationsStrings()['ph_customer_phone'] . ': 193-951-2600 ' . $paragraphEnd .
-                                     $paragraphStart . BackendStrings::getNotificationsStrings()['ph_customer_email'] . ': customer@domain.com ' . $paragraphEnd,
+            'booked_customer'     =>
+                $paragraphStart .
+                BackendStrings::getNotificationsStrings()['ph_customer_full_name'] .
+                ': John Micheal Doe ' .
+                $paragraphEnd .
+                $paragraphStart .
+                BackendStrings::getNotificationsStrings()['ph_customer_phone'] .
+                ': 193-951-2600 ' .
+                $paragraphEnd .
+                $paragraphStart .
+                BackendStrings::getNotificationsStrings()['ph_customer_email'] .
+                ': customer@domain.com ' .
+                $paragraphEnd,
             'company_address'     => $companySettings['address'],
             'company_name'        => $companySettings['name'],
             'company_phone'       => $companySettings['phone'],
             'company_website'     => $companySettings['website'],
+            'company_vat_number'  => $companySettings['vat'],
             'company_email'       => !empty($companySettings['email']) ? $companySettings['email'] : '',
             'customer_email'      => 'customer@domain.com',
             'customer_first_name' => 'John',
@@ -200,6 +211,7 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
             'company_name'    => $companyName,
             'company_phone'   => $companySettings['phone'],
             'company_website' => $companySettings['website'],
+            'company_vat_number' => $companySettings['vat'],
             'company_email'   => !empty($companySettings['email']) ? $companySettings['email'] : null,
             'company_logo'    => $companySettings['pictureThumbPath']
         ];
@@ -281,7 +293,7 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
 
                     $couponsUsed[] =
                         BackendStrings::getCommonStrings()['customer'] . ': ' .
-                        $customerData['firstName'] . ' ' . $customerData['lastName'] . ' ' .$break .
+                        $customerData['firstName'] . ' ' . $customerData['lastName'] . ' ' . $break .
                         BackendStrings::getFinanceStrings()['code'] . ': ' .
                         $customerBooking['coupon']['code'] . ' ' . $break .
                         ($amountData['discount'] ? BackendStrings::getPaymentStrings()['discount_amount'] . ': ' .
@@ -331,28 +343,31 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
                         $expirationDate : '');
             }
 
-            $numberOfPersons = empty($appointment['bookings'][$bookingKey]['ticketsData']) ? $appointment['bookings'][$bookingKey]['persons'] : array_sum(array_column($appointment['bookings'][$bookingKey]['ticketsData'], 'persons'));
+            $numberOfPersons =
+                empty($appointment['bookings'][$bookingKey]['ticketsData']) ?
+                $appointment['bookings'][$bookingKey]['persons'] :
+                    array_sum(array_column($appointment['bookings'][$bookingKey]['ticketsData'], 'persons'));
 
-            $invoiceItem['invoice_qty'] = $amountData['qty'];
-            $invoiceItem['invoice_unit_price'] = $amountData['unit_price'];
-            $invoiceItem['invoice_subtotal'] = $amountData['subtotal'];
-            $invoiceItem['invoice_tax'] = $amountData['tax'];
-            $invoiceItem['invoice_tax_rate'] = $amountData['tax_rate'];
+            $invoiceItem['invoice_qty']          = $amountData['qty'];
+            $invoiceItem['invoice_unit_price']   = $amountData['unit_price'];
+            $invoiceItem['invoice_subtotal']     = $amountData['subtotal'];
+            $invoiceItem['invoice_tax']          = $amountData['tax'];
+            $invoiceItem['invoice_tax_rate']     = $amountData['tax_rate'];
             $invoiceItem['invoice_tax_excluded'] = $amountData['tax_excluded'];
-            $invoiceItem['invoice_tax_type'] = $amountData['tax_type'];
-            $invoiceItem['invoice_extras_tax'] = !empty($amountData['extras_tax']) ? $amountData['extras_tax'] : null;
-            $invoiceItem['invoice_tickets_tax'] = !empty($amountData['tickets_tax']) ? $amountData['tickets_tax'] : null;
+            $invoiceItem['invoice_tax_type']     = $amountData['tax_type'];
+            $invoiceItem['invoice_extras_tax']   = !empty($amountData['extras_tax']) ? $amountData['extras_tax'] : null;
+            $invoiceItem['invoice_tickets_tax']  = !empty($amountData['tickets_tax']) ? $amountData['tickets_tax'] : null;
 
             $icsFiles = !empty($appointment['bookings'][$bookingKey]['icsFiles']) ? $appointment['bookings'][$bookingKey]['icsFiles'] : [];
 
             $payment = !empty($appointment['bookings'][$bookingKey]['payments'][0]) ? $appointment['bookings'][$bookingKey]['payments'][0] : null;
 
             $invoiceItem['invoice_paid_amount'] = 0;
-            $invoiceItem['invoice_method']  = '';
+            $invoiceItem['invoice_method']      = '';
             foreach (!empty($appointment['bookings'][$bookingKey]['payments']) ? $appointment['bookings'][$bookingKey]['payments'] : [] as $p) {
                 if ($p['status'] === PaymentStatus::PARTIALLY_PAID || $p['status'] === PaymentStatus::PAID) {
                     $invoiceItem['invoice_paid_amount'] += $p['amount'];
-                    $invoiceItem['invoice_method'] = $p['gateway'];
+                    $invoiceItem['invoice_method']       = $p['gateway'];
                 }
             }
 
@@ -490,7 +505,8 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
                 /** @var AbstractUser $customer */
                 $customer = $userRepository->getById($customerBooking['customerId']);
 
-                if ((!$hasApprovedOrPendingStatus && $customerBooking['isChangedStatus']) ||
+                if (
+                    (!$hasApprovedOrPendingStatus && $customerBooking['isChangedStatus']) ||
                     ($customerBooking['status'] !== BookingStatus::CANCELED && $customerBooking['status'] !== BookingStatus::REJECTED)
                 ) {
                     if ($customerBooking['info']) {
@@ -522,10 +538,17 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
                 }
             }
 
-            $bookedCustomer = $paragraphStart . BackendStrings::getNotificationsStrings()['ph_customer_full_name'] . ': ' . $bookedCustomerFullName . $paragraphEnd;
+            $bookedCustomer =
+                $paragraphStart . BackendStrings::getNotificationsStrings()['ph_customer_full_name'] . ': ' . $bookedCustomerFullName . $paragraphEnd;
 
-            $bookedCustomer .= $bookedCustomerPhone ? $paragraphStart . BackendStrings::getNotificationsStrings()['ph_customer_phone'] . ': ' . $bookedCustomerPhone . $paragraphEnd : '';
-            $bookedCustomer .= $bookedCustomerEmail ? $paragraphStart . BackendStrings::getNotificationsStrings()['ph_customer_email'] . ': ' . $bookedCustomerEmail . $paragraphEnd : '';
+            $bookedCustomer .=
+                $bookedCustomerPhone ?
+                    $paragraphStart . BackendStrings::getNotificationsStrings()['ph_customer_phone'] . ': ' . $bookedCustomerPhone . $paragraphEnd :
+                    '';
+            $bookedCustomer .=
+                $bookedCustomerEmail ?
+                    $paragraphStart . BackendStrings::getNotificationsStrings()['ph_customer_email'] . ': ' . $bookedCustomerEmail . $paragraphEnd :
+                    '';
 
             return [
                 'booked_customer'     => $paragraphStart ?
@@ -642,20 +665,39 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
         $bookingCustomFieldsKeys = [];
 
         if ($bookingKey === null) {
-            $sendAllCustomFields = $settingsService->getSetting('notifications', 'sendAllCF') || (array_key_exists('sendCF', $appointment) && $appointment['sendCF']);
+            $sendAllCustomFields =
+                $settingsService->getSetting('notifications', 'sendAllCF') ||
+                (array_key_exists('sendCF', $appointment) && $appointment['sendCF']);
             foreach ($appointment['bookings'] as $booking) {
-                if ((!$booking['isChangedStatus'] || (array_key_exists('isLastBooking', $booking) && !$booking['isLastBooking']))
-                    && !(isset($appointment['isRescheduled']) ? $appointment['isRescheduled'] : false) && !$sendAllCustomFields) {
+                if (
+                    (!$booking['isChangedStatus'] || (array_key_exists('isLastBooking', $booking) && !$booking['isLastBooking']))
+                    && !(isset($appointment['isRescheduled']) ? $appointment['isRescheduled'] : false) && !$sendAllCustomFields
+                ) {
                     continue;
                 }
 
-                if (sizeof($appointment['bookings']) > 1 &&
+                if (
+                    sizeof($appointment['bookings']) > 1 &&
                     ($booking['status'] === BookingStatus::CANCELED || $booking['status'] === BookingStatus::REJECTED)
                 ) {
                     continue;
                 }
 
                 $bookingCustomFields = !empty($booking['customFields']) ? json_decode($booking['customFields'], true) : null;
+
+                if ($booking['customerId'] && !isset($booking['customer'])) {
+                    /** @var UserRepository $userRepository */
+                    $userRepository = $this->container->get('domain.users.repository');
+
+                    $booking['customer'] = $userRepository->getById($booking['customerId'])->toArray();
+                }
+
+                $customerCustomFields = !empty($booking['customer']['customFields']) ? json_decode($booking['customer']['customFields'], true) : null;
+
+                if ($customerCustomFields) {
+                    $bookingCustomFields =  $bookingCustomFields ? ($bookingCustomFields + $customerCustomFields) : $customerCustomFields;
+                }
+
 
                 if ($bookingCustomFields) {
                     foreach ($bookingCustomFields as $bookingCustomFieldKey => $bookingCustomField) {
@@ -665,7 +707,8 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
                                 $bookingCustomField['value'] = date_i18n($dateFormat, $date->getTimestamp());
                             }
 
-                            if ($bookingCustomField['type'] === 'file' &&
+                            if (
+                                $bookingCustomField['type'] === 'file' &&
                                 (!empty($appointment['provider']) || !empty($appointment['providers']))
                             ) {
                                 /** @var HelperService $helperService */
@@ -687,9 +730,15 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
                                 $files = '';
 
                                 if ($bookingCustomField['value']) {
+                                    $entityId = $booking['id'];
+
+                                    if ($customerCustomFields && array_key_exists($bookingCustomFieldKey, $customerCustomFields)) {
+                                        $entityId = $booking['customerId'];
+                                    }
+
                                     foreach ($bookingCustomField['value'] as $index => $file) {
                                         $files .= '<a href="'
-                                            . AMELIA_ACTION_URL . '/fields/' . $bookingCustomFieldKey . '/' . $booking['id'] . '/' . $index . '&token=' . $token
+                                            . AMELIA_ACTION_URL . '/fields/' . $bookingCustomFieldKey . '/' . $entityId . '/' . $index . '&token=' . $token
                                             . '">' . $file['name'] . '</a>';
                                     }
 
@@ -697,7 +746,8 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
                                 }
                             }
 
-                            if ($bookingCustomField['type'] === 'file' &&
+                            if (
+                                $bookingCustomField['type'] === 'file' &&
                                 (empty($appointment['provider']) && empty($appointment['providers']))
                             ) {
                                 continue;
@@ -705,7 +755,10 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
 
                             if (array_key_exists('custom_field_' . $bookingCustomFieldKey, $customFieldsData)) {
                                 $value = $bookingCustomField['type'] === CustomFieldType::ADDRESS ? (
-                                    $type === 'email' ? '<a href="https://maps.google.com/?q='. $bookingCustomField['value'] .'" target="_blank">'.  $bookingCustomField['value'] .'</a>' :
+                                    $type === 'email' ?
+                                        '<a href="https://maps.google.com/?q=' .
+                                        $bookingCustomField['value'] . '" target="_blank">' .  $bookingCustomField['value'] .
+                                        '</a>' :
                                         'https://maps.google.com/?q=' . str_replace(' ', '+', $bookingCustomField['value'])
                                 ) : $bookingCustomField['value'];
                                 $customFieldsData['custom_field_' . $bookingCustomFieldKey]
@@ -714,7 +767,10 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
                                     '; ' . $value;
                             } else {
                                 $value = $bookingCustomField['type'] === CustomFieldType::ADDRESS ? (
-                                $type === 'email' ? '<a href="https://maps.google.com/?q='. $bookingCustomField['value'] .'" target="_blank">' .  $bookingCustomField['value'] . '</a>' :
+                                $type === 'email' ?
+                                    '<a href="https://maps.google.com/?q=' .
+                                    $bookingCustomField['value'] . '" target="_blank">' .  $bookingCustomField['value'] .
+                                    '</a>' :
                                     'https://maps.google.com/?q=' . str_replace(' ', '+', $bookingCustomField['value'])
                                 ) : $bookingCustomField['value'];
                                 $customFieldsData['custom_field_' . $bookingCustomFieldKey] =
@@ -735,17 +791,35 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
                 $bookingCustomFields = [];
             }
 
+            if ($appointment['bookings'][$bookingKey]['customerId'] && !isset($appointment['bookings'][$bookingKey]['customer'])) {
+                /** @var UserRepository $userRepository */
+                $userRepository = $this->container->get('domain.users.repository');
+
+                $appointment['bookings'][$bookingKey]['customer'] = $userRepository->getById($appointment['bookings'][$bookingKey]['customerId'])->toArray();
+            }
+
+            if ($appointment['bookings'][$bookingKey]['customer']['customFields']) {
+                $customerCustomFields = !is_array($appointment['bookings'][$bookingKey]['customer']['customFields']) ?
+                    json_decode($appointment['bookings'][$bookingKey]['customer']['customFields'], true) :
+                    $appointment['bookings'][$bookingKey]['customer']['customFields'];
+
+                $bookingCustomFields += $customerCustomFields;
+            }
+
             if ($bookingCustomFields) {
                 foreach ((array)$bookingCustomFields as $bookingCustomFieldKey => $bookingCustomField) {
                     $bookingCustomFieldsKeys[(int)$bookingCustomFieldKey] = true;
 
-                    if (is_array($bookingCustomField) &&
+                    if (
+                        is_array($bookingCustomField) &&
                         array_key_exists('type', $bookingCustomField) &&
-                        $bookingCustomField['type'] === 'file') {
+                        $bookingCustomField['type'] === 'file'
+                    ) {
                         continue;
                     }
 
-                    if (is_array($bookingCustomField) &&
+                    if (
+                        is_array($bookingCustomField) &&
                         array_key_exists('type', $bookingCustomField) &&
                         $bookingCustomField['type'] === 'datepicker' &&
                         $bookingCustomField['value']
@@ -756,7 +830,10 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
 
                     if (isset($bookingCustomField['value'])) {
                         $value = $bookingCustomField['type'] === CustomFieldType::ADDRESS ? (
-                            $type === 'email' ? '<a href="https://maps.google.com/?q='. $bookingCustomField['value'] .'" target="_blank">'.  $bookingCustomField['value'] .'</a>' :
+                            $type === 'email' ?
+                                '<a href="https://maps.google.com/?q=' .
+                                $bookingCustomField['value'] . '" target="_blank">' . $bookingCustomField['value'] .
+                                '</a>' :
                                 'https://maps.google.com/?q=' . str_replace(' ', '+', $bookingCustomField['value'])
                         ) : $bookingCustomField['value'];
                         $customFieldsData['custom_field_' . $bookingCustomFieldKey] = is_array($value)
@@ -911,19 +988,28 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
                     /** @var EventRepository $eventRepository */
                     $eventRepository = $this->container->get('domain.booking.event.repository');
 
-                    $eventsIds = $eventRepository->getFilteredIds(
+                    /** @var Collection $eventsBookings */
+                    $eventsBookings = $eventRepository->getBookingsByCriteria(
                         [
+                            'ids'                   => [$appointment['id']],
                             'customerId'            => $customerId,
                             'customerBookingStatus' => BookingStatus::APPROVED,
-                        ],
-                        0
+                            'fetchBookings'         => false,
+                            'fetchBookingsTickets'  => false,
+                            'fetchBookingsUsers'    => false,
+                            'fetchBookingsPayments' => false,
+                        ]
                     );
 
                     /** @var Collection $customerReservations */
                     $customerReservations = new Collection();
 
-                    foreach ($eventsIds as $eventId) {
-                        $customerReservations->addItem(EventFactory::create(['id' => $eventId]), $eventId);
+                    /** @var Collection $eventBookings */
+                    foreach ($eventsBookings->getItems() as $eventBookings) {
+                        /** @var Collection $booking */
+                        foreach ($eventBookings->getItems() as $bookingId => $booking) {
+                            $customerReservations->addItem($booking, $bookingId);
+                        }
                     }
 
                     break;
@@ -932,7 +1018,13 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
                     /** @var PackageCustomerRepository $packageCustomerRepository */
                     $packageCustomerRepository = $this->container->get('domain.bookable.packageCustomer.repository');
 
-                    $customerReservations = $packageCustomerRepository->getByEntityId($customerId, 'customerId');
+                    $customerReservations = $packageCustomerRepository->getFiltered(
+                        [
+                            'packages'      => [$appointment['id']],
+                            'customerId'    => $customerId,
+                            'bookingStatus' => BookingStatus::APPROVED,
+                        ]
+                    );
 
                     break;
             }
@@ -943,33 +1035,14 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
 
             /** @var Coupon $coupon */
             foreach ($entityCoupons->getItems() as $coupon) {
-                /** @var Collection $reservationsForCheck */
-                $reservationsForCheck = new Collection();
-
-                switch ($type) {
-                    case Entities::PACKAGE:
-                    case Entities::APPOINTMENT:
-                        $reservationsForCheck = $customerReservations;
-
-                        break;
-
-                    case Entities::EVENT:
-                        /** @var Event $reservation */
-                        foreach ($customerReservations->getItems() as $reservation) {
-                            if ($coupon->getEventList()->keyExists($reservation->getId()->getValue())) {
-                                $reservationsForCheck->addItem($reservation, $reservation->getId()->getValue());
-                            }
-                        }
-
-                        break;
-                }
-
                 $sendCoupon = (
+                        $customerReservations->length() &&
                         !$coupon->getNotificationRecurring()->getValue() &&
-                        $reservationsForCheck->length() === $coupon->getNotificationInterval()->getValue()
+                        $customerReservations->length() === $coupon->getNotificationInterval()->getValue()
                     ) || (
+                        $customerReservations->length() &&
                         $coupon->getNotificationRecurring()->getValue() &&
-                        $reservationsForCheck->length() % $coupon->getNotificationInterval()->getValue() === 0
+                        $customerReservations->length() % $coupon->getNotificationInterval()->getValue() === 0
                     );
 
                 try {
@@ -984,7 +1057,7 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
                             ) .
                             ($coupon->getDiscount() && $coupon->getDiscount()->getValue() ?
                                 BackendStrings::getPaymentStrings()['discount_amount'] . ' ' .
-                                $coupon->getDiscount()->getValue() . '% '. $break
+                                $coupon->getDiscount()->getValue() . '% ' . $break
                                 : '') .
                             ($coupon->getExpirationDate() && $coupon->getExpirationDate()->getValue() ?
                                 BackendStrings::getPaymentStrings()['expiration_date'] . ': ' .
@@ -1066,7 +1139,8 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
         $info = !empty($reservation['bookings'][$bookingKey]['info']) ?
             json_decode($reservation['bookings'][$bookingKey]['info'], true) : null;
 
-        if ($bookingKey !== null &&
+        if (
+            $bookingKey !== null &&
             (
                 !empty($reservation['bookings'][$bookingKey]['customerId']) ||
                 !empty($reservation['bookings'][$bookingKey]['customer']['id'])

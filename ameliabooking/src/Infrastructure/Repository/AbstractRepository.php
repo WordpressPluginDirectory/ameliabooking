@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @copyright © TMS-Plugins. All rights reserved.
  * @licence   See LICENCE.md for license details.
@@ -10,6 +11,7 @@ use AmeliaBooking\Domain\Collection\Collection;
 use AmeliaBooking\Domain\Common\Exceptions\InvalidArgumentException;
 use AmeliaBooking\Domain\Entity\Bookable\Service\Service;
 use AmeliaBooking\Domain\Entity\Coupon\Coupon;
+use AmeliaBooking\Domain\Entity\CustomField\CustomField;
 use AmeliaBooking\Domain\Entity\Location\Location;
 use AmeliaBooking\Domain\Entity\Notification\Notification;
 use AmeliaBooking\Domain\Entity\Payment\Payment;
@@ -25,7 +27,7 @@ use AmeliaBooking\Infrastructure\Connection;
  */
 class AbstractRepository
 {
-    const FACTORY = '';
+    public const FACTORY = '';
 
     /** @var \PDO */
     protected $connection;
@@ -40,13 +42,13 @@ class AbstractRepository
     public function __construct(Connection $connection, $table)
     {
         $this->connection = $connection();
-        $this->table = $table;
+        $this->table      = $table;
     }
 
     /**
      * @param int $id
      *
-     * @return Payment|Coupon|Service|Notification|AbstractUser|Location
+     * @return Payment|Coupon|Service|Notification|AbstractUser|Location|CustomField
      * @throws NotFoundException
      * @throws QueryExecutionException
      */
@@ -117,7 +119,7 @@ class AbstractRepository
     {
         try {
             $statement = $this->connection->query($this->selectQuery());
-            $rows = $statement->fetchAll();
+            $rows      = $statement->fetchAll();
         } catch (\Exception $e) {
             throw new QueryExecutionException('Unable to get data from ' . __CLASS__, $e->getCode(), $e);
         }
@@ -139,7 +141,7 @@ class AbstractRepository
     {
         try {
             $statement = $this->connection->query($this->selectQuery());
-            $rows = $statement->fetchAll();
+            $rows      = $statement->fetchAll();
         } catch (\Exception $e) {
             throw new QueryExecutionException('Unable to get data from ' . __CLASS__, $e->getCode(), $e);
         }
@@ -359,16 +361,16 @@ class AbstractRepository
     public function updateFieldByColumn($fieldName, $fieldValue, $columnName, $columnValue)
     {
         $params = [
-            ":$fieldName"  => $fieldValue,
-            ":$columnName" => $columnValue,
+            ':first'  => $fieldValue,
+            ':second' => $columnValue,
         ];
 
         try {
             $statement = $this->connection->prepare(
                 "UPDATE {$this->table}
                 SET
-                `$fieldName` = :$fieldName
-                WHERE $columnName = :$columnName"
+                `$fieldName` = :first
+                WHERE $columnName = :second"
             );
 
             $res = $statement->execute($params);
@@ -525,7 +527,11 @@ class AbstractRepository
 
             $statement->execute($params);
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to add error "' . $errorMessage . '" to ' . $this->table . ' with id ' . $entityId . ' in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException(
+                'Unable to add error "' . $errorMessage . '" to ' . $this->table . ' with id ' . $entityId . ' in ' . __CLASS__,
+                $e->getCode(),
+                $e
+            );
         }
     }
 }

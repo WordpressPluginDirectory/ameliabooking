@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @copyright © TMS-Plugins. All rights reserved.
  * @licence   See LICENCE.md for license details.
@@ -15,6 +16,7 @@ use AmeliaBooking\Domain\Entity\Entities;
 use AmeliaBooking\Infrastructure\Common\Exceptions\NotFoundException;
 use AmeliaBooking\Infrastructure\Common\Exceptions\QueryExecutionException;
 use AmeliaBooking\Infrastructure\Repository\Payment\PaymentRepository;
+use Interop\Container\Exception\ContainerException;
 
 /**
  * Class GetPaymentCommandHandler
@@ -31,7 +33,7 @@ class GetPaymentCommandHandler extends CommandHandler
      * @throws NotFoundException
      * @throws InvalidArgumentException
      * @throws AccessDeniedException
-     * @throws \Interop\Container\Exception\ContainerException
+     * @throws ContainerException
      */
     public function handle(GetPaymentCommand $command)
     {
@@ -46,17 +48,10 @@ class GetPaymentCommandHandler extends CommandHandler
         /** @var PaymentRepository $paymentRepository */
         $paymentRepository = $this->container->get('domain.payment.repository');
 
-        if ($command->getField('invoice')) {
-            $paymentArray = $paymentRepository->getFiltered(['paymentId' => $command->getArg('id')]);
-        } else {
-            $payment = $paymentRepository->getById($command->getArg('id'));
+        /** @var Payment $payment */
+        $payment = $paymentRepository->getById($command->getArg('id'));
 
-            $paymentArray = [$payment->toArray()];
-        }
-
-        $paymentArray = $payment->toArray();
-
-        $paymentArray = apply_filters('amelia_get_payment_filter', $paymentArray);
+        $paymentArray = apply_filters('amelia_get_payment_filter', $payment->toArray());
 
         do_action('amelia_get_payment', $paymentArray);
 

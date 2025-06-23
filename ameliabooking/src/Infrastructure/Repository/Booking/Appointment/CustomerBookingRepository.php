@@ -29,8 +29,7 @@ use Exception;
  */
 class CustomerBookingRepository extends AbstractRepository implements CustomerBookingRepositoryInterface
 {
-
-    const FACTORY = CustomerBookingFactory::class;
+    public const FACTORY = CustomerBookingFactory::class;
 
     /**
      * @param CustomerBooking $entity
@@ -42,6 +41,11 @@ class CustomerBookingRepository extends AbstractRepository implements CustomerBo
     {
         $data = $entity->toArray();
 
+        $couponId = !empty($data['coupon']) ? $data['coupon']['id'] : null;
+        if (!$couponId && !empty($data['couponId'])) {
+            $couponId = $data['couponId'];
+        }
+
         $params = [
             ':appointmentId'   => $data['appointmentId'],
             ':customerId'      => $data['customerId'],
@@ -49,7 +53,7 @@ class CustomerBookingRepository extends AbstractRepository implements CustomerBo
             ':price'           => $data['price'],
             ':tax'             => !empty($data['tax']) ? json_encode($data['tax']) : null,
             ':persons'         => $data['persons'],
-            ':couponId'        => !empty($data['coupon']) ? $data['coupon']['id'] : null,
+            ':couponId'        => $couponId,
             ':token'           => $data['token'],
             ':customFields'    => $data['customFields'] && json_decode($data['customFields']) !== false ?
                 $data['customFields'] : null,
@@ -316,7 +320,8 @@ class CustomerBookingRepository extends AbstractRepository implements CustomerBo
         $where = [];
 
         if ($criteria['dates']) {
-            $where[] = "(DATE_FORMAT(a.bookingStart, '%Y-%m-%d') < :bookingFrom)";
+            $where[] = "(a.bookingStart < :bookingFrom)";
+
             $params[':bookingFrom'] = DateTimeService::getCustomDateTimeInUtc($criteria['dates'][0]);
         }
 
@@ -361,7 +366,7 @@ class CustomerBookingRepository extends AbstractRepository implements CustomerBo
         $where = [];
 
         if ($criteria['dates']) {
-            $where[] = "(DATE_FORMAT(a.bookingStart, '%Y-%m-%d') BETWEEN :bookingFrom AND :bookingTo)";
+            $where[] = "(a.bookingStart BETWEEN :bookingFrom AND :bookingTo)";
 
             $params[':bookingFrom'] = DateTimeService::getCustomDateTimeInUtc($criteria['dates'][0]);
 
@@ -724,7 +729,7 @@ class CustomerBookingRepository extends AbstractRepository implements CustomerBo
 
     /**
      * @param array $criteria
-     * @param array $itemsPerPageBackEnd
+     * @param int $itemsPerPageBackEnd
      *
      * @return array
      * @throws QueryExecutionException
@@ -732,9 +737,9 @@ class CustomerBookingRepository extends AbstractRepository implements CustomerBo
      */
     public function getEventBookingIdsByCriteria($criteria = [], $itemsPerPageBackEnd = 0)
     {
-        $eventsPeriodsTable = EventsPeriodsTable::getTableName();
+        $eventsPeriodsTable            = EventsPeriodsTable::getTableName();
         $customerBookingsEventsPeriods = CustomerBookingsToEventsPeriodsTable::getTableName();
-        $eventsTable = EventsTable::getTableName();
+        $eventsTable         = EventsTable::getTableName();
         $eventProvidersTable = EventsProvidersTable::getTableName();
 
         $params = [];
@@ -760,7 +765,7 @@ class CustomerBookingRepository extends AbstractRepository implements CustomerBo
 
         if (!empty($criteria['dates'])) {
             if (isset($criteria['dates'][0], $criteria['dates'][1])) {
-                $where[] = "(DATE_FORMAT(ep.periodStart, '%Y-%m-%d %H:%i:%s') BETWEEN :eventFrom AND :eventTo)";
+                $where[] = "(ep.periodStart BETWEEN :eventFrom AND :eventTo)";
                 $params[':eventFrom'] = DateTimeService::getCustomDateTimeInUtc($criteria['dates'][0]);
                 $params[':eventTo']   = DateTimeService::getCustomDateTimeInUtc($criteria['dates'][1]);
             }
@@ -823,7 +828,7 @@ class CustomerBookingRepository extends AbstractRepository implements CustomerBo
         $where = $where ? 'WHERE ' . implode(' AND ', $where) : '';
 
         $groupBy = 'GROUP BY cb.id';
-        $limit = $this->getLimit(
+        $limit   = $this->getLimit(
             !empty($criteria['page']) ? (int)$criteria['page'] : 0,
             $itemsPerPageBackEnd
         );
@@ -831,11 +836,11 @@ class CustomerBookingRepository extends AbstractRepository implements CustomerBo
         $orderBy = 'ORDER BY MIN(ep.periodStart), cb.id';
 
         if (!empty($criteria['sort'])) {
-            $column = $criteria['sort'][0] === '-' ? substr($criteria['sort'], 1) : $criteria['sort'];
+            $column      = $criteria['sort'][0] === '-' ? substr($criteria['sort'], 1) : $criteria['sort'];
             $orderColumn = '';
             if ($column === 'attendee') {
                 $orderColumn = ', CONCAT(cu.firstName, " ", cu.lastName)';
-            } else if ($column === 'event') {
+            } elseif ($column === 'event') {
                 $orderColumn = ', e.name';
             }
             $orderDir = $orderColumn ? ($criteria['sort'][0] === '-' ? 'DESC' : 'ASC') : '';
@@ -877,11 +882,11 @@ class CustomerBookingRepository extends AbstractRepository implements CustomerBo
      */
     public function getEventBookingsByIds($ids, $criteria)
     {
-        $eventsPeriodsTable = EventsPeriodsTable::getTableName();
+        $eventsPeriodsTable            = EventsPeriodsTable::getTableName();
         $customerBookingsEventsPeriods = CustomerBookingsToEventsPeriodsTable::getTableName();
-        $usersTable  = UsersTable::getTableName();
-        $eventsTable = EventsTable::getTableName();
-        $eventProvidersTable = EventsProvidersTable::getTableName();
+        $usersTable           = UsersTable::getTableName();
+        $eventsTable          = EventsTable::getTableName();
+        $eventProvidersTable  = EventsProvidersTable::getTableName();
         $bookingsTicketsTable = CustomerBookingToEventsTicketsTable::getTableName();
 
         $params = [];
@@ -894,7 +899,7 @@ class CustomerBookingRepository extends AbstractRepository implements CustomerBo
 
         if (!empty($criteria['dates'])) {
             if (isset($criteria['dates'][0], $criteria['dates'][1])) {
-                $where[] = "(DATE_FORMAT(ep.periodStart, '%Y-%m-%d %H:%i:%s') BETWEEN :eventFrom AND :eventTo)";
+                $where[] = "(ep.periodStart BETWEEN :eventFrom AND :eventTo)";
                 $params[':eventFrom'] = DateTimeService::getCustomDateTimeInUtc($criteria['dates'][0]);
                 $params[':eventTo']   = DateTimeService::getCustomDateTimeInUtc($criteria['dates'][1]);
             }

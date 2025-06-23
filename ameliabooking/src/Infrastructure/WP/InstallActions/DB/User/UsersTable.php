@@ -18,8 +18,7 @@ use AmeliaBooking\Infrastructure\WP\InstallActions\DB\AbstractDatabaseTable;
  */
 class UsersTable extends AbstractDatabaseTable
 {
-
-    const TABLE = 'users';
+    public const TABLE = 'users';
 
     /**
      * @return string
@@ -29,11 +28,11 @@ class UsersTable extends AbstractDatabaseTable
     {
         $table = self::getTableName();
 
-        $name = Name::MAX_LENGTH;
-        $email = Email::MAX_LENGTH;
-        $phone = Phone::MAX_LENGTH;
-        $picture = Picture::MAX_LENGTH;
-        $password = Password::MAX_LENGTH;
+        $name        = Name::MAX_LENGTH;
+        $email       = Email::MAX_LENGTH;
+        $phone       = Phone::MAX_LENGTH;
+        $picture     = Picture::MAX_LENGTH;
+        $password    = Password::MAX_LENGTH;
         $description = Description::MAX_LENGTH;
 
         return "CREATE TABLE {$table}  (
@@ -57,6 +56,7 @@ class UsersTable extends AbstractDatabaseTable
                   `stripeConnect` varchar({$name}) DEFAULT NULL,
                   `countryPhoneIso` varchar(2) DEFAULT NULL,
                   `translations` TEXT NULL DEFAULT NULL,
+                  `customFields` TEXT NULL DEFAULT NULL,
                   `timeZone` varchar({$name}) DEFAULT NULL,
                   `appleCalendarId` varchar({$name}) DEFAULT NULL,
                   `employeeAppleCalendar` TEXT NULL DEFAULT NULL,

@@ -26,7 +26,7 @@ use AmeliaBooking\Infrastructure\WP\InstallActions\DB\User\WPUsersTable;
  */
 class ProviderRepository extends UserRepository implements ProviderRepositoryInterface
 {
-    const FACTORY = ProviderFactory::class;
+    public const FACTORY = ProviderFactory::class;
 
     /** @var string */
     protected $providerWeekDayTable;
@@ -206,8 +206,8 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
 
             $statement->execute();
 
-            $providerRows = [];
-            $serviceRows = [];
+            $providerRows        = [];
+            $serviceRows         = [];
             $providerServiceRows = [];
 
             if ($statement->rowCount() === 0) {
@@ -259,8 +259,8 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
 
             $statement->execute();
 
-            $providerRows = [];
-            $serviceRows = [];
+            $providerRows        = [];
+            $serviceRows         = [];
             $providerServiceRows = [];
 
             while ($row = $statement->fetch()) {
@@ -290,9 +290,9 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
 
             $order = '';
             if (!empty($criteria['sort'])) {
-                $orderColumn = 'CONCAT(u.firstName, " ", u.lastName)';
+                $orderColumn    = 'CONCAT(u.firstName, " ", u.lastName)';
                 $orderDirection = $criteria['sort'][0] === '-' ? 'DESC' : 'ASC';
-                $order = "ORDER BY {$orderColumn} {$orderDirection}";
+                $order          = "ORDER BY {$orderColumn} {$orderDirection}";
             }
 
             $where = [];
@@ -316,9 +316,9 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
                 $queryServices = [];
 
                 foreach ((array)$criteria['services'] as $index => $value) {
-                    $param = ':service' . $index;
+                    $param           = ':service' . $index;
                     $queryServices[] = $param;
-                    $params[$param] = $value;
+                    $params[$param]  = $value;
                 }
 
                 $where[] = "u.id IN (
@@ -331,9 +331,9 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
                 $queryProviders = [];
 
                 foreach ((array)$criteria['providers'] as $index => $value) {
-                    $param = ':provider' . $index;
+                    $param            = ':provider' . $index;
                     $queryProviders[] = $param;
-                    $params[$param] = $value;
+                    $params[$param]   = $value;
                 }
 
                 $where[] = 'u.id IN (' . implode(', ', $queryProviders) . ')';
@@ -343,9 +343,9 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
                 $queryLocations = [];
 
                 foreach ((array)$criteria['location'] as $index => $value) {
-                    $param = ':location' . $index;
+                    $param            = ':location' . $index;
                     $queryLocations[] = $param;
-                    $params[$param] = $value;
+                    $params[$param]   = $value;
                 }
 
                 $where[] = "u.id IN (
@@ -410,6 +410,14 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
 
         $queryProviders = [];
 
+        if (!empty($criteria['dates'][0])) {
+            $criteria['dates'][0] = explode(' ', $criteria['dates'][0])[0];
+        }
+
+        if (!empty($criteria['dates'][1])) {
+            $criteria['dates'][1] = explode(' ', $criteria['dates'][1])[0];
+        }
+
         if (!empty($criteria['providerStatus'])) {
             $params[':providerStatus'] = $criteria['providerStatus'];
 
@@ -454,16 +462,16 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
 
         if (isset($criteria['dates'][0], $criteria['dates'][1])) {
             $dotJoinQuery = "AND (dot.repeat = 1 OR (
-              DATE_FORMAT(dot.startDate, '%Y-%m-%d %H:%i:%s') BETWEEN :from1 AND :to1 OR
-              DATE_FORMAT(dot.endDate, '%Y-%m-%d %H:%i:%s') BETWEEN :from2 AND :to2 OR
-              (DATE_FORMAT(dot.startDate, '%Y-%m-%d %H:%i:%s') <= :from3 AND DATE_FORMAT(dot.endDate, '%Y-%m-%d %H:%i:%s') >= :to3)
+              dot.startDate BETWEEN :from1 AND :to1 OR
+              dot.endDate BETWEEN :from2 AND :to2 OR
+              (dot.startDate <= :from3 AND dot.endDate >= :to3)
             ))";
 
             $userParams[':from1'] = $userParams[':from2'] = $userParams[':from3'] = $criteria['dates'][0];
 
             $userParams[':to1'] = $userParams[':to2'] = $userParams[':to3'] = $criteria['dates'][1];
         } elseif (isset($criteria['dates'][0])) {
-            $dotJoinQuery = "AND (dot.repeat = 1 OR DATE_FORMAT(dot.startDate, '%Y-%m-%d %H:%i:%s') >= :from1 OR DATE_FORMAT(dot.endDate, '%Y-%m-%d %H:%i:%s') >= :from2)";
+            $dotJoinQuery = "AND (dot.repeat = 1 OR dot.startDate >= :from1 OR dot.endDate >= :from2)";
 
             $userParams[':from1'] = $userParams[':from2'] = $criteria['dates'][0];
         }
@@ -593,9 +601,9 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
 
         if (isset($criteria['dates'][0], $criteria['dates'][1])) {
             $where[] = "(
-              DATE_FORMAT(sdt.startDate, '%Y-%m-%d %H:%i:%s') BETWEEN :from1 AND :to1 OR
-              DATE_FORMAT(sdt.endDate, '%Y-%m-%d %H:%i:%s') BETWEEN :from2 AND :to2 OR
-              (DATE_FORMAT(sdt.startDate, '%Y-%m-%d %H:%i:%s') <= :from3 AND DATE_FORMAT(sdt.endDate, '%Y-%m-%d %H:%i:%s') >= :to3)
+              sdt.startDate BETWEEN :from1 AND :to1 OR
+              sdt.endDate BETWEEN :from2 AND :to2 OR
+              (sdt.startDate <= :from3 AND sdt.endDate >= :to3)
             )";
 
             $sdtParams[':from1'] = $sdtParams[':from2'] = $sdtParams[':from3'] = $criteria['dates'][0];
@@ -603,8 +611,8 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
             $sdtParams[':to1'] = $sdtParams[':to2'] = $sdtParams[':to3'] = $criteria['dates'][1];
         } elseif (isset($criteria['dates'][0])) {
             $where[] = "(
-              DATE_FORMAT(sdt.startDate, '%Y-%m-%d %H:%i:%s') >= :from1 OR
-              DATE_FORMAT(sdt.endDate, '%Y-%m-%d %H:%i:%s') >= :from2
+              sdt.startDate >= :from1 OR
+              sdt.endDate >= :from2
             )";
 
             $sdtParams[':from1'] = $sdtParams[':from2'] = $criteria['dates'][0];
@@ -699,9 +707,9 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
                 $queryServices = [];
 
                 foreach ((array)$criteria['services'] as $index => $value) {
-                    $param = ':service' . $index;
+                    $param           = ':service' . $index;
                     $queryServices[] = $param;
-                    $params[$param] = $value;
+                    $params[$param]  = $value;
                 }
 
                 $where[] = "u.id IN (
@@ -714,9 +722,9 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
                 $queryLocations = [];
 
                 foreach ((array)$criteria['location'] as $index => $value) {
-                    $param = ':location' . $index;
+                    $param            = ':location' . $index;
                     $queryLocations[] = $param;
-                    $params[$param] = $value;
+                    $params[$param]   = $value;
                 }
 
                 $where[] = "u.id IN (
@@ -743,17 +751,15 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
     }
 
     /**
-     * @param      $criteria
+     * @param $criteria
      *
      * @return Collection
      * @throws InvalidArgumentException
      * @throws QueryExecutionException
      */
-    public function getWithServicesAndExtrasAndCoupons($criteria)
+    public function getWithServicesAndExtras($criteria)
     {
         $extrasTable = ExtrasTable::getTableName();
-        $couponToServicesTable = CouponsToServicesTable::getTableName();
-        $couponsTable = CouponsTable::getTableName();
 
         $params = [
             ':type'          => AbstractUser::USER_ROLE_PROVIDER,
@@ -764,16 +770,10 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
         $where = [];
 
         foreach ((array)$criteria as $index => $value) {
-            $params[':service' . $index] = $value['serviceId'];
+            $params[':service' . $index]  = $value['serviceId'];
             $params[':provider' . $index] = $value['providerId'];
 
-            if ($value['couponId']) {
-                $params[':coupon' . $index] = $value['couponId'];
-                $params[':couponStatus' . $index] = Status::VISIBLE;
-            }
-
-            $where[] = "(s.id = :service$index AND u.id = :provider$index"
-                . ($value['couponId'] ? " AND c.id = :coupon$index AND c.status = :couponStatus$index" : '') . ')';
+            $where[] = "(s.id = :service$index AND u.id = :provider$index)";
         }
 
         $where = $where ? ' AND ' . implode(' OR ', $where) : '';
@@ -815,27 +815,18 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
                     e.duration AS extra_duration,
                     e.description AS extra_description,
                     e.position AS extra_position,
-                    e.aggregatedPrice AS extra_aggregatedPrice,
-                    c.id AS coupon_id,
-                    c.code AS coupon_code,
-                    c.discount AS coupon_discount,
-                    c.deduction AS coupon_deduction,
-                    c.limit AS coupon_limit,
-                    c.customerLimit AS coupon_customerLimit,
-                    c.status AS coupon_status
+                    e.aggregatedPrice AS extra_aggregatedPrice
                 FROM {$this->table} u
                 INNER JOIN {$this->providerServicesTable} st ON st.userId = u.id
                 INNER JOIN {$this->serviceTable} s ON s.id = st.serviceId
                 LEFT JOIN {$extrasTable} e ON e.serviceId = s.id
-                LEFT JOIN {$couponToServicesTable} cs ON cs.serviceId = s.id
-                LEFT JOIN {$couponsTable} c ON c.id = cs.couponId
                 WHERE u.status = :userStatus AND s.status = :serviceStatus AND u.type = :type $where"
             );
 
             $statement->execute($params);
 
-            $providerRows = [];
-            $serviceRows = [];
+            $providerRows        = [];
+            $serviceRows         = [];
             $providerServiceRows = [];
 
             while ($row = $statement->fetch()) {
@@ -859,9 +850,9 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
      */
     public function getAvailable($dayIndex, $providerTimeZone)
     {
-        $currentDateTime = DateTimeService::getNowDateTime();
+        $currentDateTime           = DateTimeService::getNowDateTime();
         $currentDateTimeInTimeZone = DateTimeService::getCustomDateTimeObjectInTimeZone($currentDateTime, $providerTimeZone);
-        $currentDateTimeSQL = "STR_TO_DATE('" . $currentDateTimeInTimeZone->format('Y-m-d H:i:s') . "', '%Y-%m-%d %H:%i:%s')";
+        $currentDateTimeSQL        = "STR_TO_DATE('" . $currentDateTimeInTimeZone->format('Y-m-d H:i:s') . "', '%Y-%m-%d %H:%i:%s')";
 
         $params = [
             ':dayIndex'         => $dayIndex === 0 ? 7 : $dayIndex,
@@ -871,7 +862,8 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
         ];
 
         try {
-            $statement = $this->connection->prepare("SELECT
+            $statement = $this->connection->prepare(
+                "SELECT
                 u.id AS user_id,
                 u.firstName AS user_firstName,
                 u.lastName AS user_lastName,
@@ -900,7 +892,8 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
               {$currentDateTimeSQL} <= pt.endTime AND
               pt.startTime IS NOT NULL AND
               pt.endTime IS NOT NULL
-              ))");
+              ))"
+            );
 
             $statement->execute($params);
 
@@ -935,7 +928,7 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
     public function getOnSpecialDay()
     {
         $dateTimeNowString = DateTimeService::getNowDateTime();
-        $currentDateTime = "STR_TO_DATE('" . $dateTimeNowString . "', '%Y-%m-%d %H:%i:%s')";
+        $currentDateTime   = "STR_TO_DATE('" . $dateTimeNowString . "', '%Y-%m-%d %H:%i:%s')";
         $currentDateString = DateTimeService::getNowDate();
 
         $params = [
@@ -943,17 +936,18 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
         ];
 
         try {
-            $statement = $this->connection->prepare("SELECT
+            $statement = $this->connection->prepare(
+                "SELECT
                 u.id AS user_id,
                 u.firstName AS user_firstName,
                 u.lastName AS user_lastName,
                 sdpt.startTime AS sdp_startTime,
                 sdpt.endTime AS sdp_endTime,
                 IF (
-                    {$currentDateTime} >= STR_TO_DATE(CONCAT(DATE_FORMAT(sdt.startDate, '%Y-%m-%d'), ' 00:00:00'), '%Y-%m-%d %H:%i:%s') AND
-                    {$currentDateTime} <= DATE_ADD(STR_TO_DATE(CONCAT(DATE_FORMAT(sdt.endDate, '%Y-%m-%d'), ' 00:00:00'), '%Y-%m-%d %H:%i:%s'), INTERVAL 1 DAY) AND
-                    {$currentDateTime} >= STR_TO_DATE(CONCAT('{$currentDateString}', ' ', DATE_FORMAT(sdpt.startTime, '%H:%i:%s')), '%Y-%m-%d %H:%i:%s') AND
-                    {$currentDateTime} <= STR_TO_DATE(CONCAT('{$currentDateString}', ' ', DATE_FORMAT(sdpt.endTime, '%H:%i:%s')), '%Y-%m-%d %H:%i:%s'),
+                    {$currentDateTime} >= STR_TO_DATE(CONCAT(sdt.startDate, ' 00:00:00'), '%Y-%m-%d %H:%i:%s') AND
+                    {$currentDateTime} <= DATE_ADD(STR_TO_DATE(CONCAT(sdt.endDate, ' 00:00:00'), '%Y-%m-%d %H:%i:%s'), INTERVAL 1 DAY) AND
+                    {$currentDateTime} >= STR_TO_DATE(CONCAT('{$currentDateString}', ' ', sdpt.startTime), '%Y-%m-%d %H:%i:%s') AND
+                    {$currentDateTime} <= STR_TO_DATE(CONCAT('{$currentDateString}', ' ', sdpt.endTime), '%Y-%m-%d %H:%i:%s'),
                     1,
                     0
                 ) AS available
@@ -962,7 +956,8 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
               INNER JOIN {$this->providerSpecialDayPeriodTable} sdpt ON sdpt.specialDayId = sdt.id
               WHERE u.type = :type AND
                 STR_TO_DATE('{$currentDateString}', '%Y-%m-%d') BETWEEN sdt.startDate AND sdt.endDate
-              ");
+              "
+            );
 
             $statement->execute($params);
 
@@ -1000,7 +995,8 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
         ];
 
         try {
-            $statement = $this->connection->prepare("SELECT
+            $statement = $this->connection->prepare(
+                "SELECT
                 u.id AS user_id,
                 u.firstName AS user_firstName,
                 u.lastName AS user_lastName,
@@ -1019,7 +1015,8 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
               {$currentDateTime} >= wdt.startTime AND
               {$currentDateTime} <= wdt.endTime AND
               {$currentDateTime} >= tot.startTime AND
-              {$currentDateTime} <= tot.endTime");
+              {$currentDateTime} <= tot.endTime"
+            );
 
             $statement->execute($params);
 
@@ -1043,14 +1040,15 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
      */
     public function getOnVacation()
     {
-        $currentDateTime = "STR_TO_DATE('" . DateTimeService::getNowDateTime() . "', '%Y-%m-%d %H:%i:%s')";
+        $currentDateTime = explode(' ', DateTimeService::getNowDateTime())[0];
 
         $params = [
             ':type' => AbstractUser::USER_ROLE_PROVIDER
         ];
 
         try {
-            $statement = $this->connection->prepare("SELECT
+            $statement = $this->connection->prepare(
+                "SELECT
                 u.id,
                 u.firstName,
                 u.lastName,
@@ -1060,7 +1058,8 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
               FROM {$this->table} u
               LEFT JOIN {$this->providerDayOffTable} dot ON dot.userId = u.id
               WHERE u.type = :type AND
-              DATE_FORMAT({$currentDateTime}, '%Y-%m-%d') BETWEEN dot.startDate AND dot.endDate");
+              $currentDateTime BETWEEN dot.startDate AND dot.endDate"
+            );
 
             $statement->execute($params);
 
@@ -1093,30 +1092,36 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
         $appointmentTable = AppointmentsTable::getTableName();
 
         $params = [];
+
         $where = [];
 
         if ($criteria['dates']) {
-            $where[] = "(DATE_FORMAT(a.bookingStart, '%Y-%m-%d') BETWEEN :bookingFrom AND :bookingTo)";
+            $where[] = "(a.bookingStart BETWEEN :bookingFrom AND :bookingTo)";
+
             $params[':bookingFrom'] = DateTimeService::getCustomDateTimeInUtc($criteria['dates'][0]);
+
             $params[':bookingTo'] = DateTimeService::getCustomDateTimeInUtc($criteria['dates'][1]);
         }
 
         if (isset($criteria['status'])) {
             $where[] = 'u.status = :status';
+
             $params[':status'] = $criteria['status'];
         }
 
         $where = $where ? 'WHERE ' . implode(' AND ', $where) : '';
 
         try {
-            $statement = $this->connection->prepare("SELECT
+            $statement = $this->connection->prepare(
+                "SELECT
                 u.id,
                 CONCAT(u.firstName, ' ', u.lastName) AS name,
                 COUNT(a.providerId) AS appointments
             FROM {$this->table} u 
             INNER JOIN {$appointmentTable} a ON u.id = a.providerId
             $where
-            GROUP BY providerId");
+            GROUP BY providerId"
+            );
 
             $statement->execute($params);
 
@@ -1146,30 +1151,36 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
     public function getAllNumberOfViews($criteria)
     {
         $params = [];
+
         $where = [];
 
         if ($criteria['dates']) {
-            $where[] = "(DATE_FORMAT(pv.date, '%Y-%m-%d') BETWEEN :bookingFrom AND :bookingTo)";
-            $params[':bookingFrom'] = DateTimeService::getCustomDateTimeInUtc($criteria['dates'][0]);
-            $params[':bookingTo'] = DateTimeService::getCustomDateTimeInUtc($criteria['dates'][1]);
+            $where[] = "(pv.date BETWEEN :bookingFrom AND :bookingTo)";
+
+            $params[':bookingFrom'] = explode(' ', $criteria['dates'][0])[0];
+
+            $params[':bookingTo'] = explode(' ', $criteria['dates'][1])[0];
         }
 
         if (isset($criteria['status'])) {
             $where[] = 'u.status = :status';
+
             $params[':status'] = $criteria['status'];
         }
 
         $where = $where ? 'WHERE ' . implode(' AND ', $where) : '';
 
         try {
-            $statement = $this->connection->prepare("SELECT
+            $statement = $this->connection->prepare(
+                "SELECT
             u.id,
             CONCAT(u.firstName, ' ', u.lastName) as name,
             SUM(pv.views) AS views
             FROM {$this->table} u
             INNER JOIN {$this->providerViewsTable} pv ON pv.userId = u.id 
             $where
-            GROUP BY u.id");
+            GROUP BY u.id"
+            );
 
             $statement->execute($params);
 
@@ -1308,20 +1319,20 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
      */
     private function parseUserRow($row, &$providerRows, &$serviceRows, &$providerServiceRows)
     {
-        $userId = (int)$row['user_id'];
-        $serviceId = isset($row['service_id']) ? (int)$row['service_id'] : null;
-        $extraId = isset($row['extra_id']) ? $row['extra_id'] : null;
-        $couponId = isset($row['coupon_id']) ? $row['coupon_id'] : null;
-        $googleCalendarId = isset($row['google_calendar_id']) ? $row['google_calendar_id'] : null;
+        $userId            = (int)$row['user_id'];
+        $serviceId         = isset($row['service_id']) ? (int)$row['service_id'] : null;
+        $extraId           = isset($row['extra_id']) ? $row['extra_id'] : null;
+        $couponId          = isset($row['coupon_id']) ? $row['coupon_id'] : null;
+        $googleCalendarId  = isset($row['google_calendar_id']) ? $row['google_calendar_id'] : null;
         $outlookCalendarId = isset($row['outlook_calendar_id']) ? $row['outlook_calendar_id'] : null;
-        $weekDayId = isset($row['weekDay_id']) ? $row['weekDay_id'] : null;
-        $timeOutId = isset($row['timeOut_id']) ? $row['timeOut_id'] : null;
-        $periodId = isset($row['period_id']) ? $row['period_id'] : null;
-        $periodServiceId = isset($row['periodService_id']) ? $row['periodService_id'] : null;
-        $periodLocationId = isset($row['periodLocation_id']) ? $row['periodLocation_id'] : null;
-        $specialDayId = isset($row['specialDay_id']) ? $row['specialDay_id'] : null;
-        $specialDayPeriodId = isset($row['specialDayPeriod_id']) ? $row['specialDayPeriod_id'] : null;
-        $specialDayPeriodServiceId = isset($row['specialDayPeriodService_id'])
+        $weekDayId         = isset($row['weekDay_id']) ? $row['weekDay_id'] : null;
+        $timeOutId         = isset($row['timeOut_id']) ? $row['timeOut_id'] : null;
+        $periodId          = isset($row['period_id']) ? $row['period_id'] : null;
+        $periodServiceId   = isset($row['periodService_id']) ? $row['periodService_id'] : null;
+        $periodLocationId  = isset($row['periodLocation_id']) ? $row['periodLocation_id'] : null;
+        $specialDayId      = isset($row['specialDay_id']) ? $row['specialDay_id'] : null;
+        $specialDayPeriodId         = isset($row['specialDayPeriod_id']) ? $row['specialDayPeriod_id'] : null;
+        $specialDayPeriodServiceId  = isset($row['specialDayPeriodService_id'])
             ? $row['specialDayPeriodService_id'] : null;
         $specialDayPeriodLocationId = isset($row['specialDayPeriodLocation_id'])
             ? $row['specialDayPeriodLocation_id'] : null;
@@ -1358,25 +1369,28 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
             ];
         }
 
-        if ($googleCalendarId &&
+        if (
+            $googleCalendarId &&
             array_key_exists($userId, $providerRows) &&
             empty($providerRows[$userId]['googleCalendar'])
         ) {
-            $providerRows[$userId]['googleCalendar']['id'] = $row['google_calendar_id'];
-            $providerRows[$userId]['googleCalendar']['token'] = $row['google_calendar_token'];
+            $providerRows[$userId]['googleCalendar']['id']         = $row['google_calendar_id'];
+            $providerRows[$userId]['googleCalendar']['token']      = $row['google_calendar_token'];
             $providerRows[$userId]['googleCalendar']['calendarId'] = isset($row['google_calendar_calendar_id']) ? $row['google_calendar_calendar_id'] : null;
         }
 
-        if ($outlookCalendarId &&
+        if (
+            $outlookCalendarId &&
             array_key_exists($userId, $providerRows) &&
             empty($providerRows[$userId]['outlookCalendar'])
         ) {
-            $providerRows[$userId]['outlookCalendar']['id'] = $row['outlook_calendar_id'];
-            $providerRows[$userId]['outlookCalendar']['token'] = $row['outlook_calendar_token'];
+            $providerRows[$userId]['outlookCalendar']['id']         = $row['outlook_calendar_id'];
+            $providerRows[$userId]['outlookCalendar']['token']      = $row['outlook_calendar_token'];
             $providerRows[$userId]['outlookCalendar']['calendarId'] = isset($row['outlook_calendar_calendar_id']) ? $row['outlook_calendar_calendar_id'] : null;
         }
 
-        if ($weekDayId &&
+        if (
+            $weekDayId &&
             array_key_exists($userId, $providerRows) &&
             !array_key_exists($weekDayId, $providerRows[$userId]['weekDayList'])
         ) {
@@ -1390,7 +1404,8 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
             ];
         }
 
-        if ($periodId &&
+        if (
+            $periodId &&
             $weekDayId &&
             array_key_exists($userId, $providerRows) &&
             array_key_exists($weekDayId, $providerRows[$userId]['weekDayList']) &&
@@ -1406,7 +1421,8 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
             ];
         }
 
-        if ($periodServiceId &&
+        if (
+            $periodServiceId &&
             $periodId &&
             $weekDayId &&
             array_key_exists($userId, $providerRows) &&
@@ -1420,7 +1436,8 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
             ];
         }
 
-        if ($periodLocationId &&
+        if (
+            $periodLocationId &&
             $periodId &&
             $weekDayId &&
             array_key_exists($userId, $providerRows) &&
@@ -1434,7 +1451,8 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
             ];
         }
 
-        if ($timeOutId &&
+        if (
+            $timeOutId &&
             $weekDayId &&
             array_key_exists($userId, $providerRows) &&
             array_key_exists($weekDayId, $providerRows[$userId]['weekDayList']) &&
@@ -1447,7 +1465,8 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
             ];
         }
 
-        if ($specialDayId &&
+        if (
+            $specialDayId &&
             array_key_exists($userId, $providerRows) &&
             !array_key_exists($specialDayId, $providerRows[$userId]['specialDayList'])
         ) {
@@ -1459,7 +1478,8 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
             ];
         }
 
-        if ($specialDayPeriodId &&
+        if (
+            $specialDayPeriodId &&
             $specialDayId &&
             array_key_exists($userId, $providerRows) &&
             array_key_exists($specialDayId, $providerRows[$userId]['specialDayList']) &&
@@ -1475,13 +1495,17 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
             ];
         }
 
-        if ($specialDayPeriodServiceId &&
+        if (
+            $specialDayPeriodServiceId &&
             $specialDayPeriodId &&
             $specialDayId &&
             array_key_exists($userId, $providerRows) &&
             array_key_exists($specialDayId, $providerRows[$userId]['specialDayList']) &&
             array_key_exists($specialDayPeriodId, $providerRows[$userId]['specialDayList'][$specialDayId]['periodList']) &&
-            !array_key_exists($specialDayPeriodServiceId, $providerRows[$userId]['specialDayList'][$specialDayId]['periodList'][$specialDayPeriodId]['periodServiceList'])
+            !array_key_exists(
+                $specialDayPeriodServiceId,
+                $providerRows[$userId]['specialDayList'][$specialDayId]['periodList'][$specialDayPeriodId]['periodServiceList']
+            )
         ) {
             $providerRows[$userId]['specialDayList'][$specialDayId]['periodList'][$specialDayPeriodId]['periodServiceList'][$specialDayPeriodServiceId] = [
                 'id'        => $specialDayPeriodServiceId,
@@ -1489,13 +1513,17 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
             ];
         }
 
-        if ($specialDayPeriodLocationId &&
+        if (
+            $specialDayPeriodLocationId &&
             $specialDayPeriodId &&
             $specialDayId &&
             array_key_exists($userId, $providerRows) &&
             array_key_exists($specialDayId, $providerRows[$userId]['specialDayList']) &&
             array_key_exists($specialDayPeriodId, $providerRows[$userId]['specialDayList'][$specialDayId]['periodList']) &&
-            !array_key_exists($specialDayPeriodLocationId, $providerRows[$userId]['specialDayList'][$specialDayId]['periodList'][$specialDayPeriodId]['periodLocationList'])
+            !array_key_exists(
+                $specialDayPeriodLocationId,
+                $providerRows[$userId]['specialDayList'][$specialDayId]['periodList'][$specialDayPeriodId]['periodLocationList']
+            )
         ) {
             $providerRows[$userId]['specialDayList'][$specialDayId]['periodList'][$specialDayPeriodId]['periodLocationList'][$specialDayPeriodLocationId] = [
                 'id'         => $specialDayPeriodLocationId,
@@ -1503,7 +1531,8 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
             ];
         }
 
-        if ($dayOffId &&
+        if (
+            $dayOffId &&
             array_key_exists($userId, $providerRows) &&
             !array_key_exists($dayOffId, $providerRows[$userId]['dayOffList'])
         ) {
@@ -1516,7 +1545,8 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
             ];
         }
 
-        if ($serviceId &&
+        if (
+            $serviceId &&
             !array_key_exists($serviceId, $serviceRows)
         ) {
             $serviceRows[$serviceId] = [
@@ -1551,7 +1581,8 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
             ];
         }
 
-        if ($extraId &&
+        if (
+            $extraId &&
             $serviceId &&
             array_key_exists($serviceId, $serviceRows) &&
             !array_key_exists($extraId, $serviceRows[$serviceId]['extras'])
@@ -1567,7 +1598,8 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
             ];
         }
 
-        if ($couponId &&
+        if (
+            $couponId &&
             $serviceId &&
             array_key_exists($serviceId, $serviceRows) &&
             !array_key_exists($couponId, $serviceRows[$serviceId]['coupons'])

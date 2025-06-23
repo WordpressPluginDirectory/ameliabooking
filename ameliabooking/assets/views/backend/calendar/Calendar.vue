@@ -1027,6 +1027,8 @@
           }
         }
 
+        eventInDroppedTime = this.$root.settings.roles.allowAdminBookOverApp && this.$root.settings.role === 'admin' ? [] : eventInDroppedTime
+
         // If one of the conditions is not satisfied revert event on the past position
         if (!this.canWriteAppointments(draggedEvent.employeeId) || droppedInPast || !droppedInWorkingHours || droppedInBreak || eventInDroppedTime.length !== 0 || droppedOutSchedule || droppedInAppointment) {
           if (droppedInPast) {
@@ -1094,6 +1096,10 @@
                   setTimeout(function () {
                     if ('timeSlotUnavailable' in e.response.data.data && e.response.data.data.timeSlotUnavailable === true) {
                       $this.notify($this.$root.labels.error, $this.$root.labels.time_slot_unavailable, 'error')
+                    }
+
+                    if ('customerAlreadyBooked' in e.response.data.data && e.response.data.data.customerAlreadyBooked === true) {
+                      $this.notify($this.$root.labels.error, $this.$root.labels.customer_already_booked_app, 'error')
                     }
 
                     if ('rescheduleBookingUnavailable' in e.response.data.data && e.response.data.data.rescheduleBookingUnavailable === true) {

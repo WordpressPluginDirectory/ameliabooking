@@ -25,8 +25,7 @@ use AmeliaBooking\Infrastructure\WP\InstallActions\DB\Booking\CustomerBookingsTa
  */
 class UserRepository extends AbstractRepository implements UserRepositoryInterface
 {
-
-    const FACTORY = UserFactory::class;
+    public const FACTORY = UserFactory::class;
 
     /**
      * @param AbstractUser $entity
@@ -58,6 +57,7 @@ class UserRepository extends AbstractRepository implements UserRepositoryInterfa
             ':stripeConnect'         => !empty($data['stripeConnect']) ? json_encode($data['stripeConnect']) : null,
             ':employeeAppleCalendar' => !empty($data['employeeAppleCalendar']) ? json_encode($data['employeeAppleCalendar']) : null,
             ':error'                 => '',
+            ':customFields'          => isset($data['customFields']) ? $data['customFields'] : null,
         ];
 
         $additionalData = Licence\DataModifier::getUserRepositoryData($data);
@@ -86,7 +86,8 @@ class UserRepository extends AbstractRepository implements UserRepositoryInterfa
                 `stripeConnect`,
                 `employeeAppleCalendar`,   
                 `password`,
-                `error`
+                `error`,
+                `customFields`
                 ) VALUES (
                 {$additionalData['placeholders']}
                 :type,
@@ -107,7 +108,8 @@ class UserRepository extends AbstractRepository implements UserRepositoryInterfa
                 :stripeConnect,
                 :employeeAppleCalendar,
                 :password,
-                :error
+                :error,
+                :customFields
                 )"
             );
 
@@ -155,6 +157,7 @@ class UserRepository extends AbstractRepository implements UserRepositoryInterfa
             ':stripeConnect'    => !empty($data['stripeConnect']) ? json_encode($data['stripeConnect']) : null,
             ':employeeAppleCalendar' => !empty($data['employeeAppleCalendar']) ? json_encode($data['employeeAppleCalendar']) : null,
             ':id'               => $id,
+            ':customFields'     => isset($data['customFields']) ? $data['customFields'] : null,
         ];
 
         $additionalData = Licence\DataModifier::getUserRepositoryData($data);
@@ -178,8 +181,9 @@ class UserRepository extends AbstractRepository implements UserRepositoryInterfa
                 `countryPhoneIso` = :countryPhoneIso,
                 `pictureFullPath` = :pictureFullPath,
                 `pictureThumbPath` = :pictureThumbPath,
-                `stripeConnect` = :stripeConnect,
-                `employeeAppleCalendar` = :employeeAppleCalendar,
+                `stripeConnect` = :stripeConnect,     
+                `employeeAppleCalendar` = :employeeAppleCalendar,           
+                `customFields` = :customFields,
                 `password` = IFNULL(:password, `password`)
                 WHERE 
                 id = :id"
@@ -435,7 +439,7 @@ class UserRepository extends AbstractRepository implements UserRepositoryInterfa
     {
         try {
             $params[':type'] = $type;
-            $statement = $this->connection->prepare(
+            $statement       = $this->connection->prepare(
                 "
                 SELECT DISTINCT 
                     u.email AS email

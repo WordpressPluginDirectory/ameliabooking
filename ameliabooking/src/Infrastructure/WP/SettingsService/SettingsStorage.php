@@ -117,11 +117,11 @@ class SettingsStorage implements SettingsStorageInterface
         $phoneCountryCode = $this->getSetting('general', 'phoneDefaultCountryCode');
         $ipLocateApyKey   = $this->getSetting('general', 'ipLocateApiKey');
 
-        $capabilities = [];
+        $capabilities           = [];
         $additionalCapabilities = [];
         if (is_admin()) {
             $currentScreenId = get_current_screen()->id;
-            $currentScreen = substr($currentScreenId, strrpos($currentScreenId, '-') + 1);
+            $currentScreen   = substr($currentScreenId, strrpos($currentScreenId, '-') + 1);
 
             $capabilities = [
                 'canRead'        => current_user_can('amelia_read_' . $currentScreen),
@@ -168,6 +168,7 @@ class SettingsStorage implements SettingsStorageInterface
                 'serviceDurationAsSlot'                  => $this->getSetting('general', 'serviceDurationAsSlot'),
                 'defaultAppointmentStatus'               => $this->getSetting('general', 'defaultAppointmentStatus'),
                 'gMapApiKey'                             => $this->getSetting('general', 'gMapApiKey'),
+                'googleClientId'                         => $this->getSetting('googleCalendar', 'clientID'),
                 'addToCalendar'                          => $this->getSetting('general', 'addToCalendar'),
                 'requiredPhoneNumberField'               => $this->getSetting('general', 'requiredPhoneNumberField'),
                 'requiredEmailField'                     => $this->getSetting('general', 'requiredEmailField'),
@@ -200,11 +201,17 @@ class SettingsStorage implements SettingsStorageInterface
                 'enabled' => $this->getSetting('outlookCalendar', 'enableMicrosoftTeams'),
             ],
             'googleCalendar'         => [
-              'enabled' => $this->getSetting('googleCalendar', 'clientID') && $this->getSetting('googleCalendar', 'clientSecret'),
+              'enabled' =>
+                  $this->getSetting('googleCalendar', 'clientID') &&
+                  $this->getSetting('googleCalendar', 'clientSecret') &&
+                  $this->getSetting('googleCalendar', 'calendarEnabled'),
               'googleMeetEnabled' => $this->getSetting('googleCalendar', 'enableGoogleMeet')
             ],
             'outlookCalendar'        => [
-                'enabled'               => $this->getSetting('outlookCalendar', 'clientID') && $this->getSetting('outlookCalendar', 'clientSecret'),
+                'enabled'               =>
+                    $this->getSetting('outlookCalendar', 'clientID') &&
+                    $this->getSetting('outlookCalendar', 'clientSecret') &&
+                    $this->getSetting('outlookCalendar', 'calendarEnabled'),
                 'microsoftTeamsEnabled' => $this->getSetting('outlookCalendar', 'enableMicrosoftTeams'),
             ],
             'appleCalendar'          =>
@@ -222,6 +229,13 @@ class SettingsStorage implements SettingsStorageInterface
             'googleTag'              => $this->getCategorySettings('googleTag'),
             'lessonSpace'            => [
                 'enabled' => $this->getSetting('lessonSpace', 'enabled') && $this->getSetting('lessonSpace', 'apiKey')
+            ],
+            'socialLogin'            => [
+                'googleLoginEnabled'         => $this->getSetting('socialLogin', 'enableGoogleLogin'),
+                'facebookLoginEnabled'       => $this->getSetting('socialLogin', 'enableFacebookLogin'),
+                'facebookAppId'              => $this->getSetting('socialLogin', 'facebookAppId'),
+                'facebookCredentialsEnabled' => $this->getSetting('socialLogin', 'facebookAppId') &&
+                    $this->getSetting('socialLogin', 'facebookAppSecret'),
             ],
             'notifications'          => [
                 'senderName'          => $this->getSetting('notifications', 'senderName'),
@@ -290,7 +304,9 @@ class SettingsStorage implements SettingsStorageInterface
                 'square'                     => [
                     'enabled'        => $this->getSetting('payments', 'square')['enabled'],
                     'testMode'       => $this->getSetting('payments', 'square')['testMode'],
-                    'accessTokenSet' => !empty($this->getSetting('payments', 'square')['accessToken']) && !empty($this->getSetting('payments', 'square')['accessToken']['access_token']),
+                    'accessTokenSet' =>
+                        !empty($this->getSetting('payments', 'square')['accessToken']) &&
+                        !empty($this->getSetting('payments', 'square')['accessToken']['access_token']),
                     'locationId'     => $this->getSetting('payments', 'square')['locationId']
                 ],
                 'razorpay'                     => [
@@ -322,6 +338,7 @@ class SettingsStorage implements SettingsStorageInterface
             ],
             'roles'                  => [
                 'allowAdminBookAtAnyTime'     => $this->getSetting('roles', 'allowAdminBookAtAnyTime'),
+                'allowAdminBookOverApp'       => $this->getSetting('roles', 'allowAdminBookOverApp'),
                 'adminServiceDurationAsSlot'  => $this->getSetting('roles', 'adminServiceDurationAsSlot'),
                 'allowConfigureSchedule'      => $this->getSetting('roles', 'allowConfigureSchedule'),
                 'allowConfigureDaysOff'       => $this->getSetting('roles', 'allowConfigureDaysOff'),
@@ -417,7 +434,7 @@ class SettingsStorage implements SettingsStorageInterface
         Licence\DataModifier::restoreSettings($settingsCopy, self::getSavedSettings());
 
         if (get_option('amelia_show_wpdt_promo') === false) {
-            update_option('amelia_show_wpdt_promo', 'yes' );
+            update_option('amelia_show_wpdt_promo', 'yes');
         }
 
         unset($settingsCopy['wordpress']);

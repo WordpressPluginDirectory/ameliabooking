@@ -12,8 +12,7 @@ use AmeliaBooking\Infrastructure\WP\InstallActions\DB\AbstractDatabaseTable;
  */
 class CustomFieldsTable extends AbstractDatabaseTable
 {
-
-    const TABLE = 'custom_fields';
+    public const TABLE = 'custom_fields';
 
     /**
      * @return string
@@ -34,6 +33,8 @@ class CustomFieldsTable extends AbstractDatabaseTable
                    `allEvents` TINYINT(1) NULL DEFAULT NULL,
                    `useAsLocation` TINYINT(1) NULL DEFAULT NULL,
                    `width` INT(11) NOT NULL DEFAULT 50,
+                   `saveType` ENUM('bookings', 'customer') NOT NULL DEFAULT 'bookings',
+                   `saveFirstChoice` TINYINT(1) NULL DEFAULT NULL,
                     PRIMARY KEY (`id`)
                 ) DEFAULT CHARSET=utf8 COLLATE utf8_general_ci";
     }
