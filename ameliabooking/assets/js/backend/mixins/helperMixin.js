@@ -132,6 +132,35 @@ export default {
 
     trimProperty (entity, property) {
       entity[property] = entity[property].trim()
+    },
+
+    mapAddressComponentsForXML (components) {
+      const mapping = {
+        street_number: 'BuildingNumber',
+        route: 'StreetName',
+        postal_code: 'PostalZone',
+        locality: 'CityName',
+        administrative_area_level_1: 'CountrySubentity',
+        administrative_area_level_2: 'CountrySubentity',
+        country: 'CountryCode',
+        premise: 'Premise',
+        sublocality: 'AdditionalStreetName',
+        neighborhood: 'AdditionalStreetName'
+      }
+
+      const result = {}
+
+      for (const [componentsKey, value] of Object.entries(components)) {
+        if (mapping[componentsKey]) {
+          // Ensure 'CountrySubentity' is set only once
+          if (componentsKey === 'administrative_area_level_2' && result.CountrySubentity) {
+            continue
+          }
+          result[mapping[componentsKey]] = value
+        }
+      }
+
+      return result
     }
   }
 }

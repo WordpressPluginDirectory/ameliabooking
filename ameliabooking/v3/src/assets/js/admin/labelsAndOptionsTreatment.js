@@ -70,6 +70,11 @@ let basicLabelsTreatment = {
     },
   },
   sbsNew: {
+    serviceStep: {
+      card: [
+        'view_in_package'
+      ]
+    },
     paymentStep: {
       summarySegment: [
         'summary_package',
@@ -193,6 +198,16 @@ let starterLabelsTreatment = deepMerge(
           'incl_tax',
         ],
       },
+      serviceStep: {
+        card: [
+          'total_tax_colon',
+          'incl_tax',
+          'multiple_locations'
+        ],
+        popup: [
+          'locations'
+        ],
+      },
       bringingAnyone: {
         content: [
           'bringing_price',
@@ -284,6 +299,8 @@ let starterLabelsTreatment = deepMerge(
         card: [
           'pay_now_btn',
           'paid',
+          'preview_invoice',
+          'download_invoice',
           'google_meet_link',
           'microsoft_teams_link',
           'zoom_link'
@@ -460,6 +477,19 @@ let liteLabelsTreatment = deepMerge(
 
 // * Specify which option to delete from customize
 let basicOptionsTreatment = {
+  sbsNew: {
+    serviceStep: ['packagesBtn'],
+    dateTimeStep: [
+      'estimatedPricingVisibility',
+      'slotPricingVisibility',
+      'indicatorPricingVisibility',
+    ],
+    recurringSummary: [
+      'estimatedPricingVisibility',
+      'slotPricingVisibility',
+      'indicatorPricingVisibility',
+    ],
+  },
   cbf: {
     categoriesList: ['packages'],
     categoryItemsList: [
@@ -489,6 +519,18 @@ let basicOptionsTreatment = {
   ecf: {
     calendar: ['waitingBtn'],
     info: ['waitingBtn']
+  },
+  capc: {
+    rescheduleAppointment: [
+      'estimatedPricingVisibility',
+      'slotPricingVisibility',
+      'indicatorPricingVisibility',
+    ],
+  },
+  cape: {
+    events: [
+      'scanQrCodeBtn',
+    ],
   }
 }
 
@@ -510,6 +552,11 @@ let starterOptionsTreatment = deepMerge(
       initStep: [
         'location',
         'tax',
+      ],
+      serviceStep: [
+        'tax',
+        'serviceLocation',
+        'serviceCapacity'
       ],
       bringingAnyone: [
         'bringingPrice',

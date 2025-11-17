@@ -10,7 +10,7 @@ import {useEventBookingsPrice} from "../admin/event";
 
 const globalLabels = reactive(window.wpAmeliaLabels)
 
-function usePaymentLink (store, method, reservation, packageCustomerId = null) {
+function usePaymentLink (store, method, reservation) {
   if (reservation.type === 'package') store.commit('cabinet/setPackageLoading', true)
   if (reservation.type === 'appointment') store.commit('cabinet/setAppointmentsLoading', true)
   if (reservation.type === 'event') store.commit('cabinet/setEventsLoading', true)
@@ -71,30 +71,10 @@ function usePaymentFromCustomerPanel (reservation, entitySettings) {
     ? entitySettings.payments.paymentLinks
     : settings.payments.paymentLinks
 
-  let bookingNotPassed = false
-
-  switch(reservation.type) {
-    case ('package'):
-      bookingNotPassed = !reservation.end ||
-        moment(reservation.end, 'YYYY-MM-DD HH:mm').isAfter(moment())
-      break
-
-    case ('appointment'):
-      bookingNotPassed = moment(reservation.bookingStart, 'YYYY-MM-DD HH:mm:ss').isAfter(moment()) &&
-        reservation.bookings[0].payments.length > 0
-      break
-
-    case ('event'):
-      bookingNotPassed = moment(reservation.periods[reservation.periods.length - 1].periodEnd, 'YYYY-MM-DD HH:mm:ss').isAfter(moment()) &&
-        reservation.bookings[0].payments.length > 0
-      break
-  }
-
   return usePaymentMethods(settings).length &&
     settings &&
     paymentLinksEnabled &&
-    paymentLinksEnabled.enabled &&
-    bookingNotPassed
+    paymentLinksEnabled.enabled
 }
 
 function usePaymentMethods (entitySettings) {
@@ -141,6 +121,13 @@ function usePaymentMethods (entitySettings) {
       paymentOptions.push({
         value: 'square',
         label: globalLabels.square
+      })
+    }
+
+    if (settings.payments.barion.enabled && (!('barion' in entitySettings) || entitySettings.barion.enabled)) {
+      paymentOptions.push({
+        value: 'barion',
+        label: globalLabels.barion
       })
     }
   }

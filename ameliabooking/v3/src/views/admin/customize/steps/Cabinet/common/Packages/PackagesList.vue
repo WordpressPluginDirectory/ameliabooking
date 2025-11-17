@@ -8,7 +8,7 @@
       :responsive-class="responsiveClass"
     />
     <div
-      v-for="customerId in Object.keys(packages)"
+      v-for="(customerId, index) in Object.keys(packages)"
       :key="customerId"
       :style="cssVars"
       class="am-sc"
@@ -17,20 +17,68 @@
         class="am-sc__top"
         :class="responsiveClass"
       >
-        <div class="am-sc__top-left">
-          <div class="am-sc__name">
-            {{ packages[customerId].packageData.name }}
+        <div class="am-sc__top-menu">
+          <div class="am-sc__top-left">
+            <div class="am-sc__name">
+              {{ packages[customerId].packageData.name }}
+            </div>
+            <div
+              v-if="packages[customerId].packageData.end"
+              class="am-sc__date"
+            >
+              {{ `${labelsDisplay('package_book_expire')} ${getFrontedFormattedDate(packages[customerId].packageData.end.split(' ')[0])}` }}
+            </div>
+            <div v-else class="am-sc__date">
+              {{ `${labelsDisplay('package_book_expiration')} ${labelsDisplay('package_book_unlimited')}` }}
+            </div>
           </div>
-          <div
-            v-if="packages[customerId].packageData.end"
-            class="am-sc__date"
+          <el-popover
+              v-if="!licence.isStarter"
+              ref="editRef"
+              :visible="editPopVisible[index]"
+              :persistent="false"
+              :show-arrow="false"
+              :width="'auto'"
+              :popper-class="'am-sc__popper'"
+              :popper-style="cssVars"
+              trigger="click"
+              placement="bottom-end"
           >
-            {{ `${labelsDisplay('package_book_expire')} ${getFrontedFormattedDate(packages[customerId].packageData.end.split(' ')[0])}` }}
-          </div>
-          <div v-else class="am-sc__date">
-            {{ `${labelsDisplay('package_book_expiration')} ${labelsDisplay('package_book_unlimited')}` }}
-          </div>
+            <template #reference>
+              <span
+                  class="am-cc__edit-btn am-icon-dots-vertical"
+                  @click="editItem($event, index)"
+              ></span>
+            </template>
+            <div
+                v-click-outside="() => closeEditItemPopup(index)"
+                class="am-sc__edit"
+            >
+              <!-- Invoice -->
+              <div
+                  v-if="!licence.isStarter"
+                  class="am-sc__edit-item"
+              >
+                <span class="am-icon-eye"></span>
+                <span class="am-sc__edit-text">
+                  {{ labelsDisplay('preview_invoice') }}
+                </span>
+              </div>
+
+              <div
+                  v-if="!licence.isStarter"
+                  class="am-sc__edit-item"
+              >
+                <span class="am-icon-download"></span>
+                <span class="am-sc__edit-text">
+                  {{ labelsDisplay('download_invoice') }}
+                </span>
+              </div>
+              <!-- /Invoice -->
+            </div>
+          </el-popover>
         </div>
+
         <div
           class="am-sc__top-right"
           :class="responsiveClass"
@@ -57,11 +105,13 @@
 <script setup>
 // * Import from libraries
 import moment from 'moment'
+import { ClickOutside as vClickOutside } from "element-plus";
+
 
 // * Import from Vue
 import {
   computed,
-  inject,
+  inject, onMounted,
   ref
 } from "vue";
 
@@ -71,6 +121,9 @@ import CabinetFilters from '../parts/Filters.vue'
 // * Composables
 import {getFrontedFormattedDate} from "../../../../../../../assets/js/common/date";
 import {useColorTransparency} from "../../../../../../../assets/js/common/colorManipulation";
+
+// * Plugin Licence
+let licence = inject('licence')
 
 // * Component properties
 let props = defineProps({
@@ -115,6 +168,19 @@ let arrApp = [
 
 let packages = ref({})
 
+const editPopVisible = ref([]);
+
+function editItem(e, index) {
+  e.stopPropagation();
+  editPopVisible.value = editPopVisible.value.map((val, i) =>
+      i === index ? !val : false
+  );
+}
+
+function closeEditItemPopup(index) {
+  editPopVisible.value[index] = false;
+}
+
 arrApp.forEach((item, index) => {
   packages.value[index] = {
     packageData: {
@@ -144,6 +210,7 @@ arrApp.forEach((item, index) => {
       }
     ]
   }
+  editPopVisible.value.push(false);
 })
 
 function expirationDate(end) {
@@ -200,6 +267,8 @@ let cssVars = computed(() => {
     '--am-c-sc-text': amColors.value.colorMainText,
     '--am-c-sc-text-op80': useColorTransparency(amColors.value.colorMainText, 0.8),
     '--am-c-sc-warning-op50': useColorTransparency(amColors.value.colorWarning, 0.5),
+    '--am-c-sc-text-op10': useColorTransparency(amColors.value.colorMainText, 0.1),
+    '--am-c-sc-text-op15': useColorTransparency(amColors.value.colorMainText, 0.15),
   }
 })
 </script>
@@ -234,9 +303,23 @@ export default {
       display: flex;
       align-items: center;
       justify-content: space-between;
+      flex-direction: column;
 
       &.am-rw-500 {
         flex-wrap: wrap;
+      }
+
+      &-menu {
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+        width: 100%;
+
+
+        .am-cc__edit-btn {
+          height: 100%;
+          cursor: pointer;
+        }
       }
 
       &-right {
@@ -245,6 +328,12 @@ export default {
         align-items: center;
         flex: 0 0 auto;
         cursor: pointer;
+        margin-top: 12px;
+        border-radius: 8px;
+        border: 1px solid var(--am-c-sc-bgr-op15);
+        padding: 4px;
+        width: 100%;
+        justify-content: center;
 
         * {
           color: var(--am-c-sc-text);
@@ -294,13 +383,63 @@ export default {
       background-color: var(--am-c-sc-warning-op50);
       border-radius: 10px;
       padding: 0 8px;
-      margin: 16px 0 0;
+      margin: 10px 0 0;
+
+      &.am-mobile {
+        margin: 16px 0 0;
+      }
 
       [class^='am-icon'] {
         display: block;
         font-size: 20px;
       }
     }
+  }
+}
+
+.am-sc {
+  &__edit {
+    &-item {
+      display: flex;
+      align-items: center;
+      color: var(--am-c-sc-text);
+      border-radius: 4px;
+      padding: 4px;
+      cursor: pointer;
+      transition: background-color .3s ease-in-out;
+
+      &:hover {
+        background-color: var(--am-c-sc-text-op15);
+      }
+
+      span[class^="am-icon"] {
+        font-size: 24px;
+        color: inherit;
+        margin: 0 4px 0 0;
+      }
+    }
+
+    &-text {
+      font-size: 14px;
+      line-height: 1.7142857;
+      color: inherit;
+    }
+  }
+}
+
+.am-sc__popper {
+  padding: 6px 4px;
+  background-color: var(--am-c-sc-bgr);
+  border-color: var(--am-c-sc-bgr);
+  box-shadow: 0 2px 12px 0 var(--am-c-sc-text-op10);
+
+  * {
+    font-family: var(--am-font-family), sans-serif;
+    box-sizing: border-box;
+  }
+
+  &.el-popover.el-popper {
+    padding: 6px 4px;
   }
 }
 

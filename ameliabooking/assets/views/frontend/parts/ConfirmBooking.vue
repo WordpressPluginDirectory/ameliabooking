@@ -2824,6 +2824,13 @@ export default {
         })
       }
 
+      if (this.$root.settings.payments.barion.enabled) {
+        paymentOptions.push({
+          value: 'barion',
+          label: this.$root.labels.barion
+        })
+      }
+
       return paymentOptions
     },
 

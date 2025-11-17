@@ -19,7 +19,7 @@
           classname="el-input__inner"
           :placeholder="props.placeholder"
           :aria-label="props.ariaLabel"
-          @change="setAddressCF($event)"
+          @placechanged="setAddressCF"
         />
       </div>
     </div>
@@ -80,7 +80,7 @@ const props = defineProps({
 })
 
 // * Define Emits
-const emits = defineEmits(['update:modelValue'])
+const emits = defineEmits(['update:modelValue', 'address-selected'])
 
 // * Component Refs
 let addressCustomFields = ref()
@@ -100,10 +100,9 @@ function googleMapsLoaded () {
   return window.google && window.google.maps?.places && store.state.settings.general.gMapApiKey
 }
 
-function setAddressCF (val) {
-  if (typeof val === 'string') {
-    emits('update:modelValue', val)
-  }
+function setAddressCF (val, obj) {
+  emits('update:modelValue', obj.formatted_address)
+  emits('address-selected', obj.address_components)
 }
 
 onMounted(() => {

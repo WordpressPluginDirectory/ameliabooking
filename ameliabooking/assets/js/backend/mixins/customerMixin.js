@@ -34,7 +34,8 @@ export default {
         note: '',
         status: 'visible',
         type: 'customer',
-        countPendingAppointments: 0
+        countPendingAppointments: 0,
+        customFields: null
       }
     },
 

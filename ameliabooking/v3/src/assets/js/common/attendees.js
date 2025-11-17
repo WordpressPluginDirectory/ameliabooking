@@ -20,6 +20,7 @@ function useFrontAttendee(attendee, defaultAttendee = {}) {
       price: attendee.price,
       coupon: attendee.coupon,
       payments: attendee.payments,
+      qrCodes: attendee.qrCodes,
     }
   )
 }

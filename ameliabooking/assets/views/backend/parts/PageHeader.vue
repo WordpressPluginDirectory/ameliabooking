@@ -2,7 +2,7 @@
   <div class="am-page-header am-section">
     <el-row :type="($router.currentRoute.name === 'wpamelia-calendar') ? '' : 'flex'" align="middle">
 
-      <el-col :span="($router.currentRoute.name === 'wpamelia-calendar') ? 6 : 18">
+      <el-col :span="headerColumnsWidth.left">
         <!-- Logo -->
         <div class="am-logo">
           <img width="92" class="logo-big" :src="$root.getUrl + 'public/img/amelia-logo-horizontal.svg'">
@@ -67,7 +67,7 @@
 
       <!-- Buttons and Filters -->
       <el-col
-        :span="($router.currentRoute.name === 'wpamelia-calendar') ? 18 : 6"
+        :span="headerColumnsWidth.right"
         class="align-right v-calendar-column"
       >
 
@@ -78,6 +78,17 @@
           @click="showDialogAppointment" class="am-dialog-create"
         >
           <i class="el-icon-plus"></i> <span class="button-text">{{ $root.labels.new_appointment }}</span>
+        </el-button>
+
+        <!-- QR Code Scanner -->
+        <el-button
+          v-if="$router.currentRoute.name === 'wpamelia-events' && $root.settings.appointments.qrCodeEvents.enabled && ($root.settings.role === 'admin' || $root.settings.role === 'provider')"
+          type="primary"
+          @click="showQrScanner"
+          class="am-qr-scanner-btn am-dialog-create"
+          style="margin-left: 10px;"
+        >
+          <i class="el-icon-camera"></i> <span class="button-text">{{ $root.labels.scan_e_ticket }}</span>
         </el-button>
 
         <!-- New Event -->
@@ -331,6 +342,27 @@
       'fetched'
     ],
 
+    computed: {
+      headerColumnsWidth () {
+        if (this.$router.currentRoute.name === 'wpamelia-calendar') {
+          return {
+            left: 6,
+            right: 18
+          }
+        } else if (this.$router.currentRoute.name === 'wpamelia-events') {
+          return {
+            left: 12,
+            right: 12
+          }
+        }
+
+        return {
+          left: 18,
+          right: 6
+        }
+      }
+    },
+
     methods: {
       showMainCustomize () {
         this.$emit('showMainCustomize', null)
@@ -374,6 +406,10 @@
 
       showDialogTax () {
         this.$emit('newTaxBtnClicked')
+      },
+
+      showQrScanner () {
+        this.$emit('showQrScanner')
       },
 
       showDialogCoupon () {

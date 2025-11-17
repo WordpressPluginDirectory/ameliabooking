@@ -451,10 +451,15 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
         }
 
         if (!empty($criteria['search'])) {
-            $where[] = "(e.name LIKE '%" . $criteria['search'] . "%' 
-            OR e.translations LIKE '{\"name\":{%" . $criteria['search'] . "%\"description\":{%'
-            OR e.translations LIKE '{\"description\":{%\"name\":{%" . $criteria['search'] . "%'
-            OR (e.translations LIKE '{\"name\":{%" . $criteria['search'] . "%' AND e.translations NOT LIKE '%\"description\":{%'))";
+            $params[':search1'] = "%{$criteria['search']}%";
+            $params[':search2'] = "{\"name\":{%{$criteria['search']}%\"description\":{%";
+            $params[':search3'] = "{\"description\":{%\"name\":{%{$criteria['search']}%";
+            $params[':search4'] = "{\"name\":{%{$criteria['search']}%";
+
+            $where[] = "(e.name LIKE :search1 
+            OR e.translations LIKE :search2
+            OR e.translations LIKE :search3
+            OR (e.translations LIKE :search4 AND e.translations NOT LIKE '%\"description\":{%'))";
         }
 
 
@@ -682,10 +687,15 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
         }
 
         if (!empty($criteria['search'])) {
-            $where[] = "(e.name LIKE '%" . $criteria['search'] . "%' 
-            OR e.translations LIKE '{\"name\":{%" . $criteria['search'] . "%\"description\":{%'
-            OR e.translations LIKE '{\"description\":{%\"name\":{%" . $criteria['search'] . "%'
-            OR (e.translations LIKE '{\"name\":{%" . $criteria['search'] . "%' AND e.translations NOT LIKE '%\"description\":{%'))";
+            $params[':search1'] = "%{$criteria['search']}%";
+            $params[':search2'] = "{\"name\":{%{$criteria['search']}%\"description\":{%";
+            $params[':search3'] = "{\"description\":{%\"name\":{%{$criteria['search']}%";
+            $params[':search4'] = "{\"name\":{%{$criteria['search']}%";
+
+            $where[] = "(e.name LIKE :search1 
+            OR e.translations LIKE :search2
+            OR e.translations LIKE :search3
+            OR (e.translations LIKE :search4 AND e.translations NOT LIKE '%\"description\":{%'))";
         }
 
         if (isset($criteria['show'])) {
@@ -1401,6 +1411,8 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
             $joins .= "
                 LEFT JOIN {$ticketsTable} eti ON eti.eventId = e.id
             ";
+
+            $orderBy .= (!empty($orderBy) ? ',' : 'ORDER BY') . ' eti.id ASC';
         }
 
         if (!empty($criteria['fetchEventsTags'])) {
@@ -1637,6 +1649,7 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
                 cu.phone AS customer_phone,
                 cu.gender AS customer_gender,
                 cu.birthday AS customer_birthday,
+                cu.customFields AS customer_customFields,
             ';
 
             $joins .= "
@@ -1674,7 +1687,8 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
             cb.utcOffset AS booking_utcOffset,
             cb.token AS booking_token,
             cb.aggregatedPrice AS booking_aggregatedPrice,
-            cb.tax AS booking_tax
+            cb.tax AS booking_tax,
+            cb.qrCodes AS booking_qrCodes
         ';
 
         if (!empty($criteria['ids'])) {

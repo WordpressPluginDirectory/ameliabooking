@@ -95,6 +95,7 @@ export default {
             '%payment_link_stripe%',
             '%payment_link_razorpay%',
             '%payment_link_square%',
+            '%payment_link_barion%',
             '%event_deposit_payment%',
             '%event_tickets%',
             '%customer_panel_url%',

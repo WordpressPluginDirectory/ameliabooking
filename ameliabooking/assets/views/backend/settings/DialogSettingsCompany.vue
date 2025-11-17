@@ -39,7 +39,7 @@
 
         <!-- Address -->
         <el-form-item :label="$root.labels.address+':'">
-          <div class="el-input">
+          <div class="el-input" style="margin-bottom: 0">
             <vue-google-autocomplete
                 v-if="$root.settings.general.gMapApiKey !== ''"
                 ref="settings.address"
@@ -59,6 +59,25 @@
             >
             </el-input>
           </div>
+        </el-form-item>
+
+        <el-form-item :label="$root.labels.country+':'">
+          <el-select
+              v-model="settings.countryCode"
+              placeholder=""
+              clearable
+              filterable
+          >
+            <el-option
+                v-for="country in countries"
+                :key="country.id"
+                :value="country.iso"
+                :label="country.nicename"
+            >
+              <span :class="'am-flag am-flag-'+country.iso"></span>
+              <span class="am-phone-input-nicename">{{ country.nicename }}</span>
+            </el-option>
+          </el-select>
         </el-form-item>
 
         <!-- Website -->
@@ -120,10 +139,12 @@
   import PictureUpload from '../parts/PictureUpload.vue'
   import VueGoogleAutocomplete from 'vue-google-autocomplete'
   import imageMixin from '../../../js/common/mixins/imageMixin'
+  import phoneCountriesMixin from '../../../js/common/mixins/phoneCountriesMixin'
+  import helperMixin from '../../../js/backend/mixins/helperMixin'
 
   export default {
 
-    mixins: [imageMixin],
+    mixins: [imageMixin, phoneCountriesMixin, helperMixin],
 
     props: ['company'],
 
@@ -180,8 +201,15 @@
         this.settings.pictureThumbPath = pictureThumbPath
       },
 
-      getAddressData: function () {
+      getAddressData: function (addressComponents) {
         this.settings.address = document.getElementById('address-autocomplete').value
+        if (addressComponents) {
+          this.settings.addressComponents = this.mapAddressComponentsForXML(addressComponents)
+          const country = this.countries.find(c => c.nicename === this.settings.addressComponents.CountryCode)
+          if (country) {
+            this.settings.addressComponents.CountryCode = country.iso
+          }
+        }
       },
 
       phoneFormatted (phone, countryPhoneIso) {

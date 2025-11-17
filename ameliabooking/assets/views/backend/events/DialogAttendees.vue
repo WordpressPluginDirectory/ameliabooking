@@ -129,6 +129,20 @@
               </div>
             </template>
             <div class="am-attendee-collapse">
+              <el-row
+                v-if="$root.settings.appointments.qrCodeEvents.enabled && booking.qrCodes"
+                :gutter="10"
+                class="am-attendee-collapse-payments"
+              >
+                <el-col :span="6">
+                  <span>{{ $root.labels.checked_in }}:</span>
+                </el-col>
+                <el-col :span="18">
+                  <p v-for="(val, date) in (getQrCodesBooking(booking.qrCodes))">
+                    <span>{{date}}:</span> {{val}}
+                  </p>
+                </el-col>
+              </el-row>
               <el-row :gutter="10" v-if="booking.payments.length" class="am-attendee-collapse-payments">
                 <el-col :span="6">
                   <span>{{ $root.labels.payment }}</span>
@@ -464,6 +478,26 @@
     },
 
     methods: {
+      getQrCodesBooking (qrCodes) {
+        const tickets = JSON.parse(qrCodes)
+        const eDates = {}
+
+        tickets.forEach(ticket => {
+          if (ticket.type !== 'booking') {
+            for (const [date, scanned] of Object.entries(ticket.dates)) {
+              (eDates[date] = eDates[date] || []).push(scanned)
+            }
+          }
+        })
+
+        return Object.fromEntries(
+          Object.entries(eDates).map(([date, scans]) => [
+            date,
+            `${scans.filter(Boolean).length}/${scans.length}`
+          ])
+        )
+      },
+
       getBookingStatus (booking) {
         if (this.eventStatus === 'rejected' || this.eventStatus === 'canceled') {
           return 'canceled'

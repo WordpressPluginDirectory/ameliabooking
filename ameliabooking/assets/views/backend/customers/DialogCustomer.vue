@@ -428,6 +428,12 @@
         }
 
         if (customer.customFields) {
+          for (let key in this.customer.customFields) {
+            if (this.customer.customFields[key].type === 'datepicker' && this.customer.customFields[key].value) {
+              this.customer.customFields[key].value = this.customer.customFields[key].value instanceof Date
+                ? this.getStringFromDate(this.customer.customFields[key].value) : this.customer.customFields[key].value
+            }
+          }
           customer.customFields = JSON.stringify(this.customer.customFields)
         }
 

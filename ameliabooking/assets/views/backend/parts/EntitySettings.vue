@@ -375,6 +375,23 @@
           </el-row>
         </div>
 
+        <!-- Service Paid Barion -->
+        <div class="am-setting-box am-switch-box" v-if="$root.settings.payments.barion.enabled">
+          <el-row type="flex" align="middle" :gutter="24">
+            <el-col :span="16">
+              <img class="svg-amelia" width="40px" :src="$root.getUrl + 'public/img/payments/barion.svg'">
+            </el-col>
+            <el-col :span="8" class="align-right">
+              <el-switch
+                  v-model="paymentsSettings.barion.enabled"
+                  active-text=""
+                  inactive-text=""
+              >
+              </el-switch>
+            </el-col>
+          </el-row>
+        </div>
+
         <el-alert
           v-if="(!paymentsSettings.wc.enabled || (!$root.settings.payments.wc.enabled && paymentsSettings.wc.enabled)) &&
           (!paymentsSettings.onSite || (!$root.settings.payments.onSite && paymentsSettings.onSite)) &&
@@ -382,7 +399,8 @@
           (!paymentsSettings.stripe.enabled || (!$root.settings.payments.stripe.enabled && paymentsSettings.stripe.enabled)) &&
           (!paymentsSettings.mollie.enabled || (!$root.settings.payments.mollie.enabled && paymentsSettings.mollie.enabled)) &&
           (!paymentsSettings.square.enabled || (!$root.settings.payments.square.enabled && paymentsSettings.square.enabled)) &&
-          (!paymentsSettings.razorpay.enabled || (!$root.settings.payments.razorpay.enabled && paymentsSettings.razorpay.enabled))"
+          (!paymentsSettings.razorpay.enabled || (!$root.settings.payments.razorpay.enabled && paymentsSettings.razorpay.enabled)) &&
+          (!paymentsSettings.barion.enabled || (!$root.settings.payments.barion.enabled && paymentsSettings.barion.enabled))"
           type="warning"
           show-icon
           title=""

@@ -1498,7 +1498,8 @@
                 '%payment_link_paypal%',
                 '%payment_link_mollie%',
                 '%payment_link_razorpay%',
-                '%payment_link_square%'
+                '%payment_link_square%',
+                '%payment_link_barion%'
               ]
             }
 
@@ -1555,8 +1556,8 @@
           excludedPlaceholders.paymentPlaceholders.push('%payment_link_paypal%')
           excludedPlaceholders.paymentPlaceholders.push('%payment_link_razorpay%')
           excludedPlaceholders.paymentPlaceholders.push('%payment_link_square%')
+          excludedPlaceholders.paymentPlaceholders.push('%payment_link_barion%')
         }
-
 
         if (notification && notification.name === 'customer_invoice') {
           excludedPlaceholders.customerPlaceholders.push('%customer_panel_url%')
@@ -1593,7 +1594,8 @@
               '%payment_link_paypal%',
               '%payment_link_mollie%',
               '%payment_link_razorpay%',
-              '%payment_link_square%'
+              '%payment_link_square%',
+              '%payment_link_barion%'
             ]
           }
         }
@@ -1638,7 +1640,8 @@
             '%payment_link_paypal%',
             '%payment_link_mollie%',
             '%payment_link_razorpay%',
-            '%payment_link_square%'
+            '%payment_link_square%',
+            '%payment_link_barion%'
           ])
         }
 
@@ -1728,7 +1731,7 @@
           common.push('employeePlaceholders')
         }
 
-        if (['provider_cart', 'customer_cart'].indexOf(notification.name) !== -1) {
+        if (['provider_cart', 'customer_cart', 'customer_event_qr_code'].indexOf(notification.name) !== -1) {
           common = common.filter(ph => ph !== 'paymentPlaceholders')
         }
 
@@ -1758,7 +1761,7 @@
               )
 
             case ('event'):
-              if (this.userTypeTab === 'customer') {
+              if (this.userTypeTab === 'customer' && ['customer_event_qr_code'].indexOf(notification.name) === -1) {
                 common = common.concat(['couponsPlaceholders'])
               }
 
@@ -1777,16 +1780,16 @@
               }
 
               return common.concat(
-                notification.name !== 'customer_cart' && notification.name !== 'provider_cart' ?
-                [
-                  'appointmentPlaceholders',
-                  'customFieldsPlaceholders',
-                  'employeePlaceholders',
-                  'locationPlaceholders',
-                  'extrasPlaceholders',
-                  'categoryPlaceholders'
-                ] : [
-                ]
+                notification.name !== 'customer_cart' && notification.name !== 'provider_cart'
+                  ? [
+                    'appointmentPlaceholders',
+                    'customFieldsPlaceholders',
+                    'employeePlaceholders',
+                    'locationPlaceholders',
+                    'extrasPlaceholders',
+                    'categoryPlaceholders'
+                  ] : [
+                  ]
               )
           }
         }
@@ -1808,7 +1811,8 @@
           name === 'provider_package_purchased' ||
           name === 'provider_package_canceled' ||
           name === 'customer_event_waiting' ||
-          name === 'provider_event_waiting'
+          name === 'provider_event_waiting' ||
+          name === 'customer_event_qr_code'
         )) {
           return 'pro'
         }

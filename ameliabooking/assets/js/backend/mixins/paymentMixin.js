@@ -17,7 +17,7 @@ export default {
     },
 
     longNamePayments(gateway) {
-      return ['mollie', 'razorpay', 'square'].includes(gateway)
+      return ['mollie', 'razorpay', 'square', 'barion'].includes(gateway)
     },
 
     getPaymentData(payment, appointment, event, pack, recurring = []) {
@@ -156,6 +156,8 @@ export default {
           return '70px'
         case 'mollie':
           return '38px'
+        case 'barion':
+          return '50px'
         default:
           return '16px'
       }

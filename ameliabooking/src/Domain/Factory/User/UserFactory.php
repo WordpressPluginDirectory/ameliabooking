@@ -18,6 +18,7 @@ use AmeliaBooking\Domain\Factory\Schedule\SpecialDayPeriodFactory;
 use AmeliaBooking\Domain\Factory\Schedule\SpecialDayPeriodLocationFactory;
 use AmeliaBooking\Domain\Factory\Schedule\SpecialDayPeriodServiceFactory;
 use AmeliaBooking\Domain\Factory\Stripe\StripeFactory;
+use AmeliaBooking\Domain\ValueObjects\BooleanValueObject;
 use AmeliaBooking\Domain\ValueObjects\DateTime\Birthday;
 use AmeliaBooking\Domain\ValueObjects\Gender;
 use AmeliaBooking\Domain\ValueObjects\Json;
@@ -178,6 +179,10 @@ class UserFactory
                     new Collection($appointmentList)
                 );
 
+                if (isset($data['show'])) {
+                    $user->setShow(new BooleanValueObject($data['show']));
+                }
+
                 if (!empty($data['password'])) {
                     $user->setPassword(new Password($data['password']));
                 }
@@ -244,6 +249,15 @@ class UserFactory
                     new Gender(!empty($data['gender']) ? strtolower($data['gender']) : null)
                 );
 
+                // Fix for customFields being encoded multiple times
+                if (
+                    !empty($data['customFields']) &&
+                    is_string($data['customFields']) &&
+                    !is_array(json_decode($data['customFields'], true))
+                ) {
+                    $data['customFields'] = null;
+                }
+
                 if (!empty($data['translations'])) {
                     $user->setTranslations(new Json($data['translations']));
                 }
@@ -259,13 +273,33 @@ class UserFactory
             $user->setCountryPhoneIso(new Name($data['countryPhoneIso']));
         }
 
-        if (($data['type'] === 'customer' || $data['type'] === 'provider') && !empty($data['stripeConnect'])) {
+        if ($data['type'] === 'provider' && !empty($data['stripeConnect'])) {
             if (!is_array($data['stripeConnect'])) {
                 $data['stripeConnect'] = json_decode($data['stripeConnect'], true);
             }
             $user->setStripeConnect(StripeFactory::create($data['stripeConnect']));
         }
 
+        if ($data['type'] === 'customer' && !empty($data['stripeConnect'])) {
+            if (!is_array($data['stripeConnect'])) {
+                $data['stripeConnect'] = json_decode($data['stripeConnect'], true);
+            }
+
+            if (!empty($data['stripeConnect'])) {
+                if (empty($data['stripeConnect'][0])) {
+                    $data['stripeConnect'] = [$data['stripeConnect']];
+                }
+            } else {
+                $data['stripeConnect'] = [];
+            }
+
+            $stripeConnects = new Collection();
+            foreach ($data['stripeConnect'] as $key => $stripeConnect) {
+                $stripeConnects->addItem(StripeFactory::create($stripeConnect));
+            }
+
+            $user->setStripeConnect($stripeConnects);
+        }
 
         if (!empty($data['birthday'])) {
             if (is_string($data['birthday'])) {

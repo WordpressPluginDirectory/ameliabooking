@@ -202,6 +202,54 @@
                           <LicenceBlock :licence="'pro'"></LicenceBlock>
                         </div>
                       <!-- /Show waiting list slots -->
+
+                      <!-- Enable QR Code -->
+                      <div
+                        class="am-setting-box am-switch-box am-waiting-list-events"
+                        v-if="notInLicence('pro') ? licenceVisible() : true"
+                        :class="licenceClass('pro')"
+                      >
+                        <el-row type="flex" align="middle" :gutter="24">
+                          <el-col :span="24">
+                            <span>{{ $root.labels.enable_qr_code }}</span>
+                          </el-col>
+                          <el-col :span="4" class="align-right">
+                            <el-switch
+                              v-model="settings.qrCodeEvents.enabled"
+                              active-text=""
+                              inactive-text=""
+                              :disabled="notInLicence('pro')"
+                            >
+                            </el-switch>
+                          </el-col>
+                        </el-row>
+
+                        <el-row align="middle" :gutter="24" style="margin-top: 24px" v-if="settings.qrCodeEvents.enabled">
+                          <el-col>
+                            <!-- QR Code notice -->
+                            <div class="am-waiting-list-notice-box">
+                              <div class="am-waiting-list-notice-box-left">
+                                <img :src="$root.getUrl + 'public/img/am-alert-triangle.svg'" class="am-waiting-list-notice-box-img"/>
+                                <div class="am-waiting-list-notice-box-text">
+                                  <p class="am-waiting-list-notice-box-text-title">{{ $root.labels.events_qr_code_notice_title }}</p>
+                                  <p class="am-waiting-list-notice-box-text-subtitle">{{ $root.labels.events_qr_code_notice_subtitle }}</p>
+                                </div>
+                              </div>
+                              <div class="am-waiting-list-notice-box-right">
+                                <el-button
+                                  @click="setWaitingListNotification"
+                                  class="am-waiting-list-notice-box-btn"
+                                  :disabled="notInLicence('pro')"
+                                >
+                                  {{ $root.labels.events_qr_code_notice_btn_text }}
+                                </el-button>
+                              </div>
+                            </div>
+                          </el-col>
+                        </el-row>
+                        <LicenceBlock :licence="'pro'"></LicenceBlock>
+                      </div>
+                      <!-- /Enable QR Code -->
                     </el-tab-pane>
 
                 </el-tabs>

@@ -45,6 +45,16 @@ class InfrastructureService
     /**
      * @param Container $c
      *
+     * @return InfrastructureServices\Mailchimp\AbstractMailchimpService
+     */
+    public static function getMailchimpService($c)
+    {
+        return new InfrastructureServices\Mailchimp\StarterMailchimpService($c);
+    }
+
+    /**
+     * @param Container $c
+     *
      * @return InfrastructureServices\Recaptcha\AbstractRecaptchaService
      */
     public static function getRecaptchaService($c)
@@ -139,6 +149,16 @@ class InfrastructureService
         );
     }
 
+    public static function getBarionService($c)
+    {
+        return new InfrastructureServices\Payment\StarterPaymentService(
+            $c->get('domain.settings.service'),
+            new InfrastructureServices\Payment\CurrencyService(
+                $c->get('domain.settings.service')
+            )
+        );
+    }
+
     /**
      * @param $c
      * @return InfrastructureServices\Authentication\AbstractSocialAuthenticationService
@@ -146,5 +166,15 @@ class InfrastructureService
     public static function getSocialAuthenticationService($c)
     {
         return new InfrastructureServices\Authentication\StarterSocialAuthenticationService($c);
+    }
+
+    /**
+     * @param Container $c
+     *
+     * @return InfrastructureServices\QrCode\AbstractQrCodeInfrastructureService
+     */
+    public static function getQrCodeService($c)
+    {
+        return new InfrastructureServices\QrCode\StarterQrCodeInfrastructureService($c);
     }
 }

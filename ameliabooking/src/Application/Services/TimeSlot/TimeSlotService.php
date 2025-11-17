@@ -108,7 +108,7 @@ class TimeSlotService
 
         $searchStartDateTime = clone $requiredDateTime;
 
-        $searchStartDateTime->modify('-1 days');
+        $searchStartDateTime->modify('first day of this month')->modify('-1 days');
 
         $searchEndDateTime = clone $requiredDateTime;
 
@@ -451,7 +451,7 @@ class TimeSlotService
                     'providers'      => $props['providerIds'],
                     'fetchCalendars' => true,
                 ],
-                $props['isFrontEndBooking'] ? ['providerStatus' => Status::VISIBLE] : []
+                $props['isFrontEndBooking'] ? ['providerStatus' => Status::VISIBLE, 'show' => 1] : []
             )
         );
 

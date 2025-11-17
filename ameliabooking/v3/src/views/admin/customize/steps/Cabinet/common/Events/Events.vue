@@ -12,7 +12,17 @@
     <div
       v-if="pageRenderKey === 'cape'"
       class="am-cap__actions"
+      :class="responsiveClass"
     >
+      <AmButton
+        v-if="(licence.isPro || licence.isDeveloper) && amSettings.appointments.qrCodeEvents.enabled && amCustomize.cape.events.options.scanQrCodeBtn.visibility"
+        prefix="scan-qr-code"
+        size="small"
+        category="secondary"
+        type="plain"
+      >
+        {{amLabels.scan_e_ticket}}
+      </AmButton>
       <AmButton
         prefix="plus"
         size="small"
@@ -118,6 +128,9 @@ import {
 import AmButton from "../../../../../../_components/button/AmButton.vue";
 
 let pageRenderKey = inject('pageRenderKey')
+
+// * Global Settings
+let amSettings = inject('settings')
 
 // * Plugin Licence
 let licence = inject('licence')
@@ -608,9 +621,20 @@ export default {
       display: flex;
       justify-content: flex-end;
       margin: 0 0 16px;
+      gap: 0 10px;
+
+      &.am-rw-420 {
+        justify-content: flex-start;
+        flex-wrap: wrap;
+        gap: 8px;
+
+        .am-button {
+          width: 100%;
+        }
+      }
 
       .am-button {
-        .am-icon-plus {
+        .am-icon-plus, .am-icon-scan-qr-code {
           font-size: 24px;
         }
       }

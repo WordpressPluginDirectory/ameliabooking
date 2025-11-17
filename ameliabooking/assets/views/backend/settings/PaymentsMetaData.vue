@@ -218,6 +218,14 @@
       >
       </el-input>
     </el-form-item>
+    <el-form-item :label="$root.labels.description_barion + ':'" v-show="data.barion.enabled">
+      <el-input
+          type="textarea"
+          :autosize="{ minRows: 4, maxRows: 6}"
+          v-model="description_barion"
+      >
+      </el-input>
+    </el-form-item>
     <el-form-item>
       <inline-placeholders
         :placeholdersNames="getInlinePlaceholdersNames()"
@@ -375,6 +383,14 @@ export default {
         this.data.square.description[this.tab] = newDescription
       }
     },
+    description_barion: {
+      get () {
+        return this.data.barion.description[this.tab]
+      },
+      set (newDescription) {
+        this.data.barion.description[this.tab] = newDescription
+      }
+    },
     description_razorpay: {
       get () {
         return this.data.razorpay.description[this.tab]
@@ -415,7 +431,8 @@ export default {
         '%payment_link_stripe%',
         '%payment_link_mollie%',
         '%payment_link_razorpay%',
-        '%payment_link_square%'
+        '%payment_link_square%',
+        '%payment_link_barion%'
       ]
 
       switch (this.tab) {

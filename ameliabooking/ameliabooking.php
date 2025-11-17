@@ -3,7 +3,7 @@
 Plugin Name: Amelia
 Plugin URI: https://wpamelia.com/
 Description: Amelia is a simple yet powerful automated booking specialist, working 24/7 to make sure your customers can make appointments and events even while you sleep!
-Version: 1.2.30
+Version: 1.2.37
 Author: TMS
 Author URI: https://tmsproducts.io/
 Text Domain: ameliabooking
@@ -104,7 +104,7 @@ if (!defined('AMELIA_LOGIN_URL')) {
 
 // Const for Amelia version
 if (!defined('AMELIA_VERSION')) {
-    define('AMELIA_VERSION', '1.2.30');
+    define('AMELIA_VERSION', '1.2.37');
 }
 
 // Const for site URL
@@ -138,7 +138,11 @@ if (!defined('AMELIA_DEV')) {
 }
 
 if (!defined('AMELIA_NGROK_URL')) {
-    define('AMELIA_NGROK_URL', '97619f3954de.ngrok.app');
+    define('AMELIA_NGROK_URL', 'ce3ac66a70b5.ngrok-free.app');
+}
+
+if (!defined('AMELIA_MAILCHIMP_CLIENT_ID')) {
+    define('AMELIA_MAILCHIMP_CLIENT_ID', '459163389015');
 }
 
 require_once AMELIA_PATH . '/vendor/autoload.php';
@@ -522,6 +526,39 @@ class Plugin
         exit;
     }
 
+    /**
+     * @param array $links
+     *
+     * @return array
+     */
+    public static function addPluginActionLinks($links)
+    {
+        $primaryLinks = [
+            '<a href="' . admin_url('admin.php?page=wpamelia-dashboard') . '">View</a>',
+            '<a href="' . admin_url('admin.php?page=wpamelia-settings') . '">Settings</a>'
+        ];
+
+        return array_merge($primaryLinks, $links);
+    }
+
+    /**
+     * @param array  $links
+     * @param string $file
+     * @param array  $pluginData
+     * @param string $status
+     *
+     * @return array
+     */
+    public static function addPluginRowMeta($links, $file, $pluginData, $status)
+    {
+        if ($file !== AMELIA_PLUGIN_SLUG) {
+            return $links;
+        }
+
+        $links[] = '<a href="https://wpamelia.com/documentation/" target="_blank" rel="noopener">Docs</a>';
+
+        return $links;
+    }
 }
 
 add_action('wp_ajax_amelia_remove_wpdt_promo_notice', array('AmeliaBooking\Plugin', 'amelia_remove_wpdt_promo_notice'));
@@ -586,6 +623,8 @@ add_filter('submenu_file', function($submenu_file) {
     return $submenu_file;
 });
 
+add_filter('plugin_row_meta', array('AmeliaBooking\Plugin', 'addPluginRowMeta'), 10, 4);
+add_filter('plugin_action_links_' . AMELIA_PLUGIN_SLUG, array('AmeliaBooking\Plugin', 'addPluginActionLinks'));
 
 add_action( 'wp_logout',  array('AmeliaBooking\Infrastructure\WP\UserService\UserService', 'logoutAmeliaUser'));
 add_action( 'profile_update',  array('AmeliaBooking\Infrastructure\WP\UserService\UserService', 'updateAmeliaUser'), 10, 3);

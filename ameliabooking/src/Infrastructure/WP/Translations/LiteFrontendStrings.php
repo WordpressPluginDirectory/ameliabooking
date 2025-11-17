@@ -124,6 +124,7 @@ class LiteFrontendStrings
             'licence_dev_description'      => __('Available in Elite licence', 'ameliabooking'),
             'licence_button_text'          => __('Upgrade', 'ameliabooking'),
             'min'                          => __('min', 'ameliabooking'),
+            'no_results_found'             => __('No results found...', 'ameliabooking'),
             'on_site'                      => __('On-site', 'ameliabooking'),
             'payment_btn_on_site'          => __('On-Site', 'ameliabooking'),
             'oops'                         => __('Oops...'),
@@ -142,6 +143,7 @@ class LiteFrontendStrings
             'total_number_of_persons'      => __('Total Number of People:', 'ameliabooking'),
             'view'                         => __('View', 'ameliabooking'),
             'select'                       => __('Select', 'ameliabooking'),
+            'free'                         => __('Free', 'ameliabooking'),
         ];
     }
 
@@ -177,6 +179,8 @@ class LiteFrontendStrings
             'your_name_colon'              => __('Your Name', 'ameliabooking'),
 
             'service_selection'            => __('Service Selection', 'ameliabooking'),
+            'employee_selection'           => __('Employee Selection', 'ameliabooking'),
+            'location_selection'           => __('Location Selection', 'ameliabooking'),
             'service_colon'                => __('Service', 'ameliabooking'),
             'please_select_service'        => __('Please select service', 'ameliabooking'),
             'dropdown_category_heading'    => __('Category', 'ameliabooking'),
@@ -201,6 +205,9 @@ class LiteFrontendStrings
             'congrats_employee'            => __('Employee', 'ameliabooking'),
             'show_more'                    => __('Show more', 'ameliabooking'),
             'show_less'                    => __('Show less', 'ameliabooking'),
+            'learn_more'                   => __('Learn More', 'ameliabooking'),
+            'view_in_package'              => __('View in Package', 'ameliabooking'),
+            'service_information'          => __('Service information', 'ameliabooking'),
         ];
     }
 
@@ -236,6 +243,7 @@ class LiteFrontendStrings
             'event_show_less'           => __('Show less', 'ameliabooking'),
             'event_show_more'           => __('Show more', 'ameliabooking'),
             'event_location'            => __('Event Location', 'ameliabooking'),
+            'no_events'                 => __('No results found...', 'ameliabooking'),
         ];
     }
 
@@ -260,6 +268,7 @@ class LiteFrontendStrings
             'back_btn'                           => __('Go Back', 'ameliabooking'),
             'heading_service'                    => __('Service', 'ameliabooking'),
             'heading_services'                   => __('Services', 'ameliabooking'),
+            'no_search_data'                     => __('No results', 'ameliabooking'),
         ];
     }
 

@@ -188,6 +188,10 @@ export default {
           {
             value: '%payment_link_square%',
             label: this.$root.labels.ph_payment_link_square
+          },
+          {
+            value: '%payment_link_barion%',
+            label: this.$root.labels.ph_payment_link_barion
           }
         ],
 

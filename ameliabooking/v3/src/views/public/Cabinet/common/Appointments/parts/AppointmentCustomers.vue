@@ -246,11 +246,11 @@
 
           <!-- Duration -->
           <AmSelect
-            v-if="employeeService.customPricing.durations.enabled === 'duration'"
+            v-if="employeeService.customPricing.enabled === 'duration'"
             v-model="item.duration"
             :parent-class="`${bookingClassDropdown(
               employeeService.maxCapacity > 1,
-              employeeService.customPricing.durations.enabled === 'duration'
+              employeeService.customPricing.enabled === 'duration'
             )} ${props.responsiveClass}`"
             :placeholder="amLabels.duration"
             prefix-icon="clock"

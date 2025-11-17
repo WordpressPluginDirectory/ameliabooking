@@ -427,7 +427,7 @@
 
 
         <!-- Send invoice -->
-        <div :class="licenceClass('basic')" class="am-setting-box am-switch-box">
+        <div :class="licenceClass('basic')" class="am-setting-box am-switch-box" style="margin-bottom: 20px">
           <el-row type="flex" align="middle" :gutter="24">
             <el-col :span="16">
               {{ $root.labels.send_invoice_by_default }}
@@ -448,6 +448,23 @@
 
           <LicenceBlock :licence="'basic'"/>
         </div>
+
+        <!-- Invoice Format -->
+        <el-form-item label="placeholder" prop="bccEmail" :class="licenceClass('basic')">
+          <label slot="label">
+            {{ $root.labels.invoice_format }}:
+          </label>
+          <el-select v-model="settings.invoiceFormat" :disabled="notInLicence('basic')">
+              <el-option
+                  v-for="item in [{value: 'pdf', label: $root.labels.pdf}, {value: 'xml', label: $root.labels.xml}]"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value">
+              </el-option>
+          </el-select>
+
+          <LicenceBlock :licence="'basic'"/>
+        </el-form-item>
 
         <!-- Send ics files -->
         <div class="am-setting-box am-switch-box">

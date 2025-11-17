@@ -13,6 +13,10 @@
         <div id="google-pay-button"/>
       </div>
 
+      <div v-if="applePayReady" class="am-fs__payment-square__apple-pay">
+        <div id="apple-pay-button"/>
+      </div>
+
       <div class="am-fs__payment-divider">
         <span class="am-divider-text">{{ amLabels.payment_or_pay_with_card }}</span>
       </div>
@@ -26,7 +30,7 @@
 </template>
 
 <script setup>
-import {computed, inject, onMounted, ref, watchEffect, nextTick} from 'vue'
+import {computed, inject, onMounted, ref, watchEffect, nextTick, watch} from 'vue'
 import {
   getErrorMessage,
   useBookingData,
@@ -78,7 +82,8 @@ async function continueWithBooking () {
     store.commit('booking/setLoading', true)
   }
 
-  const token = await squareTokenize(cardInstance.value)
+  const totalAmount = await payingNow()
+  const token = await squareTokenize(cardInstance.value, totalAmount.formattedAmount)
   if (!token) {
     store.commit('booking/setLoading', false)
     return
@@ -100,7 +105,43 @@ watchEffect(() => {
 
 const cardReady = ref(false)
 const googlePayReady = ref(false)
-const squareLoading = computed(() => !(cardReady.value && googlePayReady.value))
+const applePayReady = ref(true)
+const squareLoading = computed(() => !(cardReady.value))
+const paymentTotalAmount = ref(null)
+
+let paymentRequest = null
+const walletInstance = ref({googlePay: null, applePay: null})
+
+// * Watch coupon changes and payment deposit changes to update paymentRequest amount
+// Apple Pay - No async operations can be called between the user gesture (click) and tokenize().
+watch(
+    [() => store.getters['booking/getCoupon'], () => store.getters['booking/getPaymentDeposit']],
+    async (newValues, oldValues) => {
+      const [newCoupon, newPaymentDeposit] = newValues
+      const [oldCoupon, oldPaymentDeposit] = oldValues
+
+      if (paymentRequest && store.getters['booking/getCouponValidated']) {
+        // Wait for next tick to ensure DOM is updated
+        await nextTick()
+        paymentRequest = await buildPaymentRequest()
+
+        const initWallet = async (method, target, onError) => {
+          try {
+            walletInstance.value[target] = await payments[method](paymentRequest)
+          } catch (err) {
+            console.log(err)
+            if (onError) onError()
+          }
+        }
+
+        await initWallet('googlePay', 'googlePay')
+        await initWallet('applePay', 'applePay', () => {
+          applePayReady.value = false
+        })
+      }
+    }
+)
+
 
 async function getAmountToPay() {
   let checkoutPaymentData = null
@@ -130,6 +171,8 @@ async function getAmountToPay() {
   const fractionPart = totalPriceParts.find((part) => part.type === 'fraction')?.value || ''
   const decimalPart = totalPriceParts.find((part) => part.type === 'decimal')?.value || ''
   const formattedAmount = `${IntegerPart}${decimalPart}${fractionPart}`
+  paymentTotalAmount.value = formattedAmount
+
   return {
     formattedAmount,
     rawAmount: checkoutPaymentData.amount,
@@ -161,10 +204,67 @@ const bookingData =  useBookingData(
     null
 )
 
-let paymentRequestAvailable = ref(false)
 let paymentStepRef = inject('paymentRef')
 
 const payments = window.Square.payments(squareClientId, squareLocationId)
+
+async function buildPaymentRequest () {
+  try {
+    const paymentInfo = await payingNow()
+    if (!paymentInfo) return null
+    return payments.paymentRequest({
+      countryCode: paymentInfo.countryCode,
+      currencyCode: bookingData.data.payment.currency,
+      total: {
+        amount: paymentInfo.formattedAmount.toString(),
+        label: 'Total'
+      }
+    })
+  } catch (e) {
+    console.log(e)
+    return null
+  }
+}
+
+async function setupDigitalWallet ({ buttonId, type, readyRef }) {
+  try {
+    const btnEl = document.getElementById(buttonId)
+    if (!btnEl) return
+
+    if (type === 'googlePay') {
+      btnEl.innerHTML = ''
+    }
+
+    if (!paymentRequest) return
+
+    walletInstance.value[type] = await payments[type](paymentRequest)
+
+    // Google Pay needs to render its own button via attach
+    if (type === 'googlePay') {
+      await walletInstance.value[type].attach(`#${buttonId}`)
+    }
+
+    readyRef.value = true
+
+    btnEl.addEventListener('click', async () => {
+      store.commit('setLoading', true)
+      store.commit('booking/setLoading', true)
+
+      const token = await squareTokenize(walletInstance.value[type], paymentTotalAmount.value)
+      if (!token) {
+        store.commit('setLoading', false)
+        store.commit('booking/setLoading', false)
+        return
+      }
+      await createSquarePayment(token)
+    })
+  } catch (e) {
+    console.log(e)
+    if (type === 'applePay') {
+      readyRef.value = false
+    }
+  }
+}
 
 async function initSquarePayment() {
   const squareCardStyle = {
@@ -184,6 +284,7 @@ async function initSquarePayment() {
     })
     await card.attach('#card-container')
     cardInstance.value = card
+
     cardReady.value = true
   } catch (e) {
     const statusContainer = document.getElementById('payment-status-container')
@@ -197,68 +298,15 @@ async function initSquarePayment() {
     }
   }
 
-  try {
-    const googlePayButton = document.getElementById('google-pay-button')
-
-    if (googlePayButton) {
-      googlePayButton.innerHTML = ''
-
-      const paymentInfo = await payingNow()
-      if (!paymentInfo) return
-
-      const initialRequest = payments.paymentRequest({
-        countryCode: paymentInfo.countryCode,
-        currencyCode: bookingData.data.payment.currency,
-        total: {
-          amount: paymentInfo.formattedAmount.toString(),
-          label: 'Total',
-        },
-      })
-
-      const googlePay = await payments.googlePay(initialRequest)
-      await googlePay.attach('#google-pay-button')
-      googlePayReady.value = true
-
-      googlePayButton.addEventListener('click', async function () {
-        store.commit('setLoading', true)
-        store.commit('booking/setLoading', true)
-
-        const updatedInfo = await payingNow()
-        if (!updatedInfo) return
-
-        const updatedPaymentRequest = payments.paymentRequest({
-          countryCode: updatedInfo.countryCode,
-          currencyCode: bookingData.data.payment.currency,
-          total: {
-            amount: updatedInfo.formattedAmount.toString(),
-            label: 'Total',
-          },
-        })
-
-        // Use new payment request for new Google Pay instance if pay full amount checked/unchecked
-        const updatedGooglePay = await payments.googlePay(updatedPaymentRequest)
-
-        const token = await squareTokenize(updatedGooglePay)
-        if (!token) {
-          store.commit('setLoading', false)
-          store.commit('booking/setLoading', false)
-
-          return
-        }
-
-        await createSquarePayment(token)
-      })
-    }
-  } catch (e) {
-    console.log(e)
-  }
+  paymentRequest = await buildPaymentRequest()
+  await setupDigitalWallet({ buttonId: 'google-pay-button', type: 'googlePay', readyRef: googlePayReady })
+  await setupDigitalWallet({ buttonId: 'apple-pay-button', type: 'applePay', readyRef: applePayReady })
 }
 
-const squareTokenize = async (payments) => {
+const squareTokenize = async (payments, totalAmount) => {
   try {
-    const totalAmount = await payingNow()
     const {token, status, errors} = await payments.tokenize({
-        amount: totalAmount.formattedAmount.toString(),
+        amount: totalAmount.toString(),
         billingContact: {
           familyName: bookingData.data.bookings[0].customer.lastName,
           givenName: bookingData.data.bookings[0].customer.firstName,
@@ -387,6 +435,19 @@ export default {
               align-items: center;
             }
           }
+        }
+      }
+
+      // Apple Pay button styling
+      &__apple-pay {
+        #apple-pay-button {
+          height: 40px;
+          width: 100%;
+          font-size: 15px;
+          display: inline-block;
+          -webkit-appearance: -apple-pay-button;
+          -apple-pay-button-type: plain;
+          -apple-pay-button-style: black;
         }
       }
 

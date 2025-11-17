@@ -70,6 +70,8 @@ class ActivationSettingsHook
 
         self::initGoogleTagSettings();
 
+        self::initMailchimpSettings();
+
         self::initAppleCalendarSettings();
 
         self::initSocialLoginSettings();
@@ -227,15 +229,17 @@ class ActivationSettingsHook
     {
 
         $settings = [
-            'pictureFullPath'  => '',
-            'pictureThumbPath' => '',
-            'name'             => '',
-            'address'          => '',
-            'phone'            => '',
-            'vat'              => '',
-            'countryPhoneIso'  => '',
-            'website'          => '',
-            'translations'     => '',
+            'pictureFullPath'   => '',
+            'pictureThumbPath'  => '',
+            'name'              => '',
+            'address'           => '',
+            'addressComponents' => [],
+            'countryCode'       => '',
+            'phone'             => '',
+            'vat'               => '',
+            'countryPhoneIso'   => '',
+            'website'           => '',
+            'translations'      => '',
         ];
 
         self::initSettings('company', $settings);
@@ -281,6 +285,7 @@ class ActivationSettingsHook
             'breakReplacement'     => '<br>',
             'pendingReminder'      => false,
             'sendInvoice'          => false,
+            'invoiceFormat'        => 'pdf',
             'whatsAppEnabled'      =>
                 $savedSettings &&
                 !empty($savedSettings['whatsAppPhoneID']) &&
@@ -431,6 +436,7 @@ This message does not have an option for responding. If you need additional info
             'sendEventInvitationEmail'         => false,
             'removeOutlookCalendarBusySlots'   => false,
             'maximumNumberOfEventsReturned'    => 50,
+            'ignoreAmeliaEvents'               => false,
             'eventTitle'                       => '%service_name%',
             'eventDescription'                 => '',
             'includeBufferTimeOutlookCalendar' => false,
@@ -588,6 +594,22 @@ This message does not have an option for responding. If you need additional info
         self::initSettings('googleTag', $settings);
     }
 
+
+    /**
+     * Init Mailchimp Settings
+     */
+    private static function initMailchimpSettings()
+    {
+        $settings = [
+            'accessToken'      => null,
+            'server'           => null,
+            'list'             => null,
+            'checkedByDefault' => false
+        ];
+
+        self::initSettings('mailchimp', $settings);
+    }
+
     /**
      * Init Ics Settings
      */
@@ -714,8 +736,15 @@ This message does not have an option for responding. If you need additional info
                 'redirectPage' => 1,
                 'bookMultiple' => false,
                 'bookUnpaid'   => empty($savedSettings['wc']),
-                'rules'        => [
+                'rules'        =>
+                    isset($savedSettings['wc']['rules']) ? $savedSettings['wc']['rules'] : [
                     'appointment' => [
+                        [
+                            'order'   => 'pending',
+                            'booking' => 'pending',
+                            'payment' => 'pending',
+                            'update'  => false,
+                        ],
                         [
                             'order'   => 'on-hold',
                             'booking' => 'default',
@@ -732,6 +761,18 @@ This message does not have an option for responding. If you need additional info
                             'order'   => 'completed',
                             'booking' => 'default',
                             'payment' => 'paid',
+                            'update'  => false,
+                        ],
+                        [
+                            'order'   => 'cancelled',
+                            'booking' => 'canceled',
+                            'payment' => 'pending',
+                            'update'  => false,
+                        ],
+                        [
+                            'order'   => 'failed',
+                            'booking' => 'canceled',
+                            'payment' => 'pending',
                             'update'  => false,
                         ],
                     ],
@@ -754,8 +795,26 @@ This message does not have an option for responding. If you need additional info
                             'payment' => 'paid',
                             'update'  => false,
                         ],
+                        [
+                            'order'   => 'cancelled',
+                            'booking' => 'canceled',
+                            'payment' => 'pending',
+                            'update'  => false,
+                        ],
+                        [
+                            'order'   => 'failed',
+                            'booking' => 'canceled',
+                            'payment' => 'pending',
+                            'update'  => false,
+                        ],
                     ],
                     'event'       => [
+                        [
+                            'order'   => 'pending',
+                            'booking' => 'pending',
+                            'payment' => 'pending',
+                            'update'  => false,
+                        ],
                         [
                             'order'   => 'on-hold',
                             'booking' => 'approved',
@@ -772,6 +831,18 @@ This message does not have an option for responding. If you need additional info
                             'order'   => 'completed',
                             'booking' => 'approved',
                             'payment' => 'paid',
+                            'update'  => false,
+                        ],
+                        [
+                            'order'   => 'cancelled',
+                            'booking' => 'canceled',
+                            'payment' => 'pending',
+                            'update'  => false,
+                        ],
+                        [
+                            'order'   => 'failed',
+                            'booking' => 'canceled',
+                            'payment' => 'pending',
                             'update'  => false,
                         ],
                     ],
@@ -851,6 +922,27 @@ This message does not have an option for responding. If you need additional info
                     'cart'        => null
                 ],
             ],
+            'barion' => [
+                'enabled'         => false,
+                'sandboxMode'     => false,
+                'livePOSKey'      => '',
+                'sandboxPOSKey'   => '',
+                'payeeEmail'      => '',
+                'description'     => [
+                    'enabled'     => false,
+                    'appointment' => '',
+                    'package'     => '',
+                    'event'       => '',
+                    'cart'        => '',
+                ],
+                'metaData'           => [
+                    'enabled'     => false,
+                    'appointment' => null,
+                    'package'     => null,
+                    'event'       => null,
+                    'cart'        => null
+                ],
+            ],
         ];
     }
 
@@ -917,6 +1009,7 @@ This message does not have an option for responding. If you need additional info
                 ['square', 'clientLiveId'],
                 ['square', 'clientTestId'],
                 ['square', 'countryCode'],
+                ['barion', 'metaData'],
             ],
             $settings
         );
@@ -1547,6 +1640,7 @@ This message does not have an option for responding. If you need additional info
                 'loginEnabled'    => true,
                 'filterDate'      => false,
                 'translations'    => [],
+                'googleRecaptcha' => false,
             ],
             'providerCabinet'             => [
                 'enabled'         => true,
@@ -1556,6 +1650,7 @@ This message does not have an option for responding. If you need additional info
                 'pageUrl'         => '',
                 'loginEnabled'    => true,
                 'filterDate'      => false,
+                'googleRecaptcha' => false,
             ],
             'urlAttachment'       => [
                 'enabled'         => true,
@@ -1631,8 +1726,10 @@ This message does not have an option for responding. If you need additional info
                 ['customerCabinet', 'translations'],
                 ['customerCabinet', 'headerJwtSecret'],
                 ['customerCabinet', 'urlJwtSecret'],
+                ['customerCabinet', 'googleRecaptcha'],
                 ['providerCabinet', 'headerJwtSecret'],
                 ['providerCabinet', 'urlJwtSecret'],
+                ['providerCabinet', 'googleRecaptcha'],
                 ['urlAttachment', 'headerJwtSecret'],
                 ['urlAttachment', 'urlJwtSecret'],
             ],
@@ -1684,6 +1781,9 @@ This message does not have an option for responding. If you need additional info
             'waitingListEvents'                 => [
                 'enabled'                          => false,
                 'addingMethod'                     => 'Manually'
+            ],
+            'qrCodeEvents'                      => [
+                'enabled'                          => false,
             ],
             'pastDaysEvents'                       => 0,
             'employeeSelection'                    => 'random',

@@ -183,6 +183,28 @@
             </el-form-item>
             <!-- Enable Employee Cabinet URL -->
 
+            <!-- Enable Employee Cabinet Recaptcha -->
+            <div v-if="settings.providerCabinet.enabled" class="am-setting-box am-switch-box">
+              <el-row type="flex" align="middle" :gutter="24">
+                <el-col :span="20">
+                  {{ $root.labels.recaptcha_enabled }}
+                  <el-tooltip placement="top">
+                    <div slot="content" v-html="$root.labels.recaptcha_roles_tooltip"></div>
+                    <i class="el-icon-question am-tooltip-icon"></i>
+                  </el-tooltip>
+                </el-col>
+                <el-col :span="4" class="align-right">
+                  <el-switch
+                    v-model="settings.providerCabinet.googleRecaptcha"
+                    active-text=""
+                    inactive-text=""
+                  >
+                  </el-switch>
+                </el-col>
+              </el-row>
+            </div>
+            <!-- Enable Employee Cabinet Recaptcha -->
+
             <!-- Manage Employee Badges -->
             <div  class="am-setting-box am-switch-box" :class="licenceClass()">
               <el-row type="flex" align="middle" :gutter="24">
@@ -354,6 +376,28 @@
             </el-form-item>
             <!-- Customer Cabinet URL -->
 
+            <!-- Enable Customer Cabinet Recaptcha -->
+            <div v-if="settings.customerCabinet.enabled" class="am-setting-box am-switch-box">
+              <el-row type="flex" align="middle" :gutter="24">
+                <el-col :span="20">
+                  {{ $root.labels.recaptcha_enabled }}
+                  <el-tooltip placement="top">
+                    <div slot="content" v-html="$root.labels.recaptcha_roles_tooltip"></div>
+                    <i class="el-icon-question am-tooltip-icon"></i>
+                  </el-tooltip>
+                </el-col>
+                <el-col :span="4" class="align-right">
+                  <el-switch
+                    v-model="settings.customerCabinet.googleRecaptcha"
+                    active-text=""
+                    inactive-text=""
+                  >
+                  </el-switch>
+                </el-col>
+              </el-row>
+            </div>
+            <!-- Enable Customer Cabinet Recaptcha -->
+
             <!-- Require Password -->
             <div class="am-setting-box am-switch-box" v-show="settings.customerCabinet.enabled">
               <el-row type="flex" align="middle" :gutter="24">
@@ -410,10 +454,10 @@
                 </el-col>
                 <el-col :span="4" class="align-right">
                   <el-switch
-                      v-model="settings.allowCustomerCancelPackages"
-                      :disabled="notInLicence('pro')"
-                      active-text=""
-                      inactive-text=""
+                    v-model="settings.allowCustomerCancelPackages"
+                    :disabled="notInLicence('pro')"
+                    active-text=""
+                    inactive-text=""
                   >
                   </el-switch>
                 </el-col>
@@ -573,9 +617,8 @@
                 </el-col>
               </el-row>
 
-              <LicenceBlock/>
+              <LicenceBlock :licence="'pro'"/>
             </div>
-
 
             <!-- Limit Appointments per Customer for Events -->
             <div class="am-setting-box am-switch-box" :class="licenceClass()">
@@ -760,7 +803,6 @@
 
           </el-tab-pane>
           <!-- /Admin -->
-
 
         </el-tabs>
       </el-form>

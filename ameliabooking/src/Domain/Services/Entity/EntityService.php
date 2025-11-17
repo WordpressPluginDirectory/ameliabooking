@@ -63,6 +63,20 @@ class EntityService
         /** @var Collection $locations */
         $locations = $slotsEntities->getLocations() ?: new Collection();
 
+        if (!empty($props['locationIds'])) {
+            /** @var Collection $filteredLocations */
+            $filteredLocations = new Collection();
+            foreach ($props['locationIds'] as $locationId) {
+                if ($locations->keyExists($locationId)) {
+                    $filteredLocations->addItem(
+                        $locations->getItem($locationId),
+                        $locationId
+                    );
+                }
+            }
+            $locations = $filteredLocations;
+        }
+
         /** @var Collection $filteredProviders */
         $filteredProviders = new Collection();
 
@@ -106,7 +120,8 @@ class EntityService
             [
                 'service'  => $services->keys(),
                 'location' => $locations->keys(),
-            ]
+            ],
+            $props['serviceId']
         );
 
         /** @var SlotsEntities $filteredSlotsEntities */

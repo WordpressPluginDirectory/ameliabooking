@@ -338,7 +338,7 @@
             <el-col :span="8" class="align-right">
               <el-switch
                   v-model="settings.onSite"
-                  :disabled="!this.settings.payPal.enabled && !this.settings.stripe.enabled && !this.settings.mollie.enabled && !this.settings.wc.enabled && !this.settings.razorpay.enabled && !this.settings.square.enabled"
+                  :disabled="!this.settings.payPal.enabled && !this.settings.stripe.enabled && !this.settings.mollie.enabled && !this.settings.wc.enabled && !this.settings.razorpay.enabled && !this.settings.square.enabled && !this.settings.barion.enabled"
                   active-text=""
                   inactive-text=""
                   @change="toggleOnSite"
@@ -736,7 +736,7 @@
                     @change="togglePayPal"
                     active-text=""
                     inactive-text=""
-                    :disabled="this.settings.wc.enabled || this.settings.mollie.enabled"
+                    :disabled="this.settings.wc.enabled || this.settings.mollie.enabled || this.settings.barion.enabled"
                 >
                 </el-switch>
               </el-col>
@@ -1032,7 +1032,7 @@
                     @change="toggleRazorpay"
                     active-text=""
                     inactive-text=""
-                    :disabled="this.settings.wc.enabled || this.settings.mollie.enabled || this.settings.square.enabled"
+                    :disabled="this.settings.wc.enabled || this.settings.mollie.enabled || this.settings.square.enabled || this.settings.barion.enabled"
                 >
                 </el-switch>
               </el-col>
@@ -1095,9 +1095,84 @@
           <LicenceBlock/>
         </el-collapse>
 
+        <!-- Barion -->
+        <el-collapse v-if="['USD', 'EUR', 'HUF', 'CZK'].includes(settings.currency)" :class="licenceClass()" v-model="barionCollapse">
+          <el-collapse-item :disabled="notInLicence()" class="am-setting-box" name="barion">
+            <!-- Barion Title -->
+            <template slot="title">
+              <img class="svg-amelia" width="60px" :src="this.$root.getUrl + 'public/img/payments/barion.svg'">
+              <i v-if="settings.barion.enabled" class="el-icon-circle-check"></i>
+            </template>
+
+            <!-- Barion Toggle -->
+            <el-row type="flex" align="middle" :gutter="24">
+              <el-col :span="16">
+                <p>{{ $root.labels.barion_service }}:</p>
+              </el-col>
+              <el-col :span="8" class="align-right">
+                <el-switch
+                    v-model="settings.barion.enabled"
+                    @change="toggleBarion"
+                    active-text=""
+                    inactive-text=""
+                    :disabled="this.settings.wc.enabled || this.settings.mollie.enabled || this.settings.square.enabled || this.settings.stripe.enabled || this.settings.payPal.enabled || this.settings.razorpay.enabled"
+                >
+                </el-switch>
+              </el-col>
+            </el-row>
+
+            <!-- Barion Test Mode -->
+            <el-row type="flex" align="middle" :gutter="24" v-show="settings.barion.enabled === true">
+              <el-col :span="16">
+                <p>{{ $root.labels.sandbox_mode }}:</p>
+              </el-col>
+              <el-col :span="8" class="align-right">
+                <el-switch
+                    v-model="settings.barion.sandboxMode"
+                    @change="handleBarionValidationRules"
+                    active-text=""
+                    inactive-text=""
+                >
+                </el-switch>
+              </el-col>
+            </el-row>
+
+            <!-- Barion Live POSKey -->
+            <el-form-item
+                :label="$root.labels.barion_live_poskey + ':'"
+                prop="barion.livePOSKey"
+                v-show="settings.barion.enabled === true && settings.barion.sandboxMode === false"
+            >
+              <el-input v-model.trim="settings.barion.livePOSKey" auto-complete="off"></el-input>
+            </el-form-item>
+
+            <!-- Barion Sandbox POSKey -->
+            <el-form-item
+                :label="$root.labels.barion_sandbox_poskey + ':'"
+                prop="barion.sandboxPOSKey"
+                v-show="settings.barion.enabled === true && settings.barion.sandboxMode === true"
+            >
+              <el-input v-model.trim="settings.barion.sandboxPOSKey" auto-complete="off"></el-input>
+            </el-form-item>
+
+            <!-- Barion Payee Email -->
+            <el-form-item
+                :label="$root.labels.barion_payee_email + ':'"
+                prop="barion.payeeEmail"
+                v-show="settings.barion.enabled === true"
+            >
+              <el-input v-model.trim="settings.barion.payeeEmail" auto-complete="off"></el-input>
+            </el-form-item>
+
+          </el-collapse-item>
+
+          <LicenceBlock/>
+        </el-collapse>
+        <!-- /Barion -->
+
 
         <!-- Set MetaData for Payment -->
-        <el-collapse v-show="(settings.wc.enabled || settings.stripe.enabled || settings.payPal.enabled || settings.mollie.enabled || settings.razorpay.enabled || settings.square.enabled)">
+        <el-collapse v-show="(settings.wc.enabled || settings.stripe.enabled || settings.payPal.enabled || settings.mollie.enabled || settings.razorpay.enabled || settings.square.enabled || settings.barion.enabled)">
           <el-collapse-item class="am-setting-box">
             <template slot="title">
               <p>{{ $root.labels.set_metaData_and_description }}:</p>
@@ -1289,10 +1364,12 @@
           stripe: {},
           mollie: {},
           payPal: {},
-          square: {}
+          square: {},
+          barion: {},
         },
         stripeCollapse: '',
         payPalCollapse: '',
+        barionCollapse: '',
         wooCommerceCollapse: '',
         mollieCollapse: '',
         squareCollapse: '',
@@ -1310,6 +1387,7 @@
       this.handleStripeValidationRules()
       this.handlePayPalValidationRules()
       this.handleMollieValidationRules()
+      this.handleBarionValidationRules()
 
       // Fallback for users that don't have enabled "On-site" option enabled. Remove in future versions.
       let paymentOption = this.defaultPaymentMethods.find(option => option.value === this.settings.defaultPaymentMethod)
@@ -1322,6 +1400,7 @@
         this.settings.wc.enabled = false
         this.settings.razorpay.enabled = false
         this.settings.mollie.enabled = false
+        this.settings.barion.enabled = false
         if (this.$refs['square']) {
           this.$refs['square'].$el.scrollIntoView({ behavior: 'smooth' })
         }
@@ -1467,6 +1546,16 @@
               }
             }
 
+            if (this.settings.barion.enabled) {
+              if (!this.settings.barion.sandboxMode && this.settings.barion.livePOSKey === '') {
+                this.barionCollapse = 'barion'
+              }
+
+              if (this.settings.barion.sandboxMode && this.settings.barion.sandboxPOSKey === '') {
+                this.barionCollapse = 'barion'
+              }
+            }
+
             if (this.settings.razorpay.enabled) {
               if (!this.settings.razorpay.sandboxMode && (this.settings.razorpay.liveApiClientId === '' || this.settings.razorpay.liveApiSecret === '')) {
                 this.razorpayCollapse = 'razorpay'
@@ -1483,7 +1572,7 @@
       },
 
       checkOnSitePayment () {
-        if (this.settings.razorpay.enabled === false && this.settings.mollie.enabled === false && this.settings.square.enabled === false && this.settings.payPal.enabled === false && this.settings.stripe.enabled === false && this.settings.wc.enabled === false) {
+        if (this.settings.razorpay.enabled === false && this.settings.mollie.enabled === false && this.settings.square.enabled === false && this.settings.payPal.enabled === false && this.settings.stripe.enabled === false && this.settings.wc.enabled === false && this.settings.barion.enabled === false) {
           this.settings.onSite = true
         }
       },
@@ -1496,7 +1585,7 @@
       },
 
       isStripeDisabled() {
-        return this.settings.wc.enabled || this.settings.mollie.enabled || this.settings.square.enabled
+        return this.settings.wc.enabled || this.settings.mollie.enabled || this.settings.square.enabled || this.settings.barion.enabled
       },
 
       toggleStripe () {
@@ -1526,6 +1615,20 @@
         }
       },
 
+      toggleBarion () {
+        this.checkOnSitePayment()
+        this.handleBarionValidationRules()
+        this.handleMollieValidationRules()
+
+        if (this.settings.barion.enabled === false) {
+          this.barionCollapse = ''
+        }
+
+        if (this.settings.defaultPaymentMethod === 'barion' && this.settings.barion.enabled === false) {
+          this.settings.defaultPaymentMethod = this.defaultPaymentMethods[0].value
+        }
+      },
+
       toggleWooCommerce () {
         if (!this.settings.wc.enabled) {
           this.settings.onSite = true
@@ -1535,6 +1638,7 @@
         this.settings.mollie.enabled = false
         this.settings.razorpay.enabled = false
         this.settings.square.enabled = false
+        this.settings.barion.enabled = false
         if (this.settings.defaultPaymentMethod === 'wc' && this.settings.wc.enabled === false) {
           this.settings.defaultPaymentMethod = this.defaultPaymentMethods[0].value
         }
@@ -1546,6 +1650,7 @@
         this.settings.wc.enabled = false
         this.settings.razorpay.enabled = false
         this.settings.square.enabled = false
+        this.settings.barion.enabled = false
 
         if (!this.settings.mollie.enabled && !this.settings.square.enabled) {
           this.settings.onSite = true
@@ -1565,6 +1670,7 @@
         this.settings.wc.enabled = false
         this.settings.razorpay.enabled = false
         this.settings.mollie.enabled = false
+        this.settings.barion.enabled = false
 
         this.checkOnSitePayment()
 
@@ -1638,6 +1744,33 @@
           }
         } else {
           this.rules.payPal = {}
+        }
+      },
+
+      handleBarionValidationRules () {
+        this.clearValidation()
+        if (this.settings.barion.enabled === true) {
+          if (this.settings.barion.sandboxMode === true) {
+            this.rules.barion = {
+              sandboxPOSKey: [
+                {required: true, message: this.$root.labels.barion_sandbox_poskey_error, trigger: 'submit'}
+              ],
+              payeeEmail: [
+                {required: true, message: this.$root.labels.barion_payee_email_error, trigger: 'submit'}
+              ],
+            }
+          } else {
+            this.rules.barion = {
+              livePOSKey: [
+                {required: true, message: this.$root.labels.barion_live_poskey_error, trigger: 'submit'}
+              ],
+              payeeEmail: [
+                {required: true, message: this.$root.labels.barion_payee_email_error, trigger: 'submit'}
+              ],
+            }
+          }
+        } else {
+          this.rules.barion = {}
         }
       },
 
@@ -1715,6 +1848,13 @@
           methods.push({
             label: this.$root.labels.payPal,
             value: 'payPal'
+          })
+        }
+
+        if (this.settings.barion.enabled) {
+          methods.push({
+            label: this.$root.labels.barion,
+            value: 'barion'
           })
         }
 

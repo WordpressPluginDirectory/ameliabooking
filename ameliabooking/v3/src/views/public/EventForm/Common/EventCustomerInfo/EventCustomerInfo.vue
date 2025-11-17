@@ -68,6 +68,14 @@
           ></component>
         </template>
 
+        <el-form-item v-if="amSettings.mailchimp.subscribeFieldVisible && customizedOptions.email.visibility" class="am-elfci__item am-subscribe" >
+          <AmCheckbox
+            v-model="subscribeToMailchimp"
+            :label="amLabels.subscribe_to_mailing_list"
+          >
+          </AmCheckbox>
+        </el-form-item>
+
         <!-- Custom Fields -->
         <template v-for="(item, index) in eventCustomFieldsArray" :key="index">
           <component
@@ -76,6 +84,7 @@
             ref="customFieldsCollectorRefs"
             v-model="infoFormData[`cf${item.id}`]"
             v-bind="infoFormConstruction[`cf${item.id}`].props"
+            @address-selected="(address) => addressSelected(address, item.id)"
           ></component>
         </template>
       </el-form>
@@ -138,6 +147,8 @@ import {settings} from "../../../../../plugins/settings";
 import httpClient from "../../../../../plugins/axios";
 import AmSocialButton from "../../../../common/FormFields/AmSocialButton.vue";
 import {SocialAuthOptions} from "../../../../../assets/js/admin/socialAuthOptions";
+import AmCheckbox from "../../../../_components/checkbox/AmCheckbox.vue";
+import {mapAddressComponentsForXML} from "../../../../../assets/js/common/helper";
 
 let props = defineProps({
   globalClass: {
@@ -404,6 +415,13 @@ let infoFormRules = ref({
   ],
 })
 
+let subscribeToMailchimp = computed({
+  get: () => store.getters['customerInfo/getCustomerSubscribe'],
+  set: (val) => {
+    store.commit('customerInfo/setCustomerSubscribe', val)
+  }
+})
+
 Object.keys(customFields.value).forEach((fieldKey) => {
   // * Form Model
   infoFormData.value[fieldKey] = computed({
@@ -647,6 +665,14 @@ function checkCustomerCustomFieldVisibility (cf) {
   return true
 }
 
+function addressSelected (addressComponents, cfId) {
+  if (addressComponents && store.getters['customFields/getCustomFields']['cf' + cfId]) {
+    const cf = store.getters['customFields/getCustomFields']['cf' + cfId]
+    cf.components = mapAddressComponentsForXML(addressComponents)
+    store.commit('customFields/setCustomField', cf)
+  }
+}
+
 // * Responsive - Container Width
 let cWidth = inject('containerWidth')
 let dWidth = inject('dialogWidth')
@@ -830,6 +856,22 @@ export default {
 
         &.am-cf-width-100 {
           width: 100%;
+        }
+
+        &.am-subscribe {
+          width: 100%;
+          .el-checkbox {
+            &__input {
+              height: 32px;
+              line-height: 32px;
+              align-items: center;
+            }
+
+            &__label {
+              line-height: 32px;
+              align-items: center;
+            }
+          }
         }
 
         .el-form-item {

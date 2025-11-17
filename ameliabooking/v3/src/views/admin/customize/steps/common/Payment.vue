@@ -43,6 +43,7 @@
         >
           <img
             :src="`${baseUrls.wpAmeliaPluginURL}/v3/src/assets/img/icons/${gateway === 'mollie' ? 'stripe' : gateway}.svg`"
+            :class="gateway"
           >
           <div>
             <p>
@@ -331,6 +332,10 @@ const cssVars = computed(() => {
         img {
           height: 24px;
           width: 24px;
+        }
+
+        .barion {
+          width: 50px;
         }
 
         div {

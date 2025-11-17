@@ -424,6 +424,12 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
             $where[] = 'u.status = :providerStatus';
         }
 
+        if (isset($criteria['show'])) {
+            $params[':show'] = $criteria['show'];
+
+            $where[] = 'u.show = :show';
+        }
+
         if (!empty($criteria['providers'])) {
             foreach ($criteria['providers'] as $index => $value) {
                 $param = ':provider' . $index;
@@ -432,26 +438,6 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
 
                 $userParams[$param] = $value;
             }
-        }
-
-        $calendarJoin = '';
-
-        $calendarFields = '';
-
-        if (!empty($criteria['fetchCalendars'])) {
-            $calendarJoin = "
-                LEFT JOIN {$this->providersGoogleCalendarTable} gd ON gd.userId = u.id
-                LEFT JOIN {$this->providersOutlookCalendarTable} od ON od.userId = u.id
-            ";
-
-            $calendarFields = '
-                gd.id AS google_calendar_id,
-                gd.token AS google_calendar_token,
-                gd.calendarId AS google_calendar_calendar_id,
-                od.id AS outlook_calendar_id,
-                od.token AS outlook_calendar_token,
-                od.calendarId AS outlook_calendar_calendar_id,
-            ';
         }
 
         if ($queryProviders) {
@@ -500,13 +486,13 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
                     u.translations AS user_translations,
                     u.timeZone AS user_timeZone,
                     u.badgeId AS badge_id,
+                    u.show AS user_show,
                     plt.locationId AS user_locationId,
                     pst.serviceId AS service_id,
                     pst.price AS service_price,
                     pst.customPricing AS service_customPricing,
                     pst.minCapacity AS service_minCapacity,
                     pst.maxCapacity AS service_maxCapacity,
-                    {$calendarFields}
                     dot.id AS dayOff_id,
                     dot.name AS dayOff_name,
                     dot.startDate AS dayOff_startDate,
@@ -515,7 +501,6 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
                 FROM {$this->table} u
                 LEFT JOIN {$this->providerServicesTable} pst ON pst.userId = u.id
                 LEFT JOIN {$this->providerLocationTable} plt ON plt.userId = u.id
-                {$calendarJoin}
                 LEFT JOIN {$this->providerDayOffTable} dot ON dot.userId = u.id {$dotJoinQuery}
                 {$where}
                 ORDER BY CONCAT(u.firstName, ' ', u.lastName), u.id"
@@ -666,6 +651,59 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
             )->setSpecialDayList($provider->getSpecialDayList());
         }
 
+        if (!empty($criteria['fetchCalendars'])) {
+            $where = 'WHERE u.id IN (' . implode(', ', $providers->keys()) . ')';
+
+            try {
+                $statement = $this->connection->prepare(
+                    "SELECT
+                        u.id AS user_id,
+                        gd.id AS google_calendar_id,
+                        gd.token AS google_calendar_token,
+                        gd.calendarId AS google_calendar_calendar_id,
+                        od.id AS outlook_calendar_id,
+                        od.token AS outlook_calendar_token,
+                        od.calendarId AS outlook_calendar_calendar_id
+                    FROM {$this->table} u
+                    LEFT JOIN {$this->providersGoogleCalendarTable} gd ON gd.userId = u.id
+                    LEFT JOIN {$this->providersOutlookCalendarTable} od ON od.userId = u.id
+                    {$where}"
+                );
+
+                $statement->execute();
+
+                while ($row = $statement->fetch()) {
+                    $this->parseUserRow($row, $providerRows, $serviceRows, $providerServiceRows);
+                }
+            } catch (\Exception $e) {
+                throw new QueryExecutionException('Unable to find by id in ' . __CLASS__, $e->getCode(), $e);
+            }
+
+            /** @var Collection $providersWithCalendars */
+            $providersWithCalendars = call_user_func(
+                [static::FACTORY, 'createCollection'],
+                $providerRows,
+                $serviceRows,
+                $providerServiceRows
+            );
+
+            /** @var Provider $provider */
+            foreach ($providersWithCalendars->getItems() as $provider) {
+                /** @var Provider $targetProvider */
+                $targetProvider = $providers->getItem(
+                    $provider->getId()->getValue()
+                );
+
+                if ($provider->getGoogleCalendar()) {
+                    $targetProvider->setGoogleCalendar($provider->getGoogleCalendar());
+                }
+
+                if ($provider->getOutlookCalendar()) {
+                    $targetProvider->setOutlookCalendar($provider->getOutlookCalendar());
+                }
+            }
+        }
+
         return Licence::getEmployees($providers);
     }
 
@@ -785,6 +823,7 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
                     u.firstName AS user_firstName,
                     u.lastName AS user_lastName,
                     u.email AS user_email,
+                    u.timeZone AS user_timeZone,
                     u.translations AS user_translations,
                     st.serviceId AS service_id,
                     st.price AS service_price,
@@ -1043,7 +1082,8 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
         $currentDateTime = explode(' ', DateTimeService::getNowDateTime())[0];
 
         $params = [
-            ':type' => AbstractUser::USER_ROLE_PROVIDER
+            ':type'        => AbstractUser::USER_ROLE_PROVIDER,
+            ':currentDate' => $currentDateTime,
         ];
 
         try {
@@ -1058,7 +1098,7 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
               FROM {$this->table} u
               LEFT JOIN {$this->providerDayOffTable} dot ON dot.userId = u.id
               WHERE u.type = :type AND
-              $currentDateTime BETWEEN dot.startDate AND dot.endDate"
+              :currentDate BETWEEN dot.startDate AND dot.endDate"
             );
 
             $statement->execute($params);
@@ -1366,6 +1406,7 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
                 'badgeId'          => isset($row['badge_id']) ? $row['badge_id'] : null,
                 'appleCalendarId'  => isset($row['user_apple_calendar_id']) ? $row['user_apple_calendar_id'] : null,
                 'employeeAppleCalendar' => isset($row['user_employee_apple_calendar']) ? $row['user_employee_apple_calendar'] : null,
+                'show'             => isset($row['user_show']) ? $row['user_show'] : 0,
             ];
         }
 

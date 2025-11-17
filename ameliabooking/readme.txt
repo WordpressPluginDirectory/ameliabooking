@@ -6,7 +6,7 @@ Donate link: https://wpamelia.com/
 Requires at least: 5.3
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.2.30
+Stable tag: 1.2.37
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -268,6 +268,10 @@ When you apply a new style (change colors and font styles for the booking form) 
 
 Some hosting providers don’t allow 3rd party SMTP settings (Gmail, Yahoo, Outlook, etc.) to be saved, and are intentionally blocking them because they use their own. If you configured the Notification Settings, and your emails are not being sent, please contact your hosting provider, and ask them if they are blocking the SMTP.
 
+**Where do I report security bugs found in this plugin?**
+
+Please report security bugs found in the source code of the Amelia plugin through the [Patchstack Vulnerability Disclosure Program](https://patchstack.com/database/vdp/911b6d06-79cf-4f64-9416-c38ebe2bf236). The Patchstack team will assist you with verification, CVE assignment, and notify the developers of this plugin.
+
 
 == Installation ==
 
@@ -287,6 +291,38 @@ Installing Amelia Lite WordPress Booking Plugin is as easy as 1-2-3!
 
 
 == Changelog ==
+V1.2.37
+* BugFix: Fixed issue CVE-2023-49282
+* Other small bug fixes and stability improvements
+
+V1.2.36
+* Feature: ApplePay via Square - Expanded payment options through Square integration for greater flexibility
+* Improvement: Updated ID generation method in frontend forms
+* BugFix: Fixed issue with additional white space on the Events form on smaller/mobile screen
+* BugFix: Fixed issues with time slot display and “All slots are selected” message on Step-by-step booking form
+* BugFix: Fixed issue with updating email for existing customers with only a phone number
+* BugFix: Fixed issue CVE-2025-12482
+* Other small bug fixes and stability improvements
+
+V1.2.35
+* Small bug fixes and stability improvements
+
+V1.2.34
+* Fixed issue with visible Employee Selection on Customize page, Step by step list layout
+* Small bug fixes and stability improvements
+
+V1.2.33
+* Small bug fixes and stability improvements
+
+V1.2.32
+* BugFix: Fixed issue with additional white space on the Events form on smaller/mobile screen
+* BugFix: Fixed issue with pagination on the Events list form
+* BugFix: Fixed issue with keyboard navigation on Step-by-step Booking form
+* Other small bug fixes and stability improvements
+
+V1.2.31
+* Small bug fixes and stability improvements
+
 V1.2.30
 * BugFix: Fixed issue with the drawer not opening when duplicating the event
 * Other small bug fixes and stability improvements

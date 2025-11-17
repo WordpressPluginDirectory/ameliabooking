@@ -48,8 +48,15 @@
                   {{ `${props.customers[0].firstName} ${props.customers[0].lastName}` }}
                 </div>
 
+                <AppointmentStatus
+                  v-if="props.reservation && props.reservation.type === 'appointment' && shortcodeData.cabinetType === 'employee' && amSettings.roles.allowWriteAppointments && props.parentWidth <= 650"
+                  :id="props.reservation.id"
+                  :status="props.reservation.status"
+                  class="am-cc__status am-cc__status--dropdown"
+                  @status-change="(message, type) => emits('statusChange', message, type)"
+                />
                 <div
-                  v-if="(props.booking || shortcodeData.cabinetType === 'employee') && props.parentWidth <= 650"
+                  v-else-if="props.booking && props.parentWidth <= 650"
                   class="am-cc__status"
                   :class="`am-cc__status-${status.class}`"
                 >
@@ -81,8 +88,15 @@
                   {{ `${props.customers[0].firstName} ${props.customers[0].lastName}` }}
                 </div>
 
+                <AppointmentStatus
+                  v-if="props.reservation && props.reservation.type === 'appointment' && shortcodeData.cabinetType === 'employee' && amSettings.roles.allowWriteAppointments && props.parentWidth > 650"
+                  :id="props.reservation.id"
+                  :status="props.reservation.status"
+                  class="am-cc__status am-cc__status--dropdown"
+                  @status-change="(message, type) => emits('statusChange', message, type)"
+                />
                 <div
-                  v-if="(props.booking || shortcodeData.cabinetType === 'employee') && props.parentWidth > 650"
+                  v-else-if="props.booking && props.parentWidth > 650"
                   class="am-cc__status"
                   :class="`am-cc__status-${status.class}`"
                 >
@@ -169,22 +183,21 @@
               </el-popover>
             </div>
             <div
-              v-else-if="(props.booking && props.booking.status === 'approved' || props.booking.status === 'pending' || props.booking.status === 'waiting')
-              && ((!props.isPackageBooking && props.booking.price > 0
-              && usePaymentFromCustomerPanel(props.reservation, props.bookable.settings))
-              || !!(props.reservation.cancelable
-              || (amSettings.roles.allowCustomerReschedule && props.reservation.reschedulable)))"
+              v-else-if="!licence.isStarter || menuVisible()"
               class="am-cc__heading-actions"
               :class="props.responsiveClass"
             >
               <PaymentButton
-                v-if="props.booking.status !== 'waiting' && !props.isPackageBooking && props.booking.price > 0 && usePaymentFromCustomerPanel(props.reservation, props.bookable.settings)"
+                v-if="bookingPositiveStatus() && props.booking.status !== 'waiting' && !props.isPackageBooking && !props.booking.packageCustomerService
+                 && props.booking.price > 0 && usePaymentFromCustomerPanel(props.reservation, props.bookable.settings)"
                 :reservation="props.reservation"
                 :bookable="props.bookable"
               >
               </PaymentButton>
               <el-popover
-                v-if="props.reservation.cancelable || (amSettings.roles.allowCustomerReschedule && props.reservation.reschedulable)"
+                v-if="!licence.isStarter ||
+                (bookingPositiveStatus() && (props.reservation.cancelable ||
+                (amSettings.roles.allowCustomerReschedule && props.reservation.reschedulable)))"
                 ref="editRef"
                 :visible="editPopVisible"
                 :persistent="false"
@@ -207,7 +220,7 @@
                 >
                   <!-- Reschedule -->
                   <div
-                    v-if="props.reservation.type === 'appointment' && amSettings.roles.allowCustomerReschedule && props.reservation.reschedulable"
+                    v-if="props.reservation.type === 'appointment' && bookingPositiveStatus() && amSettings.roles.allowCustomerReschedule && props.reservation.reschedulable"
                     class="am-cc__edit-item"
                     @click="rescheduleItem"
                   >
@@ -218,9 +231,33 @@
                   </div>
                   <!-- /Reschedule -->
 
+                  <!-- Invoice -->
+                  <div
+                      v-if="!licence.isStarter"
+                      class="am-cc__edit-item"
+                      @click="previewInvoice"
+                  >
+                    <span class="am-icon-eye"></span>
+                    <span class="am-cc__edit-text">
+                      {{ amLabels['preview_invoice'] }}
+                    </span>
+                  </div>
+
+                  <div
+                      v-if="!licence.isStarter"
+                      class="am-cc__edit-item"
+                      @click="downloadInvoice"
+                  >
+                    <span class="am-icon-download"></span>
+                    <span class="am-cc__edit-text">
+                      {{ amLabels['download_invoice'] }}
+                    </span>
+                  </div>
+                  <!-- /Invoice -->
+
                   <!-- Cancel item -->
                   <div
-                    v-if="props.reservation.cancelable"
+                    v-if="props.reservation.cancelable && bookingPositiveStatus()"
                     class="am-cc__edit-item am-delete"
                     @click="cancelItem"
                   >
@@ -427,6 +464,24 @@
                 </span>
               </div>
               <!-- /Location -->
+
+              <!-- QR Code -->
+              <CollapseCardPopover
+                v-if="props.qrCodes.length"
+                type="qrCode"
+                :header-text="amLabels.e_tickets"
+                :content-data="props.qrCodes"
+              >
+                <template #default>
+                  <div class="am-cc__data">
+                    <span class="am-icon-tickets"></span>
+                    <span class="am-cc__data-text">
+                      {{ amLabels.e_tickets }}
+                    </span>
+                  </div>
+                </template>
+              </CollapseCardPopover>
+              <!-- /QR Code -->
             </div>
           </div>
         </template>
@@ -451,15 +506,27 @@ import AmCollapse from "../../../../../_components/collapse/AmCollapse.vue";
 import AmCollapseItem from "../../../../../_components/collapse/AmCollapseItem.vue";
 import CollapseCardPopover from "./popover/CollapseCardPopover.vue";
 import PaymentButton from "../PaymentButton.vue";
+import AppointmentStatus from "../../Appointments/AppointmentStatus.vue";
 
 // * Composables
 import { useColorTransparency } from "../../../../../../assets/js/common/colorManipulation";
 import { useFormattedPrice } from "../../../../../../assets/js/common/formatting";
 import { useSecondsToDuration } from "../../../../../../assets/js/common/date";
 import { usePaymentFromCustomerPanel } from "../../../../../../assets/js/public/cabinet";
+import httpClient from "../../../../../../plugins/axios";
+import {useAuthorizationHeaderObject} from "../../../../../../assets/js/public/panel";
+import {useStore} from "vuex";
+import {createFileUrlFromResponse} from "../../../../../../assets/js/common/helper";
+
+// * Vars
+let store = useStore()
 
 // * Component porps
 let props = defineProps({
+  id: {
+    type: Number,
+    default: 0
+  },
   start: {
     type: [String, Object, Array, Function],
     required: true
@@ -479,6 +546,10 @@ let props = defineProps({
   location: {
     type: [String, Object],
     default: ''
+  },
+  qrCodes: {
+    type: Array,
+    default: () => []
   },
   price: {
     type: Number,
@@ -551,7 +622,16 @@ let props = defineProps({
 })
 
 // * Component emits
-let emits = defineEmits(['cancelBooking', 'rescheduling', 'editAppointment', 'editEvent', 'addEventAttendee', 'listEventAttendees'])
+let emits = defineEmits([
+  'cancelBooking',
+  'rescheduling',
+  'editAppointment',
+  'editEvent',
+  'addEventAttendee',
+  'listEventAttendees',
+  'statusChange',
+  'showQrCodes'
+])
 
 // * Data in shortcode
 const shortcodeData = inject('shortcodeData')
@@ -564,11 +644,73 @@ let originKey = inject('originKey')
 // * Labels
 const amLabels = inject('amLabels')
 
+// * Plugin Licence
+let licence = inject('licence')
+
 let editPopVisible = ref(false)
 
 function editItem (e) {
   e.stopPropagation()
   editPopVisible.value = !editPopVisible.value
+}
+
+function menuVisible () {
+  return bookingPositiveStatus()
+  && ((!props.isPackageBooking && props.booking.price > 0
+          && usePaymentFromCustomerPanel(props.reservation, props.bookable.settings))
+      || !!(props.reservation.cancelable
+          || (amSettings.roles.allowCustomerReschedule && props.reservation.reschedulable)))
+}
+
+function bookingPositiveStatus () {
+  return props.booking && props.booking.status === 'approved' || props.booking.status === 'pending' || props.booking.status === 'waiting'
+}
+
+function previewInvoice () {
+  if (props.reservation.type === 'appointment') store.commit('cabinet/setAppointmentsLoading', true)
+  if (props.reservation.type === 'event') store.commit('cabinet/setEventsLoading', true)
+
+  httpClient.post(
+      '/invoices/' + props.reservation.bookings[0].payments[0].id,
+      { format: 'pdf' },
+      Object.assign(useAuthorizationHeaderObject(store), {params: {source: 'cabinet-customer'}})
+  ).then(response => {
+    window.open(createFileUrlFromResponse(response))
+  })
+  .catch(e => {
+    console.log(e.message)
+  })
+  .finally(() => {
+    if (props.reservation.type === 'appointment') store.commit('cabinet/setAppointmentsLoading', false)
+    if (props.reservation.type === 'event') store.commit('cabinet/setEventsLoading', false)
+  })
+}
+
+function downloadInvoice () {
+  if (props.reservation.type === 'appointment') store.commit('cabinet/setAppointmentsLoading', true)
+  if (props.reservation.type === 'event') store.commit('cabinet/setEventsLoading', true)
+
+  const format = amSettings.notifications.invoiceFormat || 'pdf'
+  httpClient.post(
+      '/invoices/' + props.reservation.bookings[0].payments[0].id,
+      { format: format },
+      Object.assign(useAuthorizationHeaderObject(store), {params: {source: 'cabinet-customer'}})
+  ).then(response => {
+    let url = createFileUrlFromResponse(response, format)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `Invoice.${format}`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+  })
+  .catch(e => {
+    console.log(e.message)
+  })
+  .finally(() => {
+    if (props.reservation.type === 'appointment') store.commit('cabinet/setAppointmentsLoading', false)
+    if (props.reservation.type === 'event') store.commit('cabinet/setEventsLoading', false)
+  })
 }
 
 function closeEditItemPopup () {
@@ -691,6 +833,16 @@ let status = computed(() => {
   }
 })
 
+let dropdownStatusWidth = computed(() => {
+  if (props.reservation && props.reservation.type === 'appointment' && shortcodeData.value.cabinetType === 'employee' && amSettings.roles.allowWriteAppointments) {
+    if (props.parentWidth <= 440) return '70px'
+    if (props.parentWidth <= 690) return '130px'
+    return '160px'
+  }
+
+  return 'auto'
+})
+
 /*************
  * Customize *
  *************/
@@ -719,6 +871,7 @@ let cssVars = computed(() => {
     '--am-c-cc-text-op70': useColorTransparency(amColors.value.colorMainText, 0.7),
     '--am-c-cc-text-op90': useColorTransparency(amColors.value.colorMainText, 0.9),
     '--am-font-family': amFonts.value.fontFamily,
+    '--am-status-width': dropdownStatusWidth.value,
 
     // css properties
     '--am-rad-inp': '6px',
@@ -878,6 +1031,17 @@ export default {
       line-height: 1.428571429;
       border-radius: 12px;
       padding: 2px 12px;
+
+
+      &--dropdown {
+        width: var(--am-status-width);
+        padding: 0;
+        border-radius: unset;
+
+        &:before {
+          display: none;
+        }
+      }
 
       &:before {
         content: '';
@@ -1052,6 +1216,11 @@ export default {
           font-size: 24px;
           color: inherit;
           margin: 0 4px 0 0;
+        }
+
+        &.am-button {
+          width: 100%;
+          border: none;
         }
       }
 

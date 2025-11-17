@@ -79,6 +79,7 @@
                   v-if="cf.id in customFieldsForm"
                   v-model="customFieldsForm[cf.id]"
                   v-bind="cfFormConstruction[cf.id]?.props"
+                  @address-selected="(address) => addressSelected(address, cf.id)"
                 />
               </template>
             </el-form>
@@ -188,6 +189,7 @@ import { formFieldsTemplates } from "../../../../../assets/js/common/formFieldsT
 
 // * Import from Vuex
 import { useStore } from "vuex";
+import {mapAddressComponentsForXML} from "../../../../../assets/js/common/helper";
 let store = useStore()
 
 // * Loading state
@@ -608,6 +610,17 @@ function logout () {
   store.dispatch('auth/logout')
 }
 
+function addressSelected (addressComponents, cfId) {
+  if (addressComponents) {
+    for (const key in customFields) {
+      if (customFields[key].id === cfId) {
+        customFields[key].components = mapAddressComponentsForXML(addressComponents)
+        break;
+      }
+    }
+  }
+}
+
 function deleteProfile () {
   store.commit('setLoading', true)
 
@@ -723,6 +736,10 @@ function setInitCustomerCustomFields() {
         value: savedValue ?? (field.type === 'checkbox' || field.type === 'file' ? [] : ''),
       }
 
+      if (field.type === 'address' && savedCustomFields[id]?.components) {
+        customFields[position].components = savedCustomFields[id]?.components
+      }
+
       setCustomerCustomFieldsFormData(field, id, customFields[position].value)
       setCustomerCustomFieldsFormConstruction(field, id)
       setCustomerCustomFieldsFormRules(field)
@@ -743,6 +760,9 @@ function saveCustomerCustomFields() {
           label: field.label,
           type: field.type,
           value: typeof value === 'string' ? value.trim() : value,
+        }
+        if (field.type === 'address' && field.components) {
+          customFieldData[field.id].components = field.components
         }
       }
 

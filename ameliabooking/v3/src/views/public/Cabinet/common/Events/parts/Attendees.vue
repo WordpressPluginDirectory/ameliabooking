@@ -237,6 +237,16 @@
                 </div>
               </div>
 
+              <div v-if="amSettings.appointments.qrCodeEvents.enabled && item.qrCodes" class="am-capei-att__card-etickets">
+                <div class="am-capei-att__card-etickets__label">
+                  {{ amLabels.checked_in }}:
+                </div>
+                <div v-for="(val, date) in (getQrCodesBooking(item.qrCodes))" :key="date" class="am-capei-att__card-etickets__item">
+                  <span class="am-capei-att__card-etickets__date">{{date}}:</span>
+                  <span class="am-capei-att__card-etickets__capacity">{{val}}</span>
+                </div>
+              </div>
+
               <DotsPopup
                 v-if="amSettings.roles.allowWriteEvents"
                 :index="index"
@@ -855,6 +865,26 @@ let placesLabels = computed(() => {
     : amLabels.value.attendees
 })
 
+function getQrCodesBooking (qrCodes) {
+  const tickets = JSON.parse(qrCodes)
+  const eDates = {}
+
+  tickets.forEach(ticket => {
+    if (ticket.type !== 'booking') {
+      for (const [date, scanned] of Object.entries(ticket.dates)) {
+        (eDates[date] = eDates[date] || []).push(scanned)
+      }
+    }
+  })
+
+  return Object.fromEntries(
+    Object.entries(eDates).map(([date, scans]) => [
+      date,
+      `${scans.filter(Boolean).length}/${scans.length}`
+    ])
+  )
+}
+
 onMounted(() => {
   getBookings(['approved', 'canceled'])
 
@@ -1040,6 +1070,40 @@ export default {
         font-weight: 400;
         line-height: 1.6;
         color: var(--am-c-capei-att-text);
+      }
+
+      &-etickets {
+        order: 3;
+        display: flex;
+        flex-direction: column;
+        gap: 4px 0;
+        width: calc(100% - 24px);
+
+        &__label {
+          font-size: 14px;
+          font-weight: 400;
+          line-height: 1.6;
+          color: var(--am-c-capei-att-text);
+        }
+
+        &__item {
+          display: flex;
+          gap: 0 8px;
+        }
+
+        &__date {
+          font-size: 14px;
+          font-weight: 400;
+          line-height: 1.6;
+          color: var(--am-c-capei-att-text);
+        }
+
+        &__capacity {
+          font-size: 14px;
+          font-weight: 600;
+          line-height: 1.6;
+          color: var(--am-c-capei-att-text);
+        }
       }
     }
 

@@ -88,6 +88,22 @@
         {{ amLabels.reset_password }}
       </span>
     </div>
+
+    <div
+      v-if="amSettings.general.googleRecaptcha.enabled && amSettings.roles[cabinetType + 'Cabinet'].googleRecaptcha"
+      id="am-recaptcha"
+      class="am-recaptcha-holder"
+    >
+      <vue-recaptcha
+        ref="recaptchaRef"
+        :size="amSettings.general.googleRecaptcha.invisible ? 'invisible' : null"
+        :load-recaptcha-script="true"
+        :sitekey="amSettings.general.googleRecaptcha.siteKey"
+        @verify="onRecaptchaVerify"
+        @expired="onRecaptchaExpired"
+      >
+      </vue-recaptcha>
+    </div>
   </div>
   <Skeleton
     v-else
@@ -109,6 +125,7 @@ import {
   onBeforeMount,
 } from 'vue'
 import VueAuthenticate from 'vue-authenticate'
+import {VueRecaptcha} from 'vue-recaptcha'
 
 // * Import from Vuex
 import { useStore } from 'vuex'
@@ -213,7 +230,7 @@ function onSignupSocial({ provider, credentials }) {
     store.commit('setLoading', false)
     VueAuthenticateInstance.authenticate(provider, data).then((response) => {
       infoFormData.value.email = response.data.data.user.email
-      setResponseData(response)
+      setResponseData(response, true)
     }).catch((error) => {
       if (!VueAuthenticateInstance.isAuthenticated()) {
         authError.value = true
@@ -232,7 +249,7 @@ function onSignupSocial({ provider, credentials }) {
     data.code = credentials
     httpClient.post(`${socialCheckUrl}`, data).then(response => {
       infoFormData.value.email = response.data.data.user.email
-      setResponseData(response)
+      setResponseData(response, true)
     }).catch((error) => {
       if (!('data' in error.response.data) && 'message' in error.response.data) {
         authError.value = true
@@ -250,7 +267,7 @@ function onSignupSocial({ provider, credentials }) {
   }
 }
 
-function setResponseData(response) {
+function setResponseData(response, authenticate) {
   if ('token' in response.data.data) {
     vueCookies.set('ameliaToken', response.data.data.token, amSettings.roles[cabinetType.value + 'Cabinet']['tokenValidTime'], null, null, true)
     vueCookies.set('ameliaUserEmail', response.data.data.user.email, amSettings.roles[cabinetType.value + 'Cabinet']['tokenValidTime'], null, null, true)
@@ -261,11 +278,21 @@ function setResponseData(response) {
   if ('user' in response.data.data && response.data.data.user.type === 'provider') {
     setEmployee(response)
   }
+
   store.commit('auth/setProfile', response.data.data.user)
+
   if (response.data.data.user.timeZone) {
     store.commit('cabinet/setTimeZone', response.data.data.user.timeZone)
   }
-  store.commit('auth/setAuthenticated', true)
+
+  if (!response.data.data.user.countryPhoneIso && amSettings.general.phoneDefaultCountryCode && amSettings.general.phoneDefaultCountryCode !== 'auto') {
+    store.commit('auth/setProfileCountryPhoneIso', amSettings.general.phoneDefaultCountryCode)
+  }
+
+  if (authenticate) {
+    store.commit('auth/setAuthenticated', authenticate)
+  }
+
   let tokenValidTime = cabinetType.value === 'customer'
       ? amSettings.roles.customerCabinet.tokenValidTime * 1000
       : amSettings.roles.providerCabinet.tokenValidTime * 1000
@@ -278,7 +305,39 @@ function setResponseData(response) {
         tokenValidTime
     )
   }
+
+  if (window?.ameliaBooking?.cabinet?.userLoggedIn) {
+    window.ameliaBooking.cabinet.userLoggedIn(response.data.data.user)
+  }
 }
+
+/*************
+ * Recaptcha *
+ ************/
+
+let recaptchaRef = ref(null)
+
+let recaptchaValid = ref(false)
+
+let recaptchaResponse = ref(null)
+
+function onRecaptchaExpired () {
+  recaptchaValid.value = false
+
+  authError.value = true
+  authErrorMessage.value = amLabels.value.recaptcha_invalid_error
+}
+
+function onRecaptchaVerify (response) {
+  recaptchaValid.value = true
+
+  recaptchaResponse.value = response
+
+  if (amSettings.general.googleRecaptcha.invisible) {
+    continueWithAuthenticate()
+  }
+}
+
 /********
  * Form *
  ********/
@@ -454,6 +513,10 @@ function setEmployee (response) {
 function useAuthenticate (tokenValue, isUrlToken, checkIfWpUser, changePass) {
   let params = {cabinetType: cabinetType.value, changePass: changePass}
 
+  if (recaptchaResponse.value !== null) {
+    params.recaptcha = recaptchaResponse.value
+  }
+
   if (checkIfWpUser) {
     params.checkIfWpUser = true
   }
@@ -484,29 +547,10 @@ function useAuthenticate (tokenValue, isUrlToken, checkIfWpUser, changePass) {
       return
     }
 
-    if ('token' in response.data.data) {
-      vueCookies.set('ameliaToken', response.data.data.token, amSettings.roles[cabinetType.value + 'Cabinet']['tokenValidTime'], null, null, true)
-      vueCookies.set('ameliaUserEmail', response.data.data.user.email, amSettings.roles[cabinetType.value + 'Cabinet']['tokenValidTime'], null, null, true)
-
-      store.commit('auth/setToken', response.data.data.token)
-    }
-
-    if ('user' in response.data.data && response.data.data.user.type === 'provider') {
-      setEmployee(response)
-    }
+    setResponseData(response, false)
 
     if (useUrlQueryParam('token')) {
       window.history.replaceState(null, null, useRemoveUrlParameter(window.location.href, 'token'))
-    }
-
-    store.commit('auth/setProfile', response.data.data.user)
-
-    if (!response.data.data.user.countryPhoneIso && amSettings.general.phoneDefaultCountryCode && amSettings.general.phoneDefaultCountryCode !== 'auto') {
-      store.commit('auth/setProfileCountryPhoneIso', amSettings.general.phoneDefaultCountryCode)
-    }
-
-    if (response.data.data.user.timeZone) {
-      store.commit('cabinet/setTimeZone', response.data.data.user.timeZone)
     }
 
     if ('set_password' in response.data.data && response.data.data.set_password) {
@@ -515,19 +559,6 @@ function useAuthenticate (tokenValue, isUrlToken, checkIfWpUser, changePass) {
       pageKey.value = 'setPassword'
     } else {
       store.commit('auth/setAuthenticated', true)
-    }
-
-    let tokenValidTime = cabinetType.value === 'customer'
-      ? amSettings.roles.customerCabinet.tokenValidTime * 1000
-      : amSettings.roles.providerCabinet.tokenValidTime * 1000
-
-    if (tokenValidTime > 0 && tokenValidTime < 1814400000) {
-      setTimeout(
-        () => {
-          store.dispatch('auth/logout')
-        },
-        tokenValidTime
-      )
     }
   }).catch((error) => {
     if (!('data' in error.response.data) && 'message' in error.response.data) {
@@ -540,6 +571,11 @@ function useAuthenticate (tokenValue, isUrlToken, checkIfWpUser, changePass) {
       authError.value = true
       authErrorMessage.value = amLabels.value.invalid_credentials
     }
+
+    if ('recaptcha_error' in error.response.data.data) {
+      authError.value = true
+      authErrorMessage.value = amLabels.value.recaptcha_error
+    }
   }).finally(() => {
     store.commit('setLoading', false)
   })
@@ -549,13 +585,30 @@ function useAuthenticate (tokenValue, isUrlToken, checkIfWpUser, changePass) {
 function submitForm() {
   authFormRef.value.validate((valid) => {
     if (valid) {
-      store.commit('setLoading', true)
+      if (amSettings.general.googleRecaptcha.enabled && amSettings.roles[cabinetType.value + 'Cabinet'].googleRecaptcha) {
+        if (amSettings.general.googleRecaptcha.invisible) {
+          recaptchaRef.value.execute()
+        } else if (!recaptchaValid.value) {
+          authError.value = true
+          authErrorMessage.value = amLabels.value.recaptcha_error
 
-      useAuthenticate(null, false, false, false)
+          return false
+        } else {
+          continueWithAuthenticate()
+        }
+      } else {
+        continueWithAuthenticate()
+      }
     } else {
       return false
     }
   })
+}
+
+function continueWithAuthenticate () {
+  store.commit('setLoading', true)
+
+  useAuthenticate(null, false, false, false)
 }
 
 function authenticate () {
@@ -650,6 +703,10 @@ export default {
     padding: 32px 24px 24px;
     margin: 0 auto;
     font-family: var(--am-font-family), sans-serif;
+
+    .am-recaptcha-holder {
+      justify-items: center;
+    }
 
     * {
       font-family: var(--am-font-family), sans-serif;

@@ -202,24 +202,28 @@ export default {
        isValidEmail: true,
        blogPosts: [],
        changelog: {
-         version: '8.4',
+         version: '8.6.2',
          starter: {
            feature: [
-               'GooglePay via Square - Expanded payment options through Square integration for greater flexibility',
+             'ApplePay via Square - Expanded payment options through Square integration for greater flexibility'
            ],
            improvement: [
-               'Updated Square integration - now works directly within the booking form, without redirecting to the external Square checkout page',
-               'Updated full-calendar library'
+             'Added “Signed in” and “Logged in” JavaScript hooks for Customer and Employee Panel 2.0',
+             'Updated ID generation method in frontend forms'
            ],
            translations: [
-               'Updated Korean translation'
            ],
            bugfix: [
-             'Fixed issue with preselecting an event via URL that includes a popup',
-             'Fixed issue with booking group appointments when creating a new customer',
-             'Fixed issue with event name translation on Congratulations',
-             'Fixed issue with left alignment when the alignment is changed in notifications',
-             'Fixed issue with wrong Attachment upload path in General settings'
+             'Fixed issue CVE-2023-49282',
+             'Fixed issue CVE-2025-12482',
+             'Fixed issue with labels when booking appointments on Customer panel',
+             'Fixed issue with saving payment details when editing appointments in the backend',
+             'Fixed issues with time slot display and “All slots are selected” message on Step-by-step booking form',
+             'Fixed issue with updating email for existing customers with only a phone number',
+             'Fixed issue with service_extras_details placeholder not showing in employee “Appointment Updated” notifications',
+             'Fixed issue with placeholders not translated to customer\'s language in notifications',
+             'Fixed issue with employee status showing as available on days off',
+             'Fixed date display issue on booking forms for Japanese and Chinese languages'
            ],
            other: [
              'Other small bug fixes and stability improvements'
@@ -227,35 +231,43 @@ export default {
          },
          basic: {
            feature: [
+             'Barion Payment Integration - Now you can use Barion as a payment gateway supporting secure online payments for your services and events',
+             'Stripe receipt option - Automatically send payment receipts to customers’ email addresses'
            ],
            improvement: [
-             'Updated Stripe integration for better performance'
+             'Added option for users to download invoices in XML format',
+             'Added option to include customer custom fields on invoices',
+             'Added hook to allow custom sorting of Event Tickets on the backend, reflected on frontend forms',
+             '“Pay Now” button remains visible in the Customer Panel until the appointment is fully paid or manually marked as paid, regardless of whether the appointment has started'
            ],
            translations: [
            ],
            bugfix: [
-             'Fixed the issue with coupon and Apple/Google Pay (Booking form)',
-             'Fixed issue with Woo variable products connected to Amelia services/events/packages',
-             'Fixed issue with admin booking ignoring limit settings',
-             'Fixed issue with Square and WooCommerce when the URL has a hashtag',
-             'Fixed issue with duplicating events with Custom pricing by date range',
-             'Fixed issue with CSV file of exported attendees and translations',
-             'Fixed the Select placeholder in custom fields is not translated'
+             'Fixed issue with logged-in users not completing a booking when using WooCommerce',
+             'Fixed issue with tax calculation for extras in multiple bookings when using Stripe',
+             'Fixed various issues with Event Tickets, Event List form, and Event popup functionality',
+             'Fixed Outlook calendar issues with event duplication and busy slot synchronization',
+             'Fixed issue with client time in WooCommerce orders not adjusting correctly for daylight saving time when rescheduling',
+             'Fixed issue with custom duration when booking appointments in the Employee Panel',
+             'Fixed clickable links in mandatory custom fields for RTL layouts',
+             'Fixed issue with Google event invitations being sent even when disabled',
+             'Fixed issue with WooCommerce payment description not displaying after WooCommerce 9.9.5 update'
            ],
            other: [
            ]
          },
          pro: {
            feature: [
-               'Custom pricing by the number of people - Offer flexible service pricing that automatically adjusts based on the number of people in one booking'
+             'QR code for Events Tickets - Automatically generate unique QR codes for each ticket, enabling easy attendee check-in and validation'
            ],
            improvement: [
-               'Implement option to add coupon when booking package form Manage Package page'
            ],
            translations: [
            ],
            bugfix: [
-             'Fixed issue with missing Close button when booking events on waiting list if customer panel is disabled'
+             'Fixed issue with Customer Panel URL in WhatsApp notifications',
+             'Fixed issue preventing bookings for customers after enabling Stripe Connect',
+             'Fixed issue with booking the same appointment twice in a package'
            ],
            other: [
            ]
@@ -268,7 +280,6 @@ export default {
            translations: [
            ],
            bugfix: [
-               'Fixed issue with booking appointments via API when extras are not sent'
            ],
            other: [
            ]

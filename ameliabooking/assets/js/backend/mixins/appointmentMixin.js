@@ -637,26 +637,28 @@ export default {
     },
 
     updatePaymentCallback (payment, deleteCallback = false) {
-      let $this = this
-      this.appointment.bookings.forEach(function (bookingItem) {
-        bookingItem.payments.forEach(function (paymentItem, paymentIndex) {
-          if (paymentItem.id === payment.id) {
-            if (deleteCallback) {
-              bookingItem.payments.splice(paymentIndex, 1)
-              let index = $this.savedAppointment.bookings.findIndex(b => b.id === bookingItem.id)
-              if (index !== -1) {
-                $this.savedAppointment.bookings[index].payments.splice(paymentIndex, 1)
-              }
-            } else {
-              bookingItem.payments.splice(paymentIndex, 1, payment)
-              let index = $this.savedAppointment.bookings.findIndex(b => b.id === bookingItem.id)
-              if (index !== -1) {
-                $this.savedAppointment.bookings[index].payments.splice(paymentIndex, 1, payment)
+      if (payment) {
+        let $this = this
+        this.appointment.bookings.forEach(function (bookingItem) {
+          bookingItem.payments.forEach(function (paymentItem, paymentIndex) {
+            if (paymentItem.id === payment.id) {
+              if (deleteCallback) {
+                bookingItem.payments.splice(paymentIndex, 1)
+                let index = $this.savedAppointment.bookings.findIndex(b => b.id === bookingItem.id)
+                if (index !== -1) {
+                  $this.savedAppointment.bookings[index].payments.splice(paymentIndex, 1)
+                }
+              } else {
+                bookingItem.payments.splice(paymentIndex, 1, payment)
+                let index = $this.savedAppointment.bookings.findIndex(b => b.id === bookingItem.id)
+                if (index !== -1) {
+                  $this.savedAppointment.bookings[index].payments.splice(paymentIndex, 1, payment)
+                }
               }
             }
-          }
+          })
         })
-      })
+      }
 
       this.dialogPayment = false
     },

@@ -223,6 +223,16 @@
               v-model="settingsFormData.paymentsRazorpayEnabled"
             />
           </div>
+
+          <div
+            v-if="amSettings.payments.barion.enabled"
+            class="am-capei-sef__heading"
+          >
+            <img style='width: 60px;' :src="baseUrls.wpAmeliaPluginURL + 'public/img/payments/barion.svg'" alt="Barion" />
+            <AmSwitch
+              v-model="settingsFormData.paymentsBarionEnabled"
+            />
+          </div>
         </div>
       </el-collapse-item>
 
@@ -584,6 +594,12 @@ let settingsFormData = ref({
     get: () => store.getters['event/getSettingsPaymentsRazorpayEnabled'],
     set: (val) => {
       store.commit('event/setSettingsPaymentsRazorpayEnabled', val)
+    }
+  }),
+  paymentsBarionEnabled: computed({
+    get: () => store.getters['event/getSettingsPaymentsBarionEnabled'],
+    set: (val) => {
+      store.commit('event/setSettingsPaymentsBarionEnabled', val)
     }
   }),
   paymentsSquareEnabled: computed({

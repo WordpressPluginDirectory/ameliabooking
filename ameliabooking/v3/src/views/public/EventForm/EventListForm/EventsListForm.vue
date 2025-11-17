@@ -406,6 +406,7 @@ function onClosedEventDialog () {
     store.dispatch('coupon/resetCoupon')
     store.dispatch('tickets/resetCustomTickets')
     store.dispatch('eventWaitingListOptions/resetWaitingOptions')
+    store.dispatch('payment/resetPaymentData')
   })
 }
 
@@ -661,6 +662,14 @@ export default {
     z-index: 99999999 !important;
 
     .el-dialog {
+      @media only screen and (max-width: 768px) {
+        margin-top: 0;
+      }
+
+      #amelia-container {
+        background-color: var(--am-c-main-bgr);
+      }
+
       .el-dialog {
         // am - amelia
         // mb - margin bottom
@@ -668,10 +677,6 @@ export default {
         border-radius: 8px;
         overflow: hidden;
         background-color: var(--am-c-main-bgr);
-
-        @media only screen and (max-width: 768px) {
-          margin-top: 0;
-        }
 
         * {
           box-sizing: border-box;

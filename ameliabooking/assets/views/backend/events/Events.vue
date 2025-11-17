@@ -4,7 +4,8 @@
 
       <!-- Page Header -->
       <page-header
-          @newEventBtnClicked="showDialogNewEvent"
+        @newEventBtnClicked="showDialogNewEvent"
+        @showQrScanner="qrScannerVisible = true"
       >
       </page-header>
 
@@ -387,7 +388,6 @@
         </el-dialog>
       </transition>
 
-
       <!-- Dialog Attendees -->
       <transition name="slide">
         <el-dialog
@@ -415,7 +415,6 @@
           </dialog-attendees>
         </el-dialog>
       </transition>
-
 
       <!-- Dialog Attendee -->
       <transition name="slide">
@@ -510,6 +509,14 @@
         </el-dialog>
       </transition>
 
+      <!-- QR Code Scanner Dialog -->
+      <qr-code-scanner
+        v-if="qrScannerVisible"
+        :visibility="qrScannerVisible"
+        @close-scanner="qrScannerVisible = false"
+      />
+      <!-- /QR Code Scanner Dialog -->
+
       <!-- Help Button -->
       <el-col :md="6" class="">
         <a class="am-help-button" href="https://wpamelia.com/events/" target="_blank" rel="nofollow">
@@ -545,6 +552,7 @@
   import DialogExport from '../parts/DialogExport.vue'
   import DialogTranslate from '../parts/DialogTranslate'
   import VueCookies from 'vue-cookies'
+  import QrCodeScanner from '../parts/QrCodeScanner.vue'
   // import DialogNewCustomize from '../parts/DialogNewCustomize.vue'
 
   export default {
@@ -617,7 +625,8 @@
         dialogTranslateType: 'name',
         eventTickets: null,
         selectedTimeZone: '',
-        languagesData: []
+        languagesData: [],
+        qrScannerVisible: false
       }
     },
 
@@ -1094,7 +1103,8 @@
       DialogAttendees,
       DialogAttendee,
       PaginationBlock,
-      DialogTranslate
+      DialogTranslate,
+      QrCodeScanner
       // DialogNewCustomize
     }
   }

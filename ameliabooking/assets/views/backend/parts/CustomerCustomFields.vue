@@ -37,6 +37,7 @@
                 @input="customer.customFields[customField.id].value = $event"
                 @change="setAddressCF($event, customField.id)"
                 placeholder=""
+                v-on:placechanged="(address) => getAddressData(address, customField.id)"
                 types=""
             >
             </vue-google-autocomplete>
@@ -150,9 +151,11 @@ import customFieldMixin from '../../../js/common/mixins/customFieldMixin'
 import dateMixin from '../../../js/common/mixins/dateMixin'
 import windowMixin from '../../../js/backend/mixins/windowMixin'
 import VueGoogleAutocomplete from 'vue-google-autocomplete'
+import helperMixin from '../../../js/backend/mixins/helperMixin'
+import phoneCountriesMixin from '../../../js/common/mixins/phoneCountriesMixin'
 
 export default {
-  mixins: [customFieldMixin, dateMixin, windowMixin],
+  mixins: [customFieldMixin, dateMixin, windowMixin, helperMixin, phoneCountriesMixin],
 
   props: {
     entityId: null,
@@ -188,6 +191,16 @@ export default {
   methods: {
     setAddressCF (input, cfId) {
       this.customer.customFields[cfId].value = input
+    },
+
+    getAddressData: function (addressComponents, cfId) {
+      if (addressComponents && this.customer.customFields[cfId]) {
+        this.customer.customFields[cfId].components = this.mapAddressComponentsForXML(addressComponents)
+        const country = this.countries.find(c => c.nicename === this.customer.customFields[cfId].components.CountryCode)
+        if (country) {
+          this.customer.customFields[cfId].components.CountryCode = country.iso
+        }
+      }
     },
 
     googleMapsLoaded () {

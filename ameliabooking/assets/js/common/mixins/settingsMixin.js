@@ -34,6 +34,9 @@ export default {
           },
           razorpay: {
             enabled: this.$root.settings.payments.razorpay.enabled
+          },
+          barion: {
+            enabled: this.$root.settings.payments.barion.enabled
           }
         }
       }
@@ -121,7 +124,8 @@ export default {
         !this.$root.clonedSettings.payments.wc.enabled &&
         !this.$root.clonedSettings.payments.mollie.enabled &&
         !this.$root.clonedSettings.payments.square.enabled &&
-        !this.$root.clonedSettings.payments.razorpay.enabled
+        !this.$root.clonedSettings.payments.razorpay.enabled &&
+        !this.$root.clonedSettings.payments.barion.enabled
       ) {
         return
       }
@@ -133,7 +137,7 @@ export default {
           entitySettings.payments = {}
         }
 
-        ['onSite', 'stripe', 'payPal', 'wc', 'mollie', 'razorpay', 'square'].forEach((type) => {
+        ['onSite', 'stripe', 'payPal', 'wc', 'mollie', 'razorpay', 'square', 'barion'].forEach((type) => {
           if ((!(type in entitySettings.payments))) {
             entitySettings.payments[type] = this.$root.clonedSettings.payments[type]
           }
@@ -162,12 +166,17 @@ export default {
           entitySettings.payments.razorpay = this.$root.clonedSettings.payments.razorpay
         }
 
+        if (!this.$root.clonedSettings.payments.barion.enabled || !entitySettings.payments.barion) {
+          entitySettings.payments.barion = this.$root.clonedSettings.payments.barion
+        }
+
         if (('onSite' in entitySettings.payments ? entitySettings.payments.onSite && this.$root.clonedSettings.payments.onSite : this.$root.clonedSettings.payments.onSite) &&
           ('payPal' in entitySettings.payments ? entitySettings.payments.payPal.enabled && this.$root.clonedSettings.payments.payPal.enabled : this.$root.clonedSettings.payments.payPal.enabled) &&
           ('stripe' in entitySettings.payments ? entitySettings.payments.stripe.enabled && this.$root.clonedSettings.payments.stripe.enabled : this.$root.clonedSettings.payments.stripe.enabled) &&
           ('mollie' in entitySettings.payments ? entitySettings.payments.mollie.enabled && this.$root.clonedSettings.payments.mollie.enabled : this.$root.clonedSettings.payments.mollie.enabled) &&
           ('razorpay' in entitySettings.payments ? entitySettings.payments.razorpay.enabled && this.$root.clonedSettings.payments.razorpay.enabled : this.$root.clonedSettings.payments.razorpay.enabled) &&
-          ('square' in entitySettings.payments ? entitySettings.payments.square.enabled && this.$root.clonedSettings.payments.square.enabled : this.$root.clonedSettings.payments.square.enabled)
+          ('square' in entitySettings.payments ? entitySettings.payments.square.enabled && this.$root.clonedSettings.payments.square.enabled : this.$root.clonedSettings.payments.square.enabled) &&
+          ('barion' in entitySettings.payments ? entitySettings.payments.barion.enabled && this.$root.clonedSettings.payments.barion.enabled : this.$root.clonedSettings.payments.barion.enabled)
         ) {
           entitySettings.payments = this.$root.clonedSettings.payments
         }
@@ -188,6 +197,7 @@ export default {
         entitySettings.payments.mollie = this.$root.clonedSettings.payments.mollie
         entitySettings.payments.square = this.$root.clonedSettings.payments.square
         entitySettings.payments.razorpay = this.$root.clonedSettings.payments.razorpay
+        entitySettings.payments.barion = this.$root.clonedSettings.payments.barion
 
         entitySettingsJson = JSON.stringify(entitySettings)
       }
@@ -207,6 +217,7 @@ export default {
         entitySettings.payments.stripe = this.$root.clonedSettings.payments.stripe
         entitySettings.payments.payPal = this.$root.clonedSettings.payments.payPal
         entitySettings.payments.razorpay = this.$root.clonedSettings.payments.razorpay
+        entitySettings.payments.barion = this.$root.clonedSettings.payments.barion
 
         entitySettingsJson = JSON.stringify(entitySettings)
       }
@@ -226,6 +237,7 @@ export default {
         entitySettings.payments.stripe = this.$root.clonedSettings.payments.stripe
         entitySettings.payments.payPal = this.$root.clonedSettings.payments.payPal
         entitySettings.payments.razorpay = this.$root.clonedSettings.payments.razorpay
+        entitySettings.payments.barion = this.$root.clonedSettings.payments.barion
 
         entitySettingsJson = JSON.stringify(entitySettings)
       }
@@ -237,6 +249,7 @@ export default {
         entitySettingsJson.payments.stripe.enabled = false
         entitySettingsJson.payments.payPal.enabled = false
         entitySettingsJson.payments.razorpay.enabled = false
+        entitySettingsJson.payments.barion.enabled = false
 
         entitySettingsJson = JSON.stringify(entitySettingsJson)
       }
@@ -254,7 +267,7 @@ export default {
           payments.onSite = bookableEntitySettings.payments.onSite
         }
 
-        ['stripe', 'payPal', 'razorpay', 'mollie', 'square'].forEach((paymentType) => {
+        ['stripe', 'payPal', 'razorpay', 'mollie', 'square', 'barion'].forEach((paymentType) => {
           if (paymentType in bookableEntitySettings.payments &&
             bookableEntitySettings.payments[paymentType].enabled !== this.$root.settings.payments[paymentType].enabled
           ) {

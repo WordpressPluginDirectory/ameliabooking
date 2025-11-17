@@ -188,6 +188,13 @@ export default {
             label: this.$root.labels.razorpay
           })
         }
+
+        if (this.$root.settings.payments.barion.enabled && (!('barion' in entitySettings) || entitySettings.barion.enabled)) {
+          paymentOptions.push({
+            value: 'barion',
+            label: this.$root.labels.barion
+          })
+        }
       }
 
       return paymentOptions

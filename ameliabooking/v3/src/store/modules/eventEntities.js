@@ -1,5 +1,8 @@
 import httpClient from "../../plugins/axios.js"
-import { useUrlParams } from "../../assets/js/common/helper"
+import {
+  useUrlParams,
+  useUrlQueryParams
+} from "../../assets/js/common/helper"
 import {
   useTranslateEntities,
   getNameTranslated,
@@ -162,7 +165,7 @@ export default {
     },
 
     setEmployees (state, payload) {
-      state.employees = payload.filter(e => e.status !== 'hidden')
+      state.employees = payload.filter(e => e.status !== 'hidden' && e.show)
     },
 
     setLocations (state, payload) {
@@ -306,6 +309,12 @@ export default {
         eventParams.dates = []
 
         rootState.settings.appointments.pastDaysEvents = 0
+      }
+
+      let urlParams = useUrlQueryParams(window.location.href)
+
+      if (urlParams?.ameliaEventPopup) {
+        eventParams['idPopup'] = parseInt(urlParams.ameliaEventPopup)
       }
 
       let loadingCounter = payload === 'upcoming' ? getters['getLoadingUpcomingCounter'] : getters['getLoadingCounter']

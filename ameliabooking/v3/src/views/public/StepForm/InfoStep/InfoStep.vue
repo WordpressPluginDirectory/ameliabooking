@@ -64,6 +64,18 @@
         ></component>
       </template>
 
+      <el-form-item
+          v-if="settings.mailchimp.subscribeFieldVisible && amCustomize.infoStep.options.email.visibility"
+          class="am-subscribe"
+      >
+        <AmCheckBox
+          v-model="subscribeToMailchimp"
+          :label="amLabels.subscribe_to_mailing_list"
+        >
+        </AmCheckBox>
+      </el-form-item>
+
+
       <!-- Custom Fields TODO - validation for custom fields isn't set-->
       <template v-if="availableCustomFields && allCustomFields">
         <el-form-item
@@ -92,14 +104,7 @@
                   ? 'am-custom-required-as-html'
                   : ''
               "
-              v-html="
-                cf.label
-                  ? '<label class=' +
-                    '\'am-fs__info-form__label\'>' +
-                    cf.label +
-                    '</label>'
-                  : ''
-              "
+              v-html="cf.label ? cf.label : ''"
             >
             </span>
             <span v-else class="am-fs__info-form__label">
@@ -123,6 +128,7 @@
             <AmAddressInput
               :id="`amelia-address-autocomplete-${cf.id}`"
               v-model="infoFormData['cf' + cf.id]"
+              @address-selected="(address) => addressSelected(address, cf.id)"
             />
           </template>
           <!-- /Address Field -->
@@ -273,6 +279,7 @@ import { useCartHasItems } from "../../../../assets/js/public/cart";
 import httpClient from "../../../../plugins/axios";
 import AmSocialButton from "../../../common/FormFields/AmSocialButton.vue";
 import {SocialAuthOptions} from "../../../../assets/js/admin/socialAuthOptions";
+import {mapAddressComponentsForXML} from "../../../../assets/js/common/helper";
 
 let props = defineProps({
   globalClass: {
@@ -425,6 +432,13 @@ let formFields = ref({
   }
 })
 
+let subscribeToMailchimp = computed({
+  get: () => store.getters['booking/getCustomerSubscribe'],
+  set: (val) => {
+    store.commit('booking/setCustomerSubscribe', val)
+  }
+})
+
 // * Form validation rules
 let rules = ref({
   firstName: [
@@ -506,6 +520,12 @@ function onRemoveFile (a) {
   })
 
   infoFormData.value['cf' + a.id] = a.raw
+}
+
+function addressSelected (addressComponents, cfId) {
+  if (addressComponents && store.state.booking.appointment.bookings[0].customFields[cfId]) {
+    store.state.booking.appointment.bookings[0].customFields[cfId].components = mapAddressComponentsForXML(addressComponents)
+  }
 }
 
 let customFieldsAllowedExtensions = ref('')
@@ -616,22 +636,41 @@ function checkCustomerCustomFieldVisibility (cf) {
   if (cf.saveType === 'customer' && loggedInUser.value && store.state.booking.appointment.bookings[0].customer.customFields) {
     let customerCustomFields = store.state.booking.appointment.bookings[0].customer.customFields
 
-    if (!(cf.id in JSON.parse(customerCustomFields))) {
+    try {
+      let parsedCustomerCF = JSON.parse(customerCustomFields)
+      let af = availableCustomFields.value[cf.id]
+      let currentValue = af ? af.value : undefined
+      let alreadyFlagged = Object.prototype.hasOwnProperty.call(visibilityFlags.value, cf.id)
+
+      if (!(cf.id in parsedCustomerCF)) {
+        return true
+      }
+
+       if (alreadyFlagged) {
+        return visibilityFlags.value[cf.id]
+      }
+
+      // Always show when saveFirstChoice is false
+      if (!cf.saveFirstChoice) {
+        visibilityFlags.value[cf.id] = true
+        return true
+      }
+
+      // When saveFirstChoice is true, show if saved value is empty
+      let visible
+      switch (cf.type) {
+        case 'checkbox':
+        case 'file':
+          visible = Array.isArray(currentValue) ? currentValue.length === 0 : (currentValue == null)
+          break
+        default:
+          visible = currentValue == null || currentValue === ''
+      }
+
+      visibilityFlags.value[cf.id] = visible
+      return visible
+    } catch (e) {
       return true
-    }
-
-    if (visibilityFlags.value[cf.id]) {
-      return visibilityFlags.value[cf.id]
-    }
-
-    switch (cf.type) {
-      case 'checkbox':
-      case 'file':
-        visibilityFlags.value[cf.id] = !cf.saveFirstChoice && availableCustomFields.value[cf.id].value !== []
-        return visibilityFlags.value[cf.id]
-      default:
-        visibilityFlags.value[cf.id] = !cf.saveFirstChoice && availableCustomFields.value[cf.id].value !== ''
-        return visibilityFlags.value[cf.id]
     }
   }
 
@@ -846,6 +885,22 @@ export default {
 
           &.am-cf-width-100 {
             width: 100%;
+          }
+
+          &.am-subscribe {
+            width: 100%;
+            .el-checkbox {
+              &__input {
+                height: 32px;
+                line-height: 32px;
+                align-items: center;
+              }
+
+              &__label {
+                line-height: 32px;
+                align-items: center;
+              }
+            }
           }
         }
 

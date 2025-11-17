@@ -285,18 +285,53 @@
 
           </el-col>
         </el-row>
-        <el-row v-else>
+        <el-row v-else type="flex" align="middle" :gutter="24">
           <el-col :sm="8" :span="8" class="align-left invoice-download">
-            <el-button @click="downloadInvoice()" :loading="invoiceLoading.download">
-              {{ $root.labels.download }}
-            </el-button>
+            <el-select
+              :value="$root.labels.download"
+              @change="downloadInvoice($event)"
+            >
+              <el-option
+                  v-for="option in [{
+                    label: this.$root.labels.download_pdf,
+                    value: 'pdf'
+                  },
+                  {
+                    label: this.$root.labels.download_xml,
+                    value: 'xml'
+                  }]"
+                  :key="option.value"
+                  :label="option.label"
+                  :value="option.value">
+              </el-option>
+            </el-select>
           </el-col>
-          <el-col :sm="4" :span="4" class="align-left invoice-download-mobile">
-            <el-button @click="downloadInvoice()" class="button-export am-button-icon">
-              <img class="svg-amelia" alt="Import" :src="$root.getUrl+'public/img/import.svg'"/>
-            </el-button>
+          <el-col :sm="4" :md="4" :span="4" class="invoice-download-mobile">
+            <el-select
+              :value="''"
+              :placeholder="''"
+              :show-arrow="false"
+              @change="downloadInvoice($event)"
+            >
+              <template #prefix class="invoice-download-mobile">
+                <img class="svg-amelia" alt="Download" :src="$root.getUrl+'public/img/import.svg'"/>
+              </template>
+              <el-option
+                  v-for="option in [{
+                    label: this.$root.labels.download_pdf,
+                    value: 'pdf'
+                  },
+                  {
+                    label: this.$root.labels.download_xml,
+                    value: 'xml'
+                  }]"
+                  :key="option.value"
+                  :label="option.label"
+                  :value="option.value">
+              </el-option>
+            </el-select>
           </el-col>
-          <el-col :sm="16" :span="16" class="align-right">
+          <el-col :sm="20" :md='20' :span="16" class="align-right" style="width: 100%">
             <el-button
                 @click="previewInvoice()"
                 class="am-dialog-create"
@@ -428,21 +463,22 @@ export default {
         return this.payments.filter(p => p.status === 'partiallyPaid').length > 0 && !this.invoiceInDialog
       },
 
-      createFileUrlFromResponse (response) {
+      createFileUrlFromResponse (response, format = 'pdf') {
         var byteCharacters = atob(response.data)
         var byteNumbers = new Array(byteCharacters.length)
         for (var i = 0; i < byteCharacters.length; i++) {
           byteNumbers[i] = byteCharacters.charCodeAt(i)
         }
         var byteArray = new Uint8Array(byteNumbers)
-        var file = new Blob([byteArray], { type: 'application/pdf;base64' })
+        var file = new Blob([byteArray], { type: `application/${format};base64` })
         return URL.createObjectURL(file)
       },
 
       sendInvoice () {
         this.invoiceLoading.send = true
         if (this.modalData.customer.email) {
-          this.$http.post(`${this.$root.getAjaxUrl}/invoices/${this.payments[0].id}`, {sendEmail: true})
+          let mainPayment = this.payments.find(p => p.parentId === null)
+          this.$http.post(`${this.$root.getAjaxUrl}/invoices/${mainPayment.id}`, {sendEmail: true})
             .then(response => {
               this.notify(this.$root.labels.success, this.$root.labels.invoice_sent, 'success')
               this.invoiceLoading.send = false
@@ -460,7 +496,8 @@ export default {
 
       previewInvoice () {
         this.invoiceLoading.preview = true
-        this.$http.post(`${this.$root.getAjaxUrl}/invoices/${this.payments[0].id}`)
+        let mainPayment = this.payments.find(p => p.parentId === null)
+        this.$http.post(`${this.$root.getAjaxUrl}/invoices/${mainPayment.id}`, { format: 'pdf' })
           .then(response => {
             window.open(this.createFileUrlFromResponse(response))
             this.invoiceLoading.preview = false
@@ -471,14 +508,15 @@ export default {
           })
       },
 
-      downloadInvoice () {
+      downloadInvoice (format = 'pdf') {
         this.invoiceLoading.download = true
-        this.$http.post(`${this.$root.getAjaxUrl}/invoices/${this.payments[0].id}`)
+        let mainPayment = this.payments.find(p => p.parentId === null)
+        this.$http.post(`${this.$root.getAjaxUrl}/invoices/${mainPayment.id}`, { format: format })
           .then(response => {
-            let url = this.createFileUrlFromResponse(response)
+            let url = this.createFileUrlFromResponse(response, format)
             const a = document.createElement('a')
             a.href = url
-            a.download = 'Invoice'
+            a.download = `Invoice.${format}`
             document.body.appendChild(a)
             a.click()
             document.body.removeChild(a)
@@ -634,6 +672,7 @@ export default {
         }
         this.dialogLoading = true
 
+        this.payment.entity = this.modalData.bookableType
         this.form.post(`${this.$root.getAjaxUrl}/payments/${this.payment.id}`, this.payment)
           .then(() => {
             this.showUpdatePaymentAmount = !this.showUpdatePaymentAmount

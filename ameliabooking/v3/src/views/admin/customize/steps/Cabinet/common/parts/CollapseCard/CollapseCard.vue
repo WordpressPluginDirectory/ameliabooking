@@ -58,13 +58,14 @@
               </div>
             </div>
             <div
-              v-if="(props.booking.status === 'approved' || props.booking.status === 'pending') && (!props.isPackageBooking || (props.reservation.cancelable || props.reservation.reschedulable))"
+              v-if="(props.booking.status === 'approved' || props.booking.status === 'pending') &&
+              (!props.isPackageBooking || (props.reservation.cancelable || props.reservation.reschedulable) || !licence.isStarter)"
               class="am-cc__heading-actions"
               :class="props.responsiveClass"
             >
               <PaymentButton v-if="!props.isPackageBooking && !licence.isStarter && pageRenderKey !== 'cape'"/>
               <el-popover
-                v-if="props.reservation.cancelable || props.reservation.reschedulable"
+                v-if="props.reservation.cancelable || props.reservation.reschedulable || !licence.isStarter"
                 ref="editRef"
                 :visible="editPopVisible"
                 :persistent="false"
@@ -98,6 +99,28 @@
                     </span>
                   </div>
                   <!-- /Reschedule -->
+
+                  <!-- Invoice -->
+                  <div
+                      v-if="!licence.isStarter"
+                      class="am-cc__edit-item"
+                  >
+                    <span class="am-icon-eye"></span>
+                    <span class="am-cc__edit-text">
+                      {{ labelsDisplay('preview_invoice') }}
+                    </span>
+                  </div>
+
+                  <div
+                      v-if="!licence.isStarter"
+                      class="am-cc__edit-item"
+                  >
+                    <span class="am-icon-download"></span>
+                    <span class="am-cc__edit-text">
+                      {{ labelsDisplay('download_invoice') }}
+                    </span>
+                  </div>
+                  <!-- /Invoice -->
 
                   <!-- Cancel item -->
                   <div

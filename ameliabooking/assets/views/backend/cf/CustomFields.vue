@@ -399,7 +399,8 @@
           type: type,
           width: 50,
           saveType: this.customFieldsTab,
-          saveFirstChoice: false
+          saveFirstChoice: false,
+          includeInInvoice: false
         }
 
         this.$http.post(`${this.$root.getAjaxUrl}/fields`, {

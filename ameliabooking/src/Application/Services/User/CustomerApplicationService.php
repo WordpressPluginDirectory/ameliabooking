@@ -30,6 +30,7 @@ use AmeliaBooking\Infrastructure\Repository\Booking\Event\CustomerBookingEventPe
 use AmeliaBooking\Infrastructure\Repository\Booking\Event\EventRepository;
 use AmeliaBooking\Infrastructure\Repository\Payment\PaymentRepository;
 use AmeliaBooking\Infrastructure\Repository\User\UserRepository;
+use AmeliaBooking\Infrastructure\Services\Mailchimp\AbstractMailchimpService;
 use Exception;
 use Interop\Container\Exception\ContainerException;
 use Slim\Exception\ContainerValueNotFoundException;
@@ -197,6 +198,14 @@ class CustomerApplicationService extends UserApplicationService
             ) {
                 $result->setResult(CommandResult::RESULT_ERROR);
                 $result->setData($userWithSameMail ? ['emailError' => true] : ['phoneError' => true]);
+            } elseif (
+                empty($userWithSameValue->getEmail()->getValue()) && !empty($user->getEmail())
+            ) {
+                $userRepository->updateFieldById(
+                    $userWithSameValue->getId()->getValue(),
+                    $user->getEmail()->getValue(),
+                    'email'
+                );
             }
 
             return $userWithSameValue;
@@ -281,9 +290,6 @@ class CustomerApplicationService extends UserApplicationService
         /** @var AppointmentRepository $appointmentRepository */
         $appointmentRepository = $this->container->get('domain.booking.appointment.repository');
 
-        /** @var EventRepository $eventRepository */
-        $eventRepository = $this->container->get('domain.booking.event.repository');
-
         /** @var CustomerBookingEventPeriodRepository $bookingEventPeriodRepository */
         $bookingEventPeriodRepository = $this->container->get('domain.booking.customerBookingEventPeriod.repository');
 
@@ -310,6 +316,9 @@ class CustomerApplicationService extends UserApplicationService
 
         /** @var EventApplicationService $eventAS */
         $eventAS = $this->container->get('application.booking.event.service');
+
+        /** @var AbstractMailchimpService $mailchimpService */
+        $mailchimpService = $this->container->get('infrastructure.mailchimp.service');
 
         /** @var Collection $appointments */
         $appointments = $appointmentRepository->getFiltered(
@@ -412,6 +421,10 @@ class CustomerApplicationService extends UserApplicationService
                     return false;
                 }
             }
+        }
+
+        if ($customer->getEmail() && $customer->getEmail()->getValue()) {
+            $mailchimpService->deleteSubscriber($customer->getEmail()->getValue());
         }
 
         return $userRepository->delete($customer->getId()->getValue());

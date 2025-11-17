@@ -83,6 +83,11 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
         unset($data['invoice_items_extras']);
         unset($data['invoice_items_event']);
         unset($data['items']);
+        unset($data['qr_code_tickets']);
+
+        $data = array_filter($data, function($key) {
+            return strpos($key, 'invoice_custom_field') !== 0;
+        }, ARRAY_FILTER_USE_KEY);
 
         $placeholders = array_map(
             function ($placeholder) {
@@ -151,6 +156,7 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
                 ': customer@domain.com ' .
                 $paragraphEnd,
             'company_address'     => $companySettings['address'],
+            'company_country'     => $companySettings['countryCode'],
             'company_name'        => $companySettings['name'],
             'company_phone'       => $companySettings['phone'],
             'company_website'     => $companySettings['website'],
@@ -208,6 +214,7 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
 
         return [
             'company_address' => $companySettings['address'],
+            'company_country' => $companySettings['countryCode'],
             'company_name'    => $companyName,
             'company_phone'   => $companySettings['phone'],
             'company_website' => $companySettings['website'],
@@ -247,7 +254,8 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
             'payment_link_paypal' => '',
             'payment_link_razorpay' => '',
             'payment_link_mollie' => '',
-            'payment_link_square' => ''
+            'payment_link_square' => '',
+            'payment_link_barion' => ''
         ];
 
         $couponDiscount = 0;
@@ -355,8 +363,10 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
             $invoiceItem['invoice_tax_rate']     = $amountData['tax_rate'];
             $invoiceItem['invoice_tax_excluded'] = $amountData['tax_excluded'];
             $invoiceItem['invoice_tax_type']     = $amountData['tax_type'];
-            $invoiceItem['invoice_extras_tax']   = !empty($amountData['extras_tax']) ? $amountData['extras_tax'] : null;
+            $invoiceItem['total_tax']            = $amountData['total_tax'];
+            $invoiceItem['invoice_extras_items']   = !empty($amountData['extras_items']) ? $amountData['extras_items'] : null;
             $invoiceItem['invoice_tickets_tax']  = !empty($amountData['tickets_tax']) ? $amountData['tickets_tax'] : null;
+            $invoiceItem['service_discount']  = !empty($amountData['service_discount']) ? $amountData['service_discount'] : null;
 
             $icsFiles = !empty($appointment['bookings'][$bookingKey]['icsFiles']) ? $appointment['bookings'][$bookingKey]['icsFiles'] : [];
 
@@ -372,6 +382,7 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
             }
 
             $invoiceItem['invoice_discount'] = !empty($amountData['full_discount']) && $amountData['full_discount'] > 0 ? $amountData['full_discount'] : 0;
+
 
             if (!empty($payment['paymentLinks'])) {
                 foreach ($payment['paymentLinks'] as $paymentType => $paymentLink) {
@@ -441,7 +452,9 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
                 'payment_type'                      => $paymentType,
                 'payment_status'                    => $payment ? $payment['status'] : '',
                 'payment_gateway'                   => $payment ? $payment['gateway'] : '',
-                'payment_created'                   => $payment ? date_i18n($dateFormat, $payment['created']) : '',
+                'payment_created'                   => $payment && !empty($payment['created'])
+                    ? date_i18n($dateFormat, strtotime($payment['created']))
+                    : '',
                 'payment_invoice_number'            => $payment ? $payment['invoiceNumber'] : '',
                 'payment_gateway_title'             => $payment ? $payment['gatewayTitle'] : '',
                 "payment_due_amount"                => $paymentDueAmount,
@@ -703,8 +716,7 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
                     foreach ($bookingCustomFields as $bookingCustomFieldKey => $bookingCustomField) {
                         if (!empty($bookingCustomField['value']) && !empty($bookingCustomField['type'])) {
                             if ($bookingCustomField['type'] === 'datepicker') {
-                                $date = DateTime::createFromFormat('Y-m-d', $bookingCustomField['value']);
-                                $bookingCustomField['value'] = date_i18n($dateFormat, $date->getTimestamp());
+                                $bookingCustomField['value'] = $this->formatDatepickerValue($bookingCustomField['value'], $dateFormat);
                             }
 
                             if (
@@ -784,21 +796,25 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
                 }
             }
         } else {
-            if ($appointment['bookings'][$bookingKey]['customFields']) {
+            if (!empty($appointment['bookings'][$bookingKey]['customFields'])) {
                 $bookingCustomFields = !is_array($appointment['bookings'][$bookingKey]['customFields']) ?
-                    json_decode($appointment['bookings'][$bookingKey]['customFields'], true) : $appointment['bookings'][$bookingKey]['customFields'];
+                    json_decode($appointment['bookings'][$bookingKey]['customFields'], true) :
+                    $appointment['bookings'][$bookingKey]['customFields'];
             } else {
                 $bookingCustomFields = [];
             }
 
-            if ($appointment['bookings'][$bookingKey]['customerId'] && !isset($appointment['bookings'][$bookingKey]['customer'])) {
+            if (
+                !empty($appointment['bookings'][$bookingKey]['customerId']) &&
+                !isset($appointment['bookings'][$bookingKey]['customer'])
+            ) {
                 /** @var UserRepository $userRepository */
                 $userRepository = $this->container->get('domain.users.repository');
 
                 $appointment['bookings'][$bookingKey]['customer'] = $userRepository->getById($appointment['bookings'][$bookingKey]['customerId'])->toArray();
             }
 
-            if ($appointment['bookings'][$bookingKey]['customer']['customFields']) {
+            if (!empty($appointment['bookings'][$bookingKey]['customer']['customFields'])) {
                 $customerCustomFields = !is_array($appointment['bookings'][$bookingKey]['customer']['customFields']) ?
                     json_decode($appointment['bookings'][$bookingKey]['customer']['customFields'], true) :
                     $appointment['bookings'][$bookingKey]['customer']['customFields'];
@@ -822,25 +838,33 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
                         is_array($bookingCustomField) &&
                         array_key_exists('type', $bookingCustomField) &&
                         $bookingCustomField['type'] === 'datepicker' &&
-                        $bookingCustomField['value']
+                        !empty($bookingCustomField['value'])
                     ) {
-                        $date = DateTime::createFromFormat('Y-m-d', $bookingCustomField['value']);
-                        $bookingCustomField['value'] = date_i18n($dateFormat, $date->getTimestamp());
+                        $bookingCustomField['value'] = $this->formatDatepickerValue($bookingCustomField['value'], $dateFormat);
                     }
 
+                    $rawValue = '';
                     if (isset($bookingCustomField['value'])) {
+                        $rawValue = is_array($bookingCustomField['value'])
+                            ? implode('; ', $bookingCustomField['value']) : $bookingCustomField['value'];
                         $value = $bookingCustomField['type'] === CustomFieldType::ADDRESS ? (
                             $type === 'email' ?
                                 '<a href="https://maps.google.com/?q=' .
-                                $bookingCustomField['value'] . '" target="_blank">' . $bookingCustomField['value'] .
+                                $rawValue . '" target="_blank">' . $rawValue .
                                 '</a>' :
-                                'https://maps.google.com/?q=' . str_replace(' ', '+', $bookingCustomField['value'])
-                        ) : $bookingCustomField['value'];
-                        $customFieldsData['custom_field_' . $bookingCustomFieldKey] = is_array($value)
-                            ? implode('; ', $value) : $value;
+                                'https://maps.google.com/?q=' . str_replace(' ', '+', $rawValue)
+                        ) : $rawValue;
+                        $customFieldsData['custom_field_' . $bookingCustomFieldKey] = $value;
                     } else {
                         $customFieldsData['custom_field_' . $bookingCustomFieldKey] = '';
                     }
+
+                    $customFieldsData['invoice_custom_field_' . $bookingCustomFieldKey] = [
+                        'label' => $bookingCustomField['label'],
+                        'type'  => $bookingCustomField['type'],
+                        'value' => $rawValue ?: '/',
+                        'components' => $bookingCustomField['components'] ?? null
+                    ];
                 }
             }
         }
@@ -855,6 +879,22 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
         foreach ($customFields->getItems() as $customField) {
             if (!array_key_exists($customField->getId()->getValue(), $bookingCustomFieldsKeys)) {
                 $customFieldsData['custom_field_' . $customField->getId()->getValue()] = '';
+            }
+
+            if (array_key_exists('invoice_custom_field_' . $customField->getId()->getValue(), $customFieldsData)) {
+                if (!$customField->getIncludeInInvoice() || !$customField->getIncludeInInvoice()->getValue()) {
+                    unset($customFieldsData['invoice_custom_field_' . $customField->getId()->getValue()]);
+                } else {
+                    $customFieldsData['invoice_custom_field_' . $customField->getId()->getValue()]['label'] =
+                        $customField->getLabel()->getValue();
+                }
+            } elseif ($customField->getIncludeInInvoice() && $customField->getIncludeInInvoice()->getValue()) {
+                $customFieldsData['invoice_custom_field_' . $customField->getId()->getValue()] = [
+                    'label' => $customField->getLabel()->getValue(),
+                    'type'  => $customField->getType()->getValue(),
+                    'value' => '/',
+                    'components' => null
+                ];
             }
 
             if ($customField->getType()->getValue() === 'content') {
@@ -1109,13 +1149,13 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
         /** @var HelperService $helperService */
         $helperService = $this->container->get('application.helper.service');
 
-        if (!empty($appointment['bookings'][$bookingKey]['info'])) {
-            return $helperService->getLocaleFromBooking(
-                $appointment['bookings'][$bookingKey]['info']
-            );
-        } elseif (!empty($appointment['bookings'][$bookingKey]['customer']['translations'])) {
+        if (!empty($appointment['bookings'][$bookingKey]['customer']['translations'])) {
             return $helperService->getLocaleFromTranslations(
                 $appointment['bookings'][$bookingKey]['customer']['translations']
+            );
+        } elseif (!empty($appointment['bookings'][$bookingKey]['info'])) {
+            return $helperService->getLocaleFromBooking(
+                $appointment['bookings'][$bookingKey]['info']
             );
         }
 
@@ -1199,5 +1239,35 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
         }
 
         return null;
+    }
+
+    /**
+     * Normalize and format datepicker field value.
+     * Accepts values like 'YYYY-MM-DD' or ISO 8601 'YYYY-MM-DDTHH:MM:SS(.u)Z'.
+     * Returns formatted date string on success, or the original value if parsing fails.
+     *
+     * @param string $value
+     * @param string $dateFormat WordPress date format
+     * @return string
+     */
+    protected function formatDatepickerValue($value, $dateFormat)
+    {
+        if (empty($value)) {
+            return $value;
+        }
+
+        $savedDate = (string)$value;
+        if (preg_match('/^(\d{4}-\d{2}-\d{2})/', $savedDate, $m)) {
+            $savedDate = $m[1];
+        } else {
+            return $value;
+        }
+
+        $date = DateTime::createFromFormat('Y-m-d', $savedDate);
+        if ($date instanceof DateTime) {
+            return date_i18n($dateFormat, $date->getTimestamp());
+        }
+
+        return $value;
     }
 }

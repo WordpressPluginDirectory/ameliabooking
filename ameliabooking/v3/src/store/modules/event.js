@@ -104,6 +104,9 @@ function getDefaultEvent() {
         square: {
           enabled: null,
         },
+        barion: {
+          enabled: null,
+        }
       },
       googleMeet: {
         enabled: null,
@@ -407,6 +410,10 @@ export default {
 
     getSettingsPaymentsRazorpayEnabled(state) {
       return state.settings.payments.razorpay.enabled
+    },
+
+    getSettingsPaymentsBarionEnabled(state) {
+      return state.settings.payments.barion.enabled
     },
 
     getSettingsPaymentsSquareEnabled(state) {
@@ -721,6 +728,10 @@ export default {
 
     setSettingsPaymentsRazorpayEnabled(state, payload) {
       state.settings.payments.razorpay.enabled = payload
+    },
+
+    setSettingsPaymentsBarionEnabled(state, payload) {
+      state.settings.payments.barion.enabled = payload
     },
 
     setSettingsPaymentsSquareEnabled(state, payload) {
