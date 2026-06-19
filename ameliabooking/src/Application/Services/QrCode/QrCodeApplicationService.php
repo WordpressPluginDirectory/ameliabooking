@@ -4,7 +4,6 @@ namespace AmeliaBooking\Application\Services\QrCode;
 
 use AmeliaBooking\Domain\Common\Exceptions\InvalidArgumentException;
 use AmeliaBooking\Domain\Entity\Booking\Event\CustomerBookingEventTicket;
-use AmeliaBooking\Domain\Entity\Booking\Event\EventPeriod;
 use AmeliaBooking\Domain\Services\DateTime\DateTimeService;
 use AmeliaBooking\Infrastructure\Common\Exceptions\NotFoundException;
 use AmeliaBooking\Infrastructure\Common\Exceptions\QueryExecutionException;
@@ -49,7 +48,9 @@ class QrCodeApplicationService extends AbstractQrCodeApplicationService
                     if (!empty($qr['qrCodeData'])) {
                         $eventTranslations = $eventData['translations'] ? json_decode($eventData['translations'], true) : null;
                         $qrData['bookingId'] = $booking['id'];
-                        $qrData['eventName'] =  $eventTranslations['name'][$locale] ?: $eventData['name'];
+                        $qrData['eventName'] =  !empty($eventTranslations['name'][$locale])
+                            ? $eventTranslations['name'][$locale]
+                            : $eventData['name'];
                         $qrData['eventStartDateTime'] = $eventData['periods'][0]['periodStart'];
 
                         if (
@@ -60,7 +61,9 @@ class QrCodeApplicationService extends AbstractQrCodeApplicationService
                             foreach ($eventData['customTickets'] as $ticket) {
                                 if ($ticket['id'] === $qrData['eventTicketId']) {
                                     $ticketTranslations = $ticket['translations'] ? json_decode($ticket['translations'], true) : null;
-                                    $ticketName = $ticketTranslations[$locale] ?: $ticket['name'];
+                                    $ticketName = !empty($ticketTranslations[$locale])
+                                        ? $ticketTranslations[$locale]
+                                        : $ticket['name'];
                                     $qrData['eventTicketName'] = $ticketName;
                                     break;
                                 }
@@ -130,13 +133,14 @@ class QrCodeApplicationService extends AbstractQrCodeApplicationService
 
                 $bookingQrData = 'type: booking | bookingId:' . $bookingIdVal . ' | ticketManualCode:' . $bookingManualCode;
 
-                $qrCodes[] = array_merge([
+                $qrCodes[] = [
                     'type' => 'booking',
                     'eventName' => $event->getName() ? $event->getName()->getValue() : '',
                     'ticketManualCode' => $bookingManualCode,
                     'qrCodeData' => $bookingQrData,
                     'generatedAt' => $generatedAt,
-                ], ['dates' => $this->qrCodeDateFlag($event)]);
+                    'dates' => [],
+                ];
             }
 
             // Person / ticket level
@@ -164,6 +168,7 @@ class QrCodeApplicationService extends AbstractQrCodeApplicationService
                     'ticketManualCode' => $manualTicketCode,
                     'qrCodeData'       => $ticketQrData,
                     'generatedAt'      => $generatedAt,
+                    'dates'            => []
                 ];
 
                 if ($ticketIdForPerson) {
@@ -176,7 +181,7 @@ class QrCodeApplicationService extends AbstractQrCodeApplicationService
                     }
                 }
 
-                $qrCodes[] = array_merge($entry, ['dates' => $this->qrCodeDateFlag($event)]);
+                $qrCodes[] = $entry;
             }
         }
 
@@ -214,28 +219,6 @@ class QrCodeApplicationService extends AbstractQrCodeApplicationService
         $qrCodesNumberData['ticketIds'] = $ticketIdSequence ?: null;
 
         return $qrCodesNumberData;
-    }
-
-    /**
-     * Create an array of event dates (Y-m-d) as keys, with false values, for QR code date flagging
-     *
-     * @param $event
-     * @return array
-     */
-    private function qrCodeDateFlag($event): array
-    {
-        $dates = [];
-        /** @var EventPeriod $p */
-        foreach ($event->getPeriods()->getItems() as $p) {
-            $start = (clone $p->getPeriodStart()->getValue())->setTime(0, 0, 0);
-            $end   = (clone $p->getPeriodEnd()->getValue())->setTime(0, 0, 0);
-            while ($start <= $end) {
-                $dates[$start->format('Y-m-d')] = false;
-                $start->modify('+1 day');
-            }
-        }
-
-        return $dates;
     }
 
     /**

@@ -5,7 +5,7 @@ namespace AmeliaBooking\Application\Controller\WhatsNew;
 use AmeliaBooking\Application\Commands\WhatsNew\GetWhatsNewCommand;
 use AmeliaBooking\Application\Controller\Controller;
 use RuntimeException;
-use Slim\Http\Request;
+use AmeliaVendor\Psr\Http\Message\ServerRequestInterface as Request;
 
 /**
  * Class UpdateStashController
@@ -14,22 +14,20 @@ use Slim\Http\Request;
  */
 class GetWhatsNewController extends Controller
 {
+    protected $allowedFields = ['page', 'limit', 'category'];
+
     /**
-     * Instantiates the Update Stash command to hand it over to the Command Handler
-     *
      * @param Request $request
-     * @param         $args
-     *
+     * @param $args
      * @return GetWhatsNewCommand
-     * @throws RuntimeException
      */
     protected function instantiateCommand(Request $request, $args)
     {
         $command = new GetWhatsNewCommand($args);
 
-        $requestBody = $request->getParsedBody();
+        $requestParams = $request->getQueryParams();
 
-        $this->setCommandFields($command, $requestBody);
+        $this->setCommandFields($command, $requestParams);
 
         $command->setToken($request);
 

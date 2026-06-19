@@ -6,6 +6,7 @@
  */
 
 use AmeliaBooking\Infrastructure\Common\Container;
+use AmeliaBooking\Infrastructure\Services\Logger\WPLogger;
 use AmeliaBooking\Infrastructure\Services\Notification\MailerFactory;
 use AmeliaBooking\Infrastructure\Services\Notification\MailgunService;
 use AmeliaBooking\Infrastructure\Services\Notification\OutlookService;
@@ -14,6 +15,15 @@ use AmeliaBooking\Infrastructure\Services\Notification\SMTPService;
 use AmeliaBooking\Infrastructure\Services\Notification\WpMailService;
 
 defined('ABSPATH') or die('No script kiddies please!');
+
+/**
+ * Logger Service
+ *
+ * @return AmeliaBooking\Infrastructure\Services\Logger\WPLogger
+ */
+$entries['infrastructure.logger'] = function () {
+    return new WPLogger('Amelia');
+};
 
 /**
  * Mailer Service
@@ -120,21 +130,6 @@ $entries['infrastructure.payment.currency.service'] = function ($c) {
 };
 
 /**
- * Less Parser Service
- *
- * @param Container $c
- *
- * @return AmeliaBooking\Infrastructure\Services\Frontend\LessParserService
- */
-$entries['infrastructure.frontend.lessParser.service'] = function ($c) {
-    return new AmeliaBooking\Infrastructure\Services\Frontend\LessParserService(
-        AMELIA_PATH . '/assets/less/frontend/amelia-booking.less',
-        AMELIA_UPLOADS_PATH . '/amelia/css',
-        $c->get('domain.settings.service')
-    );
-};
-
-/**
  * Google Calendar Service
  *
  * @param Container $c
@@ -146,6 +141,17 @@ $entries['infrastructure.google.calendar.service'] = function ($c) {
 };
 
 /**
+ * Google Calendar Middleware Service
+ *
+ * @param Container $c
+ *
+ * @return AmeliaBooking\Infrastructure\Services\Google\AbstractGoogleCalendarMiddlewareService
+ */
+$entries['infrastructure.google.calendar.middleware.service'] = function ($c) {
+    return AmeliaBooking\Infrastructure\Licence\InfrastructureService::getCalendarGoogleMiddlewareService($c);
+};
+
+/**
  * Mailchimp Service
  *
  * @param Container $c
@@ -154,6 +160,17 @@ $entries['infrastructure.google.calendar.service'] = function ($c) {
  */
 $entries['infrastructure.mailchimp.service'] = function ($c) {
     return AmeliaBooking\Infrastructure\Licence\InfrastructureService::getMailchimpService($c);
+};
+
+/**
+ * Google Calendar Middleware Service
+ *
+ * @param Container $c
+ *
+ * @return AmeliaBooking\Infrastructure\Services\Google\GoogleCalendarMiddlewareService
+ */
+$entries['infrastructure.google.calendar.middleware.service'] = function ($c) {
+    return AmeliaBooking\Infrastructure\Licence\InfrastructureService::getCalendarGoogleMiddlewareService($c);
 };
 
 /**
@@ -187,6 +204,17 @@ $entries['infrastructure.lesson.space.service'] = function ($c) {
  */
 $entries['infrastructure.outlook.calendar.service'] = function ($c) {
     return AmeliaBooking\Infrastructure\Licence\InfrastructureService::getCalendarOutlookService($c);
+};
+
+/**
+ * Google Calendar Middleware Service
+ *
+ * @param Container $c
+ *
+ * @return AmeliaBooking\Infrastructure\Services\Outlook\AbstractOutlookCalendarMiddlewareService
+ */
+$entries['infrastructure.outlook.calendar.middleware.service'] = function ($c) {
+    return AmeliaBooking\Infrastructure\Licence\InfrastructureService::getOutlookCalendarMiddlewareService($c);
 };
 
 /**

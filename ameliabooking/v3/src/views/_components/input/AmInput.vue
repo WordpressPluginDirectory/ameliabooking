@@ -381,6 +381,7 @@ const amInput = ref(null)
       max-width: 100%;
       background-color: transparent;
       box-shadow: 0 2px 2px var(--am-c-input-shadow);
+      border-radius: var(--am-rad-input);
 
       &.el-input {
         // Disabled state

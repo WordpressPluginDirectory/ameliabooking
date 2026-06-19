@@ -1,12 +1,13 @@
 <?php
 
 /**
- * @copyright © TMS-Plugins. All rights reserved.
+ * @copyright © Melograno Ventures. All rights reserved.
  * @licence   See LICENCE.md for license details.
  */
 
 namespace AmeliaBooking\Application\Services\Notification;
 
+use AmeliaBooking\Application\Common\Exceptions\AccessDeniedException;
 use AmeliaBooking\Domain\Collection\Collection;
 use AmeliaBooking\Domain\Common\Exceptions\InvalidArgumentException;
 use AmeliaBooking\Domain\Entity\Booking\Appointment\Appointment;
@@ -16,8 +17,6 @@ use AmeliaBooking\Domain\ValueObjects\Number\Integer\Id;
 use AmeliaBooking\Infrastructure\Common\Container;
 use AmeliaBooking\Infrastructure\Common\Exceptions\NotFoundException;
 use AmeliaBooking\Infrastructure\Common\Exceptions\QueryExecutionException;
-use Interop\Container\Exception\ContainerException;
-use Slim\Exception\ContainerValueNotFoundException;
 
 /**
  * Class ApplicationNotificationService
@@ -44,7 +43,6 @@ class ApplicationNotificationService
      *
      * @throws InvalidArgumentException
      * @throws QueryExecutionException
-     * @throws ContainerException
      */
     public function sendAppointmentProviderStatusNotifications(
         $appointment,
@@ -98,7 +96,7 @@ class ApplicationNotificationService
      * @throws InvalidArgumentException
      * @throws QueryExecutionException
      * @throws NotFoundException
-     * @throws ContainerException
+     * @throws AccessDeniedException
      */
     public function sendAppointmentCustomersStatusNotifications(
         $appointment,
@@ -158,11 +156,12 @@ class ApplicationNotificationService
 
     /**
      * @param Appointment $appointment
-     * @param bool        $notifyProvider
-     * @param bool        $notifyCustomers
+     * @param bool $notifyProvider
+     * @param bool $notifyCustomers
      *
      * @throws QueryExecutionException
      * @throws InvalidArgumentException
+     * @throws NotFoundException
      */
     public function sendAppointmentRescheduleNotifications(
         $appointment,
@@ -211,6 +210,57 @@ class ApplicationNotificationService
     }
 
     /**
+     * Wrapper for sending waiting list available spot notifications through all active channels.
+     *
+     * @param Appointment $appointment
+     * @param Collection  $waitingBookings
+     *
+     * @throws InvalidArgumentException
+     * @throws QueryExecutionException
+     */
+    public function sendWaitingListAvailableSpotNotifications(
+        $appointment,
+        $waitingBookings
+    ) {
+        /** @var SettingsService $settingsService */
+        $settingsService = $this->container->get('domain.settings.service');
+
+        /** @var AppointmentNotificationService $appointmentNotificationService */
+        $appointmentNotificationService = $this->container->get('application.notification.appointment.service');
+
+        /** @var EmailNotificationService $emailNotificationService */
+        $emailNotificationService = $this->container->get('application.emailNotification.service');
+
+        /** @var SMSNotificationService $smsNotificationService */
+        $smsNotificationService = $this->container->get('application.smsNotification.service');
+
+        /** @var AbstractWhatsAppNotificationService $whatsAppNotificationService */
+        $whatsAppNotificationService = $this->container->get('application.whatsAppNotification.service');
+
+        $appointmentNotificationService->sendWaitingListAvailableSpotNotification(
+            $emailNotificationService,
+            $appointment,
+            $waitingBookings
+        );
+
+        if ($settingsService->getSetting('notifications', 'smsSignedIn') === true) {
+            $appointmentNotificationService->sendWaitingListAvailableSpotNotification(
+                $smsNotificationService,
+                $appointment,
+                $waitingBookings
+            );
+        }
+
+        if ($whatsAppNotificationService->checkRequiredFields()) {
+            $appointmentNotificationService->sendWaitingListAvailableSpotNotification(
+                $whatsAppNotificationService,
+                $appointment,
+                $waitingBookings
+            );
+        }
+    }
+
+    /**
      * @param Appointment $appointment
      * @param int|null    $changedProviderId
      * @param bool        $notifyProvider
@@ -222,6 +272,44 @@ class ApplicationNotificationService
     public function sendAppointmentUpdatedNotifications(
         $appointment,
         $changedProviderId,
+        $notifyProvider = true,
+        $notifyCustomers = true
+    ) {
+        $appointment->setAssignedEmployeeId(new Id($appointment->getProviderId()->getValue()));
+
+        $this->sendAppointmentUpdatedNotificationsForUserType(
+            $appointment,
+            false,
+            $notifyCustomers
+        );
+
+        if ($changedProviderId) {
+            $newProviderId = $appointment->getProviderId()->getValue();
+
+            $appointment->setProviderId(new Id($changedProviderId));
+        }
+
+        $this->sendAppointmentUpdatedNotificationsForUserType(
+            $appointment,
+            $notifyProvider,
+            false
+        );
+
+        if ($changedProviderId) {
+            $appointment->setProviderId(new Id($newProviderId));
+        }
+    }
+
+    /**
+     * @param Appointment $appointment
+     * @param bool        $notifyProvider
+     * @param bool        $notifyCustomers
+     *
+     * @throws QueryExecutionException
+     * @throws InvalidArgumentException
+     */
+    private function sendAppointmentUpdatedNotificationsForUserType(
+        $appointment,
         $notifyProvider = true,
         $notifyCustomers = true
     ) {
@@ -239,12 +327,6 @@ class ApplicationNotificationService
 
         /** @var AbstractWhatsAppNotificationService $whatsAppNotificationService */
         $whatsAppNotificationService = $this->container->get('application.whatsAppNotification.service');
-
-        if ($changedProviderId) {
-            $newProviderId = $appointment->getProviderId()->getValue();
-
-            $appointment->setProviderId(new Id($changedProviderId));
-        }
 
         $appointmentNotificationService->sendUpdatedNotifications(
             $emailNotificationService,
@@ -270,10 +352,6 @@ class ApplicationNotificationService
                 $notifyCustomers
             );
         }
-
-        if ($changedProviderId) {
-            $appointment->setProviderId(new Id($newProviderId));
-        }
     }
 
     /**
@@ -282,7 +360,6 @@ class ApplicationNotificationService
      *
      * @throws InvalidArgumentException
      * @throws QueryExecutionException
-     * @throws ContainerException
      */
     public function sendEventQrNotification($event, $bookingKey)
     {

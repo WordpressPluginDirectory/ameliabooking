@@ -21,6 +21,7 @@ use AmeliaBooking\Infrastructure\WP\InstallActions\DB\Booking\EventsTagsTable;
 use AmeliaBooking\Infrastructure\WP\InstallActions\DB\Booking\EventsTicketsTable;
 use AmeliaBooking\Infrastructure\WP\InstallActions\DB\Coupon\CouponsTable;
 use AmeliaBooking\Infrastructure\WP\InstallActions\DB\Gallery\GalleriesTable;
+use AmeliaBooking\Infrastructure\WP\InstallActions\DB\Location\LocationsTable;
 use AmeliaBooking\Infrastructure\WP\InstallActions\DB\Payment\PaymentsTable;
 use AmeliaBooking\Infrastructure\WP\InstallActions\DB\User\UsersTable;
 
@@ -36,7 +37,7 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
     /**
      * @param Event $entity
      *
-     * @return bool
+     * @return int
      * @throws QueryExecutionException
      */
     public function add($entity)
@@ -66,6 +67,8 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
             ':closeAfterMin'        => $data['closeAfterMin'],
             ':closeAfterMinBookings'  => $data['closeAfterMinBookings'] ? 1 : 0,
             ':aggregatedPrice'      => $data['aggregatedPrice'] ? 1 : 0,
+            ':pictureFullPath'      => $data['pictureFullPath'],
+            ':pictureThumbPath'     => $data['pictureThumbPath'],
             ':error'                => '',
         ];
 
@@ -100,6 +103,8 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
                 `closeAfterMin`,
                 `closeAfterMinBookings`,
                 `aggregatedPrice`,
+                `pictureFullPath`,
+                `pictureThumbPath`,
                 `error`
                  )
                 VALUES (
@@ -126,19 +131,17 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
                 :closeAfterMin,
                 :closeAfterMinBookings,
                 :aggregatedPrice,
+                :pictureFullPath,
+                :pictureThumbPath,
                 :error
                 )"
             );
 
-            $res = $statement->execute($params);
-
-            if (!$res) {
-                throw new QueryExecutionException('Unable to add data in ' . __CLASS__);
-            }
+            $statement->execute($params);
 
             return $this->connection->lastInsertId();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to add data in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to add data in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
     }
 
@@ -175,7 +178,9 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
             ':parentId'             => $data['parentId'],
             ':closeAfterMin'        => $data['closeAfterMin'],
             ':closeAfterMinBookings'  => $data['closeAfterMinBookings'] ? 1 : 0,
-            ':aggregatedPrice'      => $data['aggregatedPrice'] ? 1 : 0
+            ':aggregatedPrice'      => $data['aggregatedPrice'] ? 1 : 0,
+            ':pictureFullPath'      => $data['pictureFullPath'],
+            ':pictureThumbPath'     => $data['pictureThumbPath'],
         ];
 
         $additionalData = Licence\DataModifier::getEventRepositoryData($data);
@@ -207,53 +212,17 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
                 `parentId` = :parentId,
                 `closeAfterMin` = :closeAfterMin,
                 `closeAfterMinBookings` = :closeAfterMinBookings,
-                `aggregatedPrice` = :aggregatedPrice
+                `aggregatedPrice` = :aggregatedPrice,
+                `pictureFullPath`   = :pictureFullPath,
+                `pictureThumbPath`  = :pictureThumbPath
                 WHERE id = :id"
             );
 
-            $res = $statement->execute($params);
+            $statement->execute($params);
 
-            if (!$res) {
-                throw new QueryExecutionException('Unable to save data in ' . __CLASS__);
-            }
-
-            return $res;
+            return true;
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to save data in ' . __CLASS__, $e->getCode(), $e);
-        }
-    }
-
-    /**
-     * @param int $id
-     * @param int $status
-     *
-     * @return mixed
-     * @throws QueryExecutionException
-     */
-    public function updateStatusById($id, $status)
-    {
-        $params = [
-            ':id'     => $id,
-            ':status' => $status
-        ];
-
-        try {
-            $statement = $this->connection->prepare(
-                "UPDATE {$this->table}
-                SET
-                `status` = :status
-                WHERE id = :id"
-            );
-
-            $res = $statement->execute($params);
-
-            if (!$res) {
-                throw new QueryExecutionException('Unable to save data in ' . __CLASS__);
-            }
-
-            return $res;
-        } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to save data in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to save data in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
     }
 
@@ -279,15 +248,11 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
                 WHERE id = :id"
             );
 
-            $res = $statement->execute($params);
+            $statement->execute($params);
 
-            if (!$res) {
-                throw new QueryExecutionException('Unable to save data in ' . __CLASS__);
-            }
-
-            return $res;
+            return true;
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to save data in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to save data in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
     }
 
@@ -399,6 +364,7 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
                     pu.note AS provider_note,
                     pu.description AS provider_description,
                     pu.phone AS provider_phone,
+                    pu.countryPhoneIso AS provider_countryPhoneIso,
                     pu.gender AS provider_gender,
                     pu.pictureFullPath AS provider_pictureFullPath,
                     pu.pictureThumbPath AS provider_pictureThumbPath,
@@ -415,7 +381,7 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return call_user_func([static::FACTORY, 'createCollection'], $rows);
@@ -423,7 +389,7 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
 
     /**
      * @param array $criteria
-     * @param int   $itemsPerPage
+     * @param int|null   $itemsPerPage
      *
      * @return array
      * @throws QueryExecutionException
@@ -436,39 +402,94 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
         $customerBookingsTable = CustomerBookingsTable::getTableName();
         $customerBookingsEventsPeriods = CustomerBookingsToEventsPeriodsTable::getTableName();
         $eventsProvidersTable          = EventsProvidersTable::getTableName();
-        $usersTable = UsersTable::getTableName();
 
         $params = [];
 
         $where = [];
+
+        $joins = '';
+
+        $groupBy = 'GROUP BY e.id';
 
         if (isset($criteria['parentId'])) {
             $params[':parentId'] = $criteria['parentId'];
 
             $params[':originParentId'] = $criteria['parentId'];
 
-            $where[] = 'e.parentId = :parentId OR e.id = :originParentId';
+            $where[] = '(e.parentId = :parentId OR e.id = :originParentId)';
+        }
+
+        if (!empty($criteria['events'])) {
+            $queryExcludeIds = [];
+
+            foreach ($criteria['events'] as $index => $value) {
+                $param = ':id' . $index;
+
+                $queryExcludeIds[] = $param;
+
+                $params[$param] = $value;
+            }
+
+            $where[] = 'e.id IN (' . implode(', ', $queryExcludeIds) . ')';
+        }
+
+        if (!empty($criteria['excludeIds'])) {
+            $queryExcludeIds = [];
+
+            foreach ($criteria['excludeIds'] as $index => $value) {
+                $param = ':excludeId' . $index;
+
+                $queryExcludeIds[] = $param;
+
+                $params[$param] = $value;
+            }
+
+            $where[] = 'e.id NOT IN (' . implode(', ', $queryExcludeIds) . ')';
         }
 
         if (!empty($criteria['search'])) {
-            $params[':search1'] = "%{$criteria['search']}%";
-            $params[':search2'] = "{\"name\":{%{$criteria['search']}%\"description\":{%";
-            $params[':search3'] = "{\"description\":{%\"name\":{%{$criteria['search']}%";
-            $params[':search4'] = "{\"name\":{%{$criteria['search']}%";
+            $terms = preg_split('/\s+/', trim($criteria['search']));
+            $termIndex = 0;
 
-            $where[] = "(e.name LIKE :search1 
-            OR e.translations LIKE :search2
-            OR e.translations LIKE :search3
-            OR (e.translations LIKE :search4 AND e.translations NOT LIKE '%\"description\":{%'))";
+            foreach ($terms as $term) {
+                $p1 = ":search{$termIndex}_1";
+                $p2 = ":search{$termIndex}_2";
+                $p3 = ":search{$termIndex}_3";
+                $p4 = ":search{$termIndex}_4";
+                $p5 = ":search{$termIndex}_5";
+
+                $params[$p1] = "%{$term}%";
+                $params[$p2] = "{\"name\":{%{$term}%\"description\":{%";
+                $params[$p3] = "{\"description\":{%\"name\":{%{$term}%";
+                $params[$p4] = "{\"name\":{%{$term}%";
+                $params[$p5] = "%{$term}%";
+
+                $where[] = "(
+                    e.name LIKE {$p1}
+                    OR e.translations LIKE {$p2}
+                    OR e.translations LIKE {$p3}
+                    OR (
+                        e.translations LIKE {$p4}
+                        AND e.translations NOT LIKE '%\"description\":{%'
+                    )
+                    OR e.id LIKE {$p5}
+                )";
+
+                $termIndex++;
+            }
         }
 
+        if (!empty($criteria['status'])) {
+            $params[':status'] = $criteria['status'];
+            $where[] = "e.status = :status";
+        }
 
         if (isset($criteria['show'])) {
             $where[] = 'e.show = 1';
         }
 
         if (!empty($criteria['dates'])) {
-            if (isset($criteria['dates'][0], $criteria['dates'][1])) {
+            if (!empty($criteria['dates'][0]) && !empty($criteria['dates'][1])) {
                 $where[] = "((ep.periodStart BETWEEN :eventFrom1 AND :eventTo1)
                 OR (ep.periodEnd BETWEEN :eventFrom2 AND :eventTo2)
                 OR (:eventFrom3 BETWEEN ep.periodStart AND ep.periodEnd)
@@ -476,11 +497,11 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
 
                 $params[':eventFrom1'] = $params[':eventFrom2'] = $params[':eventFrom3'] = DateTimeService::getCustomDateTimeInUtc($criteria['dates'][0]);
                 $params[':eventTo1']   = $params[':eventTo2']   = $params[':eventTo3']   = DateTimeService::getCustomDateTimeInUtc($criteria['dates'][1]);
-            } elseif (isset($criteria['dates'][0])) {
+            } elseif (!empty($criteria['dates'][0])) {
                 $where[] = "(ep.periodStart >= :eventFrom OR (ep.periodEnd >= :eventTo))";
                 $params[':eventFrom'] = DateTimeService::getCustomDateTimeInUtc($criteria['dates'][0]);
                 $params[':eventTo']   = DateTimeService::getCustomDateTimeInUtc($criteria['dates'][0]);
-            } elseif (isset($criteria['dates'][1])) {
+            } elseif (!empty($criteria['dates'][1])) {
                 $where[] = "(ep.periodStart <= :eventTo)";
 
                 $params[':eventTo'] = DateTimeService::getCustomDateTimeInUtc($criteria['dates'][1]);
@@ -490,9 +511,7 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
             }
         }
 
-        $tagJoin = '';
-
-        if (isset($criteria['tag'])) {
+        if (!empty($criteria['tag'])) {
             $queryTags = [];
 
             $tags = $criteria['tag'];
@@ -506,7 +525,29 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
 
             $where[] = 'et.name IN (' . implode(', ', $queryTags) . ')';
 
-            $tagJoin = "INNER JOIN {$eventsTagsTable} et ON et.eventId = e.id";
+            $joins .= "
+                INNER JOIN {$eventsTagsTable} et ON et.eventId = e.id
+            ";
+        }
+
+        if (!empty($criteria['skipRecurring'])) {
+            // When skipRecurring is true, only return the first upcoming event from each recurring series
+            $params[':recurringEventFrom'] = !empty($criteria['dates'][0]) ?
+                DateTimeService::getCustomDateTimeInUtc($criteria['dates'][0]) :
+                DateTimeService::getNowDateTimeInUtc();
+            $where[] = "e.id IN (
+                SELECT e_sub.id
+                FROM {$this->table} e_sub
+                INNER JOIN {$eventsPeriodsTable} ep_sub ON ep_sub.eventId = e_sub.id
+                INNER JOIN (
+                    SELECT COALESCE(e_inner.parentId, e_inner.id) as series_id, MIN(ep_inner.periodStart) as min_start
+                    FROM {$this->table} e_inner
+                    INNER JOIN {$eventsPeriodsTable} ep_inner ON ep_inner.eventId = e_inner.id
+                    WHERE ep_inner.periodStart >= :recurringEventFrom
+                    GROUP BY COALESCE(e_inner.parentId, e_inner.id)
+                ) upcoming ON COALESCE(e_sub.parentId, e_sub.id) = upcoming.series_id 
+                    AND ep_sub.periodStart = upcoming.min_start
+            )";
         }
 
         if (!empty($criteria['id'])) {
@@ -540,17 +581,30 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
             }
         }
 
-        $customerJoin = '';
-
-        if (!empty($criteria['customerId']) || !empty($criteria['customerBookingsIds'])) {
-            $customerJoin = "
-            LEFT JOIN {$customerBookingsEventsPeriods} cbe ON cbe.eventPeriodId = ep.id
-            LEFT JOIN {$customerBookingsTable} cb ON cb.id = cbe.customerBookingId";
+        if (!empty($criteria['customers']) || !empty($criteria['customerId']) || !empty($criteria['customerBookingsIds'])) {
+            $joins .= "
+                LEFT JOIN {$customerBookingsEventsPeriods} cbe ON cbe.eventPeriodId = ep.id
+                LEFT JOIN {$customerBookingsTable} cb ON cb.id = cbe.customerBookingId
+            ";
 
             if (!empty($criteria['customerId'])) {
                 $params[':customerId'] = $criteria['customerId'];
 
                 $where[] = 'cb.customerId = :customerId';
+            }
+
+            if (!empty($criteria['customers'])) {
+                $queryCustomerIds = [];
+
+                foreach ($criteria['customers'] as $index => $value) {
+                    $param = ':customerId' . $index;
+
+                    $queryCustomerIds[] = $param;
+
+                    $params[$param] = $value;
+                }
+
+                $where[] = 'cb.customerId IN (' . implode(', ', $queryCustomerIds) . ')';
             }
 
             if (!empty($criteria['customerBookingsIds'])) {
@@ -600,12 +654,11 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
             $where[] = '(' . $where3 . ')';
         }
 
-        $providerJoin = '';
-
         if (!empty($criteria['providers'])) {
-            $providerJoin   = "
-            LEFT JOIN {$eventsProvidersTable} epr ON epr.eventId = e.id
-            INNER JOIN {$usersTable} pu ON pu.id = epr.userId OR pu.id = e.organizerId";
+            $joins .= "
+                LEFT JOIN {$eventsProvidersTable} epr ON epr.eventId = e.id
+            ";
+
             $queryProviders = [];
 
             foreach ((array)$criteria['providers'] as $index => $value) {
@@ -641,12 +694,10 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
                      e.id
                 FROM {$this->table} e
                 INNER JOIN {$eventsPeriodsTable} ep ON ep.eventId = e.id
-                {$tagJoin}
-                {$providerJoin}
-                {$customerJoin}
+                {$joins}
                 {$where}
-                GROUP BY e.id
-                ORDER BY ep.periodStart, e.id
+                {$groupBy}
+                {$this->getOrderBy(!empty($criteria['sort']) ? $criteria['sort'] : null)}
                 {$limit}"
             );
 
@@ -654,244 +705,10 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return array_column($rows, 'id');
-    }
-
-    /**
-     * @param array $criteria
-     *
-     * @return int
-     * @throws QueryExecutionException
-     * @throws InvalidArgumentException
-     */
-    public function getFilteredIdsCount($criteria)
-    {
-        $eventsPeriodsTable   = EventsPeriodsTable::getTableName();
-        $eventsTagsTable      = EventsTagsTable::getTableName();
-        $eventsProvidersTable = EventsProvidersTable::getTableName();
-        $usersTable           = UsersTable::getTableName();
-
-
-        $params = [];
-        $where  = [];
-
-        if (isset($criteria['parentId'])) {
-            $params[':parentId'] = $criteria['parentId'];
-
-            $params[':originParentId'] = $criteria['parentId'];
-
-            $where[] = 'e.parentId = :parentId OR e.id = :originParentId';
-        }
-
-        if (!empty($criteria['search'])) {
-            $params[':search1'] = "%{$criteria['search']}%";
-            $params[':search2'] = "{\"name\":{%{$criteria['search']}%\"description\":{%";
-            $params[':search3'] = "{\"description\":{%\"name\":{%{$criteria['search']}%";
-            $params[':search4'] = "{\"name\":{%{$criteria['search']}%";
-
-            $where[] = "(e.name LIKE :search1 
-            OR e.translations LIKE :search2
-            OR e.translations LIKE :search3
-            OR (e.translations LIKE :search4 AND e.translations NOT LIKE '%\"description\":{%'))";
-        }
-
-        if (isset($criteria['show'])) {
-            $where[] = 'e.show = 1';
-        }
-
-        if (!empty($criteria['dates'])) {
-            if (isset($criteria['dates'][0], $criteria['dates'][1])) {
-                $where[] = "((ep.periodStart BETWEEN :eventFrom1 AND :eventTo1)
-                OR (ep.periodEnd BETWEEN :eventFrom2 AND :eventTo2)
-                OR (:eventFrom3 BETWEEN ep.periodStart AND ep.periodEnd)
-                OR (:eventTo3  BETWEEN ep.periodStart AND ep.periodEnd))";
-
-                $params[':eventFrom1'] = $params[':eventFrom2'] = $params[':eventFrom3'] = DateTimeService::getCustomDateTimeInUtc($criteria['dates'][0]);
-                $params[':eventTo1']   = $params[':eventTo2']   = $params[':eventTo3']   = DateTimeService::getCustomDateTimeInUtc($criteria['dates'][1]);
-            } elseif (isset($criteria['dates'][0])) {
-                $where[] = "(ep.periodStart >= :eventFrom OR (ep.periodEnd >= :eventTo))";
-
-                $params[':eventFrom'] = DateTimeService::getCustomDateTimeInUtc($criteria['dates'][0]);
-
-                $params[':eventTo'] = DateTimeService::getCustomDateTimeInUtc($criteria['dates'][0]);
-            } elseif (isset($criteria['dates'][1])) {
-                $where[] = "(ep.periodStart <= :eventTo)";
-
-                $params[':eventTo'] = DateTimeService::getCustomDateTimeInUtc($criteria['dates'][1]);
-            } else {
-                $where[] = "(ep.periodStart > :eventFrom)";
-
-                $params[':eventFrom'] = DateTimeService::getNowDateTimeInUtc();
-            }
-        }
-
-        if (!empty($criteria['locationId'])) {
-            $params[':locationId'] = $criteria['locationId'];
-
-            $where[] = 'e.locationId = :locationId';
-        }
-
-        if (!empty($criteria['locations'])) {
-            $queryLocations = [];
-
-            foreach ((array)$criteria['locations'] as $index => $value) {
-                $param            = ':location' . $index;
-                $queryLocations[] = $param;
-                $params[$param]   = $value;
-            }
-
-            $where3 = 'e.locationId IN (' . implode(', ', $queryLocations) . ')';
-
-            $where[] = '(' . $where3 . ')';
-        }
-
-
-        $tagJoin = '';
-
-        if (isset($criteria['tag'])) {
-            $queryTags = [];
-
-            $tags = $criteria['tag'];//explode(',', $criteria['tag']);
-            foreach ((array)$tags as $index => $value) {
-                $param = ':tag' . $index;
-
-                $queryTags[] = $param;
-
-                $params[$param] = $value;//trim($value, '{}');
-            }
-
-            $where[] = 'et.name IN (' . implode(', ', $queryTags) . ')';
-
-            $tagJoin = "INNER JOIN {$eventsTagsTable} et ON et.eventId = e.id";
-        }
-
-        if (!empty($criteria['id'])) {
-            if (!empty($criteria['recurring'])) {
-                $whereOr = [];
-                foreach ((array)$criteria['id'] as $index => $value) {
-                    $param = 'id' . $index;
-
-                    $params[':rec1' . $param] = (int)$value;
-                    $params[':rec2' . $param] = (int)$value;
-                    $params[':rec3' . $param] = (int)$value;
-                    $params[':rec4' . $param] = (int)$value;
-
-                    $whereOr[] = "((e.id = :rec1id" . $index . " AND e.parentId IS NULL) OR 
-                    (e.parentId IN (SELECT parentId FROM {$this->table} WHERE parentId IS NOT NULL AND parentId = :rec2id" . $index . ")) OR
-                    (e.id >= :rec3id" . $index . "  AND e.parentId IN (SELECT parentId FROM {$this->table} WHERE id = :rec4id" . $index . ")))";
-                }
-                $where[] = '(' . implode(' OR ', $whereOr) . ')';
-            } else {
-                $queryIds = [];
-
-                foreach ((array)$criteria['id'] as $index => $value) {
-                    $param = ':id' . $index;
-
-                    $queryIds[] = $param;
-
-                    $params[$param] = (int)$value;
-                }
-
-                $where[] = 'e.id IN (' . implode(', ', $queryIds) . ')';
-            }
-        }
-
-        $providerJoin = '';
-
-        if (!empty($criteria['providers'])) {
-            $providerJoin = "
-            LEFT JOIN {$eventsProvidersTable} epr ON epr.eventId = e.id
-            INNER JOIN {$usersTable} pu ON pu.id = epr.userId OR pu.id = e.organizerId";
-
-            $queryProviders = [];
-
-            foreach ((array)$criteria['providers'] as $index => $value) {
-                $param            = ':provider' . $index;
-                $queryProviders[] = $param;
-                $params[$param]   = $value;
-            }
-            $where1 = 'epr.userId IN (' . implode(', ', $queryProviders) . ')';
-
-            $queryProviders = [];
-            foreach ((array)$criteria['providers'] as $index => $value) {
-                $param            = ':organizer' . $index;
-                $queryProviders[] = $param;
-                $params[$param]   = $value;
-            }
-            $where2 = 'e.organizerId IN (' . implode(', ', $queryProviders) . ')';
-
-            $where[] = '(' . $where1 . ' OR ' . $where2 . ')';
-        }
-
-        $customerJoin = '';
-
-        $customerBookingsTable         = CustomerBookingsTable::getTableName();
-        $customerBookingsEventsPeriods = CustomerBookingsToEventsPeriodsTable::getTableName();
-
-        if (!empty($criteria['customerId']) || !empty($criteria['customerBookingsIds'])) {
-            $customerJoin = "
-            LEFT JOIN {$customerBookingsEventsPeriods} cbe ON cbe.eventPeriodId = ep.id
-            LEFT JOIN {$customerBookingsTable} cb ON cb.id = cbe.customerBookingId";
-
-            if (!empty($criteria['customerId'])) {
-                $params[':customerId'] = $criteria['customerId'];
-
-                $where[] = 'cb.customerId = :customerId';
-            }
-
-            if (!empty($criteria['customerBookingsIds'])) {
-                $queryBookingsIds = [];
-
-                foreach ($criteria['customerBookingsIds'] as $index => $value) {
-                    $param = ':customerBookingId' . $index;
-
-                    $queryBookingsIds[] = $param;
-
-                    $params[$param] = $value;
-                }
-
-                $where[] = 'cb.id IN (' . implode(', ', $queryBookingsIds) . ')';
-            }
-
-            if (!empty($criteria['customerBookingStatus'])) {
-                $params[':customerBookingStatus'] = $criteria['customerBookingStatus'];
-
-                $where[] = 'cb.status = :customerBookingStatus';
-            }
-
-            if (!empty($criteria['customerBookingCouponId'])) {
-                $params[':customerBookingCouponId'] = $criteria['customerBookingCouponId'];
-
-                $where[] = 'cb.couponId = :customerBookingCouponId';
-            }
-        }
-
-        $where = $where ? 'WHERE ' . implode(' AND ', $where) : '';
-
-        try {
-            $statement = $this->connection->prepare(
-                "SELECT e.id
-                FROM {$this->table} e
-                INNER JOIN {$eventsPeriodsTable} ep ON ep.eventId = e.id
-                {$tagJoin}
-                {$providerJoin}
-                {$customerJoin}
-                {$where}
-                GROUP BY e.id
-                ORDER BY ep.periodStart"
-            );
-
-            $statement->execute($params);
-
-            $rows = $statement->fetchAll();
-        } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__, $e->getCode(), $e);
-        }
-
-        return sizeOf($rows);
     }
 
     /**
@@ -1017,6 +834,7 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
                     cu.email AS customer_email,
                     cu.note AS customer_note,
                     cu.phone AS customer_phone,
+                    cu.countryPhoneIso AS customer_countryPhoneIso,
                     cu.gender AS customer_gender,
                     cu.birthday AS customer_birthday,
                     
@@ -1039,6 +857,7 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
                     pu.note AS provider_note,
                     pu.description AS provider_description,
                     pu.phone AS provider_phone,
+                    pu.countryPhoneIso AS provider_countryPhoneIso,
                     pu.gender AS provider_gender,
                     pu.translations AS provider_translations,
                     pu.timeZone AS provider_timeZone,
@@ -1081,7 +900,7 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find event by id in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find event by id in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return call_user_func([static::FACTORY, 'createCollection'], $rows)->getItem($id);
@@ -1111,7 +930,7 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
 
             return $statement->fetch();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find event by id in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find event by id in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
     }
 
@@ -1145,7 +964,7 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
 
             return array_column($events, 'eventId');
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find event by id in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find event by id in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
     }
 
@@ -1153,11 +972,11 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
      * @param int   $bookingId
      * @param array $criteria
      *
-     * @return Event
+     * @return ?Event
      * @throws QueryExecutionException
      * @throws InvalidArgumentException
      */
-    public function getByBookingId($bookingId, $criteria = [])
+    public function getByBookingId($bookingId, $criteria = []): ?Event
     {
         $eventsPeriodsTable = EventsPeriodsTable::getTableName();
 
@@ -1250,6 +1069,7 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
                 pu.note AS provider_note,
                 pu.description AS provider_description,
                 pu.phone AS provider_phone,
+                pu.countryPhoneIso AS provider_countryPhoneIso,                
                 pu.gender AS provider_gender,
                 pu.pictureFullPath AS provider_pictureFullPath,
                 pu.pictureThumbPath AS provider_pictureThumbPath,
@@ -1324,7 +1144,7 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find event by booking id in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find event by booking id in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         /** @var Collection $events */
@@ -1341,7 +1161,7 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
      * @throws QueryExecutionException
      * @throws InvalidArgumentException
      */
-    public function getByIdsWithEntities($ids, $criteria = [])
+    public function getByIdsWithEntities($ids, $criteria = [], $sort = null)
     {
         $params = [];
 
@@ -1373,7 +1193,20 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
                 INNER JOIN {$eventsPeriodsTable} ep ON ep.eventId = e.id
             ";
 
-            $orderBy = !empty($criteria['ordered']) ? 'ORDER BY e.id, ep.periodStart' : 'ORDER BY ep.periodStart';
+            $orderBy = $this->getOrderBy($sort);
+        }
+
+        if (!empty($criteria['fetchEventsLocation'])) {
+            $locationsTable = LocationsTable::getTableName();
+
+            $fields .= '
+                l.id AS location_id,
+                l.name AS location_name,
+            ';
+
+            $joins .= "
+                LEFT JOIN {$locationsTable} l ON l.id = e.locationId
+            ";
         }
 
         if (!empty($criteria['fetchEventsCoupons'])) {
@@ -1443,6 +1276,24 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
             ";
         }
 
+        if (!empty($criteria['fetchEventsOrganizer'])) {
+            $usersTable = UsersTable::getTableName();
+
+            $joins .= "
+                LEFT JOIN {$usersTable} ou ON ou.id = e.organizerId
+            ";
+
+            $fields .= '
+                ou.id AS organizer_id,
+                ou.firstName AS organizer_firstName,
+                ou.lastName AS organizer_lastName,
+                ou.email AS organizer_email,
+                ou.badgeId AS organizer_badgeId,
+                ou.pictureThumbPath AS organizer_pictureThumbPath,
+                ou.pictureFullPath AS organizer_pictureFullPath,
+            ';
+        }
+
         if (!empty($criteria['fetchEventsProviders'])) {
             $eventsProvidersTable = EventsProvidersTable::getTableName();
 
@@ -1461,11 +1312,13 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
                 pu.note AS provider_note,
                 pu.description AS provider_description,
                 pu.phone AS provider_phone,
+                pu.countryPhoneIso AS provider_countryPhoneIso,
                 pu.gender AS provider_gender,
                 pu.pictureFullPath AS provider_pictureFullPath,
                 pu.pictureThumbPath AS provider_pictureThumbPath,
                 pu.translations AS provider_translations,
                 pu.timeZone AS provider_timeZone,
+                pu.badgeId AS provider_badgeId,
             ';
         }
 
@@ -1511,7 +1364,9 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
             e.customPricing AS event_customPricing,
             e.closeAfterMin AS event_closeAfterMin,
             e.closeAfterMinBookings AS event_closeAfterMinBookings,
-            e.aggregatedPrice AS event_aggregatedPrice
+            e.aggregatedPrice AS event_aggregatedPrice,
+            e.pictureFullPath AS event_pictureFullPath,
+            e.pictureThumbPath AS event_pictureThumbPath
         ";
 
         if (!empty($ids)) {
@@ -1544,7 +1399,7 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find event by id in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find event by id in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return call_user_func([static::FACTORY, 'createCollection'], $rows);
@@ -1647,6 +1502,7 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
                 cu.email AS customer_email,
                 cu.note AS customer_note,
                 cu.phone AS customer_phone,
+                cu.countryPhoneIso AS customer_countryPhoneIso,
                 cu.gender AS customer_gender,
                 cu.birthday AS customer_birthday,
                 cu.customFields AS customer_customFields,
@@ -1688,7 +1544,8 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
             cb.token AS booking_token,
             cb.aggregatedPrice AS booking_aggregatedPrice,
             cb.tax AS booking_tax,
-            cb.qrCodes AS booking_qrCodes
+            cb.qrCodes AS booking_qrCodes,
+            cb.ivyEntryId AS booking_ivyEntryId
         ';
 
         if (!empty($criteria['ids'])) {
@@ -1723,7 +1580,7 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find event by id in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find event by id in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         $reformattedData = [];
@@ -1809,9 +1666,379 @@ class EventRepository extends AbstractRepository implements EventRepositoryInter
 
             $rows = $statement->fetch()['count'];
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return $rows;
+    }
+
+    /**
+     * @param array $ids
+     * @return array
+     * @throws QueryExecutionException
+     * @throws InvalidArgumentException
+     */
+    public function getEventsSpotsCount($ids)
+    {
+        $eventsPeriodsTable = EventsPeriodsTable::getTableName();
+
+        $customerBookingsEventsPeriods = CustomerBookingsToEventsPeriodsTable::getTableName();
+
+        $customerBookingsTable = CustomerBookingsTable::getTableName();
+
+        $where = "WHERE ep.eventId IN (" . implode(', ', $ids) . ") AND cb.status IN ('approved', 'pending', 'waiting')";
+
+        try {
+            $statement = $this->connection->prepare(
+                "SELECT
+                t.eventId, t.status, SUM(t.persons) as places
+                FROM (
+                    SELECT
+                    ep.eventId,
+                    cb.id,
+                    cb.status,
+                    cb.persons
+                    FROM {$eventsPeriodsTable} ep
+                    INNER JOIN {$customerBookingsEventsPeriods} cbep ON cbep.eventPeriodId = ep.id
+                    INNER JOIN {$customerBookingsTable} cb ON cb.id = cbep.customerBookingId
+                    {$where}
+                    GROUP BY ep.eventId, cb.id, cb.status
+                ) t
+                GROUP BY t.eventId, t.status"
+            );
+
+            $statement->execute();
+
+            $rows = $statement->fetchAll();
+
+            $result = [];
+
+            foreach ($rows as $row) {
+                $result[$row['eventId']][$row['status']] =
+                    $row['places'] +
+                    (!empty($result[$row['eventId']][$row['status']]) ? $result[$row['eventId']][$row['status']] : 0);
+            }
+        } catch (\Exception $e) {
+            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__, $e->getCode(), $e);
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param array $ids
+     * @return array
+     * @throws QueryExecutionException
+     * @throws InvalidArgumentException
+     */
+    public function getEventsTicketsCount($ids)
+    {
+        $eventsPeriodsTable = EventsPeriodsTable::getTableName();
+
+        $customerBookingsEventsPeriods = CustomerBookingsToEventsPeriodsTable::getTableName();
+
+        $customerBookingsTable = CustomerBookingsTable::getTableName();
+
+        $customerBookingsTicketsTable = CustomerBookingToEventsTicketsTable::getTableName();
+
+        $where = "WHERE ep.eventId IN (" . implode(', ', $ids) . ") AND cb.status IN ('approved', 'pending', 'waiting')";
+
+        try {
+            $statement = $this->connection->prepare(
+                "SELECT
+                t.eventId, t.status, t.eventTicketId, SUM(t.persons) as places
+                FROM (
+                    SELECT
+                    ep.eventId,
+                    cb.id,
+                    cb.status,
+                    cbt.eventTicketId,
+                    cbt.persons
+                    FROM {$eventsPeriodsTable} ep
+                    INNER JOIN {$customerBookingsEventsPeriods} cbep ON cbep.eventPeriodId = ep.id
+                    INNER JOIN {$customerBookingsTable} cb ON cb.id = cbep.customerBookingId
+                    INNER JOIN {$customerBookingsTicketsTable} cbt ON cbt.customerBookingId = cb.id
+                    {$where}
+                    GROUP BY ep.eventId, cb.id, cb.status, cbt.eventTicketId, cbt.persons
+                ) t
+                GROUP BY t.eventId, t.status, t.eventTicketId"
+            );
+
+            $statement->execute();
+
+            $rows = $statement->fetchAll();
+
+            $result = [];
+
+            foreach ($rows as $row) {
+                $result[$row['eventId']][$row['eventTicketId']][$row['status']] =
+                    $row['places'] +
+                    (
+                        !empty($result[$row['eventId']][$row['eventTicketId']][$row['status']])
+                            ? $result[$row['eventId']][$row['eventTicketId']][$row['status']]
+                            : 0
+                    );
+            }
+        } catch (\Exception $e) {
+            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__, $e->getCode(), $e);
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param int $id
+     * @return array
+     * @throws QueryExecutionException
+     * @throws InvalidArgumentException
+     */
+    public function getEventsPaymentsSummary($id)
+    {
+        $eventsPeriodsTable = EventsPeriodsTable::getTableName();
+
+        $customerBookingsEventsPeriods = CustomerBookingsToEventsPeriodsTable::getTableName();
+
+        $customerBookingsTable = CustomerBookingsTable::getTableName();
+
+        $paymentsTable = PaymentsTable::getTableName();
+
+        try {
+            $statementAmount = $this->connection->prepare(
+                "SELECT
+                SUM(t.amount) as amount
+                FROM (
+                    SELECT
+                    cb.id,
+                    p.amount
+                    FROM {$eventsPeriodsTable} ep
+                    INNER JOIN {$customerBookingsEventsPeriods} cbep ON cbep.eventPeriodId = ep.id
+                    INNER JOIN {$customerBookingsTable} cb ON cb.id = cbep.customerBookingId
+                    INNER JOIN {$paymentsTable} p ON p.customerBookingId = cb.id
+                    WHERE ep.eventId = :eventId AND cb.status IN ('approved', 'pending', 'waiting')
+                    GROUP BY cb.id, p.amount
+                ) t"
+            );
+
+            $statementAmount->execute([':eventId' => $id]);
+
+            $rowAmount = $statementAmount->fetch();
+
+            $statementStatus = $this->connection->prepare(
+                "SELECT
+                t.status, COUNT(t.status) as counter
+                FROM (
+                    SELECT
+                    cb.id,
+                    p.status
+                    FROM {$eventsPeriodsTable} ep
+                    INNER JOIN {$customerBookingsEventsPeriods} cbep ON cbep.eventPeriodId = ep.id
+                    INNER JOIN {$customerBookingsTable} cb ON cb.id = cbep.customerBookingId
+                    INNER JOIN {$paymentsTable} p ON p.customerBookingId = cb.id
+                    INNER JOIN (
+                        SELECT customerBookingId, MAX(id) as maxId
+                        FROM {$paymentsTable}
+                        GROUP BY customerBookingId
+                    ) pm ON p.customerBookingId = pm.customerBookingId AND p.id = pm.maxId
+                    WHERE ep.eventId = :eventId AND cb.status IN ('approved', 'pending', 'waiting')
+                    GROUP BY cb.id, p.status
+                ) t
+                GROUP BY t.status"
+            );
+
+            $statementStatus->execute([':eventId' => $id]);
+
+            $rowsStatus = $statementStatus->fetchAll();
+
+            $statementGateway = $this->connection->prepare(
+                "SELECT
+                t.gateway, COUNT(t.gateway) as counter
+                FROM (
+                    SELECT
+                    p.id,
+                    p.gateway
+                    FROM {$eventsPeriodsTable} ep
+                    INNER JOIN {$customerBookingsEventsPeriods} cbep ON cbep.eventPeriodId = ep.id
+                    INNER JOIN {$customerBookingsTable} cb ON cb.id = cbep.customerBookingId
+                    INNER JOIN {$paymentsTable} p ON p.customerBookingId = cb.id
+                    WHERE ep.eventId = :eventId AND cb.status IN ('approved', 'pending', 'waiting')
+                    GROUP BY p.id, p.gateway
+                ) t
+                GROUP BY t.gateway"
+            );
+
+            $statementGateway->execute([':eventId' => $id]);
+
+            $rowsGateway = $statementGateway->fetchAll();
+        } catch (\Exception $e) {
+            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__, $e->getCode(), $e);
+        }
+
+        return [
+            'amount' => $rowAmount['amount'] ? floatval($rowAmount['amount']) : 0,
+            'method' => array_map(
+                'intval',
+                array_column($rowsGateway, 'counter', 'gateway')
+            ),
+            'status'  => array_map(
+                'intval',
+                array_column($rowsStatus, 'counter', 'status')
+            ),
+        ];
+    }
+
+    /**
+     * @param array $ids
+     * @return array
+     * @throws QueryExecutionException
+     * @throws InvalidArgumentException
+     */
+    public function getEventsBookingsStatusesCount($ids)
+    {
+        $eventsPeriodsTable = EventsPeriodsTable::getTableName();
+
+        $customerBookingsEventsPeriods = CustomerBookingsToEventsPeriodsTable::getTableName();
+
+        $customerBookingsTable = CustomerBookingsTable::getTableName();
+
+        $where = "WHERE ep.eventId IN (" . implode(', ', $ids) . ")";
+
+        try {
+            $statement = $this->connection->prepare(
+                "SELECT
+                t.eventId, t.status, COUNT(t.status) as counter
+                FROM (
+                    SELECT
+                    ep.eventId,
+                    cb.id,
+                    cb.status
+                    FROM {$eventsPeriodsTable} ep
+                    INNER JOIN {$customerBookingsEventsPeriods} cbep ON cbep.eventPeriodId = ep.id
+                    INNER JOIN {$customerBookingsTable} cb ON cb.id = cbep.customerBookingId
+                    {$where}
+                    GROUP BY ep.eventId, cb.id, cb.status
+                ) t
+                GROUP BY t.eventId, t.status"
+            );
+
+            $statement->execute();
+
+            $rows = $statement->fetchAll();
+
+            $result = [];
+
+            foreach ($rows as $row) {
+                $result[$row['eventId']][$row['status']] =
+                    $row['counter'] +
+                    (!empty($result[$row['eventId']][$row['status']]) ? $result[$row['eventId']][$row['status']] : 0);
+            }
+        } catch (\Exception $e) {
+            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__, $e->getCode(), $e);
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param string $sort
+     * @return string
+     */
+    private function getOrderBy($sort)
+    {
+        $order = "ORDER BY ep.periodStart";
+        if ($sort) {
+            $column = $sort[0] === '-' ? substr($sort, 1) : $sort;
+            $orderColumn = 'ep.periodStart';
+            switch ($column) {
+                case 'name':
+                    $orderColumn = 'e.name';
+                    break;
+                case 'id':
+                    $orderColumn = 'e.id';
+                    break;
+                case 'bookingOpens':
+                    $orderColumn = 'COALESCE(e.bookingOpens, e.created)';
+                    break;
+                case 'bookingCloses':
+                    $orderColumn = 'COALESCE(e.bookingCloses, ep.periodStart)';
+                    break;
+            }
+
+            $orderDirection = $sort[0] === '-' ? 'DESC' : 'ASC';
+
+            $order = "ORDER BY {$orderColumn} {$orderDirection}";
+        }
+
+        return $order;
+    }
+
+
+    /**
+     * @param Event $event
+     * @param int $visible
+     * @param boolean $applyGlobally
+     * @throws QueryExecutionException
+     * @throws InvalidArgumentException
+     */
+    public function toggleEventVisibility($event, $visible, $applyGlobally)
+    {
+        $params = [
+            ':show' => $visible
+        ];
+
+        if ($applyGlobally) {
+            $params[':id1'] = $event->getId()->getValue();
+            $params[':id2'] = $event->getId()->getValue();
+
+            $where = "WHERE id = :id1 OR parentId = :id2";
+            if ($event->getParentId()) {
+                $params[':id3'] = $event->getId()->getValue();
+                $params[':parentId'] = $event->getParentId()->getValue();
+                $where .= ' OR (id > :id3 AND parentId = :parentId)';
+            }
+        } else {
+            $params[':id'] = $event->getId()->getValue();
+            $where = 'WHERE id = :id';
+        }
+
+        try {
+            $statement = $this->connection->prepare(
+                "UPDATE {$this->table}
+                SET
+                `show` = :show
+                $where"
+            );
+
+            $statement->execute($params);
+
+            return true;
+        } catch (\Exception $e) {
+            throw new QueryExecutionException('Unable to update visibility in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
+        }
+    }
+
+    /**
+     * @param int $organizerId
+     */
+    public function removeOrganizerFromEvents($organizerId)
+    {
+        $params = [
+            ':organizerId' => $organizerId
+        ];
+
+
+        try {
+            $statement = $this->connection->prepare(
+                "UPDATE {$this->table}
+                SET
+                organizerId = NULL
+                WHERE organizerId = :organizerId"
+            );
+
+            $statement->execute($params);
+
+            return true;
+        } catch (\Exception $e) {
+            throw new QueryExecutionException('Unable to remove organizer in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
+        }
     }
 }

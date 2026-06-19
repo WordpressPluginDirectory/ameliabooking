@@ -6,8 +6,7 @@ use AmeliaBooking\Domain\Services\DateTime\DateTimeService;
 use AmeliaBooking\Domain\Services\Settings\SettingsService;
 use AmeliaBooking\Domain\ValueObjects\Number\Integer\LoginType;
 use AmeliaBooking\Infrastructure\Common\Container;
-use AmeliaFirebase\JWT\JWT;
-use Interop\Container\Exception\ContainerException;
+use AmeliaVendor\Firebase\JWT\JWT;
 use DateTime;
 use Exception;
 
@@ -31,12 +30,39 @@ class HelperService
     }
 
     /**
+     * @param array $params
+     *
+     * @return void
+     */
+    public function convertDates(&$params)
+    {
+        if (!empty($params['dates'])) {
+            if (!empty($params['dates'][0])) {
+                $params['dates'][0] .= ' 00:00:00';
+            }
+            if (!empty($params['dates'][1])) {
+                $params['dates'][1] .= ' 23:59:59';
+            }
+
+            if (!empty($params['timeZone'])) {
+                foreach ([0, 1] as $index) {
+                    if (!empty($params['dates'][$index])) {
+                        $params['dates'][$index] = DateTimeService::getDateTimeObjectInTimeZone(
+                            $params['dates'][$index],
+                            $params['timeZone']
+                        )->setTimezone(DateTimeService::getTimeZone())->format('Y-m-d H:i:s');
+                    }
+                }
+            }
+        }
+    }
+
+    /**
      * Returns formatted price based on price plugin settings
      *
      * @param int|float $price
      *
      * @return string
-     * @throws ContainerException
      */
     public function getFormattedPrice($price)
     {
@@ -95,10 +121,10 @@ class HelperService
     }
 
     /**
-     * @param string $email
-     * @param string $secret
-     * @param int    $expireTimeStamp
-     * @param int    $loginType
+     * @param string   $email
+     * @param string   $secret
+     * @param int|null $expireTimeStamp
+     * @param int      $loginType
      *
      * @return mixed
      * @throws Exception
@@ -224,30 +250,46 @@ class HelperService
 
     /**
      * @param string $locale
-     * @param string $entityTranslation
-     * @param string $type
+     * @param array  $entityTranslation
      *
-     * @return array
+     * @return array|null
+     */
+    private function getTranslation($locale, $entityTranslation)
+    {
+        $localeParts = explode('_', $locale);
+
+        if (!array_key_exists($locale, $entityTranslation) && count($localeParts) > 1) {
+            foreach ($entityTranslation as $key => $value) {
+                if (strpos($key, $localeParts[0] . '_') === 0) {
+                    return $value;
+                }
+            }
+        }
+
+        return
+            $entityTranslation &&
+            array_key_exists($locale, $entityTranslation) ?
+                $entityTranslation[$locale] : null;
+    }
+
+    /**
+     * @param string      $locale
+     * @param string      $entityTranslation
+     * @param string|null $type
+     *
+     * @return array|null
      */
     public function getBookingTranslation($locale, $entityTranslation, $type)
     {
         $entityTranslation = !empty($entityTranslation) ? json_decode($entityTranslation, true) : null;
 
-        if ($locale) {
-            if ($type === null) {
-                return
-                    $entityTranslation &&
-                    !empty($entityTranslation[$locale]) ?
-                        $entityTranslation[$locale] : null;
-            } else {
-                return
-                    $entityTranslation &&
-                    !empty($entityTranslation[$type][$locale]) ?
-                        $entityTranslation[$type][$locale] : null;
-            }
-        }
+        $translationScope = $type === null
+            ? $entityTranslation
+            : ($entityTranslation[$type] ?? null);
 
-        return null;
+        return $locale && is_array($translationScope)
+            ? $this->getTranslation($locale, $translationScope)
+            : null;
     }
 
     /**
@@ -263,7 +305,7 @@ class HelperService
 
         $bookingInfo = !empty($bookingInfo) ? json_decode($bookingInfo, true) : null;
 
-        return $bookingInfo && !empty($bookingInfo['locale']) ? $this->getLocaleLanguage($usedLanguages, $bookingInfo['locale'])[0] : null;
+        return $bookingInfo && !empty($bookingInfo['locale']) ? $this->getLocaleLanguage($usedLanguages, $bookingInfo['locale']) : null;
     }
 
     /**
@@ -281,26 +323,32 @@ class HelperService
         $translations = !empty($translations) ? json_decode($translations, true) : null;
 
         return $translations && !empty($translations['defaultLanguage'])
-            ? $this->getLocaleLanguage($usedLanguages, $translations['defaultLanguage'])[0] : null;
+            ? $this->getLocaleLanguage($usedLanguages, $translations['defaultLanguage']) : null;
     }
 
     /**
      * @param array  $usedLanguages
      * @param string $locale
-     * @return array
+     * @return string
      */
     public function getLocaleLanguage($usedLanguages, $locale)
     {
-        $finalLanguages = [];
-        foreach ($usedLanguages as $language) {
-            if (explode('_', $language)[0] === explode('_', $locale)[0]) {
-                $finalLanguages[] = $language;
+        if (!in_array(AMELIA_LOCALE, $usedLanguages)) {
+            $usedLanguages[] = AMELIA_LOCALE;
+        }
+
+        if (in_array($locale, $usedLanguages)) {
+            return $locale;
+        } else {
+            foreach ($usedLanguages as $language) {
+                if (explode('_', $language)[0] === explode('_', $locale)[0]) {
+                    return $language;
+                }
             }
         }
 
-        return empty($finalLanguages) ? [$locale] : $finalLanguages;
+        return $locale;
     }
-
 
     /**
      * @return array

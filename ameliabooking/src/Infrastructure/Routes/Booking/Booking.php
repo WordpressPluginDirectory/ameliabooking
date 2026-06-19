@@ -1,7 +1,7 @@
 <?php
 
 /**
- * @copyright Â© TMS-Plugins. All rights reserved.
+ * @copyright Â© Melograno Ventures. All rights reserved.
  * @licence   See COPYING.md for license details.
  */
 
@@ -48,7 +48,7 @@ class Booking
 
         $app->post('/bookings', AddBookingController::class);
 
-        $app->get('/bookings/ics/{id:[0-9]+}', GetIcsController::class)->setOutputBuffering(false);
+        $app->get('/bookings/ics/{id:[0-9]+}', GetIcsController::class);
 
         $app->post('/bookings/success/{id:[0-9]+}', SuccessfulBookingController::class);
 

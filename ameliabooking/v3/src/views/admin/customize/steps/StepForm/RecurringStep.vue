@@ -1,15 +1,21 @@
 <template>
-  <div class="am-fs__rs" :class="[{'am-fs__rs-mobile': checkScreen}, props.globalClass]" :style="cssVars">
-    <template v-if="amCustomize[pageRenderKey].recurringStep.options.heading.visibility">
+  <div
+    class="am-fs__rs"
+    :class="[{ 'am-fs__rs-mobile': checkScreen }, props.globalClass]"
+    :style="cssVars"
+  >
+    <template
+      v-if="amCustomize[pageRenderKey].recurringStep.options.heading.visibility"
+    >
       <p>{{ labelsDisplay('recurrence') }}</p>
-      <span class="am-fa__rs-light">{{ labelsDisplay('recurrence_choosing_time') }}</span>
+      <span class="am-fa__rs-light">{{
+        labelsDisplay('recurrence_choosing_time')
+      }}</span>
     </template>
     <p>{{ `${labelsDisplay('repeat_every')}:` }}</p>
     <div class="am-fs__rs-every">
-      <AmInputNumber v-model="repeatInterval" :min="1" :max="100"/>
-      <AmSelect
-        v-model="repeatType"
-      >
+      <AmInputNumber v-model="repeatInterval" :min="1" :max="100" />
+      <AmSelect v-model="repeatType">
         <AmOption
           v-for="(type, i) in repeatTypes"
           :key="i"
@@ -24,7 +30,11 @@
         <div
           v-for="(day, i) in weekDays"
           :key="i"
-          :class="{'am-fs__rs-on-week-selected' : weekDays.find(i => i.value === day.value).selected}"
+          :class="{
+            'am-fs__rs-on-week-selected': weekDays.find(
+              (i) => i.value === day.value
+            ).selected,
+          }"
           @click="selectWeekDay(day.value)"
         >
           {{ day.label }}
@@ -45,14 +55,16 @@
       </div>
     </div>
     <p>{{ `${labelsDisplay('recurrence_ends')}:` }}</p>
-    <span class="am-fa__rs-light">{{ labelsDisplay('recurrence_choose_ends') }}</span>
+    <span class="am-fa__rs-light">{{
+      labelsDisplay('recurrence_choose_ends')
+    }}</span>
     <div class="am-fs__rs-ends">
       <div class="am-fs__rs-ends-choose">
-        <AmRadioGroup
-          v-model="occurrenceType"
-        >
+        <AmRadioGroup v-model="occurrenceType">
           <AmRadio value="on">{{ labelsDisplay('recurrence_on') }}</AmRadio>
-          <AmRadio value="after">{{ labelsDisplay('recurrence_after') }}</AmRadio>
+          <AmRadio value="after">{{
+            labelsDisplay('recurrence_after')
+          }}</AmRadio>
         </AmRadioGroup>
       </div>
       <div class="am-fs__rs-ends-options">
@@ -76,39 +88,57 @@
     <div class="am-fs__rs-summary">
       <p>{{ `${labelsDisplay('appointment_repeats')}:` }}</p>
       <p>
-        {{labelsDisplay('recurrence_every')}} {{ repeatInterval }} {{ repeatTypes.find((item) => item.value === repeatType) ? repeatTypes.find((item) => item.value === repeatType).label : '' }}
-        <span v-if="repeatType === 'weekly'" class="am-fa__rs-light">{{ labelsDisplay('repeats_on') }} {{ weekDays.filter(i => i.enabled).join(', ') }},</span>
-        <span v-if="repeatType === 'monthly'" class="am-fa__rs-light">{{ labelsDisplay('repeats_on') }}  {{ monthlyTypes[repeatMonthly].label }} <span v-if="repeatMonthly !== 0" class="am-fa__rs-light"></span>,</span>
-        <span class="am-fa__rs-light"> {{ labelsDisplay('repeats_from') }} {{ moment().format('YYYY-MM-DD') }} {{ labelsDisplay('repeats_at') }}  {{ moment().format('hh:mm') }}</span>
+        {{ labelsDisplay('recurrence_every') }} {{ repeatInterval }}
+        {{
+          repeatTypes.find((item) => item.value === repeatType)
+            ? repeatTypes.find((item) => item.value === repeatType).label
+            : ''
+        }}
+        <span v-if="repeatType === 'weekly'" class="am-fa__rs-light"
+          >{{ labelsDisplay('repeats_on') }}
+          {{ weekDays.filter((i) => i.enabled).join(', ') }},</span
+        >
+        <span
+          v-if="repeatType === 'monthly'" class="am-fa__rs-light"
+        >
+          {{ `${labelsDisplay('repeats_on')} ${monthlyTypes[repeatMonthly].label}, ` }}
+        </span>
+        <span class="am-fa__rs-light">
+          {{ labelsDisplay('repeats_from') }}
+          {{ moment().format('YYYY-MM-DD') }} {{ labelsDisplay('repeats_at') }}
+          {{ moment().format('hh:mm') }}</span
+        >
       </p>
       <p>
-        <span v-if="occurrenceType === 'after'" class="am-fa__rs-light">{{ labelsDisplay('number_of_recurrences') }} {{ occurrenceCount }}</span>
-        <span v-else class="am-fa__rs-light">{{ labelsDisplay('ends_on') }} {{ occurrenceDate }}</span>
+        <span v-if="occurrenceType === 'after'" class="am-fa__rs-light"
+          >{{ labelsDisplay('number_of_recurrences') }}
+          {{ occurrenceCount }}</span
+        >
+        <span v-else class="am-fa__rs-light"
+          >{{ labelsDisplay('ends_on') }} {{ occurrenceDate }}</span
+        >
       </p>
     </div>
   </div>
 </template>
 
 <script setup>
-import moment from "moment";
-import AmInputNumber from "../../../../_components/input-number/AmInputNumber.vue";
-import AmSelect from "../../../../_components/select/AmSelect.vue";
-import AmOption from "../../../../_components/select/AmOption.vue";
-import AmRadioGroup from "../../../../_components/radio/AmRadioGroup.vue";
-import AmRadio from "../../../../_components/radio/AmRadio.vue";
-import AmDatePickerFull from "../../../../_components/date-picker-full/AmDatePickerFull.vue";
-import {
-  computed,
-  ref,
-  inject,
-} from "vue";
+import moment from 'moment'
+import AmInputNumber from '../../../../_components/input-number/AmInputNumber'
+import AmSelect from '../../../../_components/select/AmSelect'
+import AmOption from '../../../../_components/select/AmOption'
+import AmRadioGroup from '../../../../_components/radio/AmRadioGroup'
+import AmRadio from '../../../../_components/radio/AmRadio'
+import AmDatePickerFull from '../../../../_components/date-picker-full/AmDatePickerFull.vue'
+import { computed, ref, inject } from 'vue'
 import { useColorTransparency } from '../../../../../assets/js/common/colorManipulation.js'
+import { useReactiveCustomize } from '../../../../../assets/js/admin/useReactiveCustomize.js'
 
 let props = defineProps({
   globalClass: {
     type: String,
-    default: ''
-  }
+    default: '',
+  },
 })
 
 // Container Width
@@ -119,15 +149,21 @@ let langKey = inject('langKey')
 let amLabels = inject('labels')
 
 let pageRenderKey = inject('pageRenderKey')
-let amCustomize = inject('customize')
+const { amCustomize } = useReactiveCustomize()
 
 // * Label computed function
-function labelsDisplay (label) {
+function labelsDisplay(label) {
   let computedLabel = computed(() => {
-    return amCustomize.value[pageRenderKey.value].recurringStep.translations
-    && amCustomize.value[pageRenderKey.value].recurringStep.translations[label]
-    && amCustomize.value[pageRenderKey.value].recurringStep.translations[label][langKey.value]
-      ? amCustomize.value[pageRenderKey.value].recurringStep.translations[label][langKey.value]
+    return amCustomize.value[pageRenderKey.value].recurringStep.translations &&
+      amCustomize.value[pageRenderKey.value].recurringStep.translations[
+        label
+      ] &&
+      amCustomize.value[pageRenderKey.value].recurringStep.translations[label][
+        langKey.value
+      ]
+      ? amCustomize.value[pageRenderKey.value].recurringStep.translations[
+          label
+        ][langKey.value]
       : amLabels[label]
   })
 
@@ -152,9 +188,21 @@ let repeatMonthly = ref(0)
 
 const repeatTypes = computed(() => {
   return [
-    {label: labelsDisplay('recurrence_day'), labelPlural: labelsDisplay('recurrence_days'), value: 'daily'},
-    {label: labelsDisplay('recurrence_week'), labelPlural: labelsDisplay('recurrence_weeks'), value: 'weekly'},
-    {label: labelsDisplay('recurrence_month'), labelPlural: labelsDisplay('recurrence_months'), value: 'monthly'}
+    {
+      label: labelsDisplay('recurrence_day'),
+      labelPlural: labelsDisplay('recurrence_days'),
+      value: 'daily',
+    },
+    {
+      label: labelsDisplay('recurrence_week'),
+      labelPlural: labelsDisplay('recurrence_weeks'),
+      value: 'weekly',
+    },
+    {
+      label: labelsDisplay('recurrence_month'),
+      labelPlural: labelsDisplay('recurrence_months'),
+      value: 'monthly',
+    },
   ]
 })
 
@@ -162,42 +210,42 @@ const monthlyTypes = computed(() => {
   return [
     {
       label: labelsDisplay('recurrence_specific_date'),
-      value: 0
+      value: 0,
     },
     {
       label: labelsDisplay('recurrence_first'),
-      value: 1
+      value: 1,
     },
     {
       label: labelsDisplay('recurrence_second'),
-      value: 2
+      value: 2,
     },
     {
       label: labelsDisplay('recurrence_third'),
-      value: 3
+      value: 3,
     },
     {
       label: labelsDisplay('recurrence_fourth'),
-      value: 4
+      value: 4,
     },
     {
       label: labelsDisplay('recurrence_last'),
-      value: 5
-    }
+      value: 5,
+    },
   ]
 })
 
 const weekDays = ref([
-  {label: 'Mon', value: 'monday', selected: false},
-  {label: 'Tue', value: 'tuesday', selected: false},
-  {label: 'Wed', value: 'wednesday', selected: false},
-  {label: 'Thu', value: 'thursday', selected: false},
-  {label: 'Fri', value: 'friday', selected: false},
-  {label: 'Sat', value: 'saturday', selected: false},
-  {label: 'Sun', value: 'sunday', selected: false}
+  { label: 'Mon', value: 'monday', selected: false },
+  { label: 'Tue', value: 'tuesday', selected: false },
+  { label: 'Wed', value: 'wednesday', selected: false },
+  { label: 'Thu', value: 'thursday', selected: false },
+  { label: 'Fri', value: 'friday', selected: false },
+  { label: 'Sat', value: 'saturday', selected: false },
+  { label: 'Sun', value: 'sunday', selected: false },
 ])
 
-function selectedOccurrenceDate (data) {
+function selectedOccurrenceDate(data) {
   occurrenceDate.value = data
 }
 
@@ -207,8 +255,8 @@ function selectedOccurrenceDate (data) {
  * Navigation *
  *************/
 
-function selectWeekDay (value) {
-  let weekDay = weekDays.value.find(i => i.value === value)
+function selectWeekDay(value) {
+  let weekDay = weekDays.value.find((i) => i.value === value)
   weekDay.selected = !weekDay.selected
 }
 
@@ -217,7 +265,10 @@ let amColors = inject('amColors')
 let cssVars = computed(() => {
   return {
     '--am-c-rs-text': amColors.value.colorMainText,
-    '--am-c-rs-text-op60': useColorTransparency(amColors.value.colorMainText, 0.6),
+    '--am-c-rs-text-op60': useColorTransparency(
+      amColors.value.colorMainText,
+      0.6
+    ),
     '--am-c-rs-bgr': amColors.value.colorMainBgr,
     '--am-c-rs-primary': amColors.value.colorPrimary,
     '--am-c-rs-inp-border': amColors.value.colorInpBorder,
@@ -235,7 +286,7 @@ export default {
     stepSelectedData: [],
     finished: false,
     selected: false,
-  }
+  },
 }
 </script>
 
@@ -248,7 +299,11 @@ export default {
         $count: 10;
         @for $i from 0 through $count {
           &:nth-child(#{$i + 1}) {
-            animation: 600ms cubic-bezier(.45,1,.4,1.2) #{$i*100}ms am-animation-slide-up;
+            animation: 600ms
+              cubic-bezier(0.45, 1, 0.4, 1.2)
+              #{$i *
+              100}ms
+              am-animation-slide-up;
             animation-fill-mode: both;
           }
         }
@@ -339,7 +394,8 @@ export default {
                 display: flex;
                 align-items: center;
 
-                .el-radio__input, .el-radio__label {
+                .el-radio__input,
+                .el-radio__label {
                   align-self: center;
                 }
               }
@@ -356,7 +412,7 @@ export default {
 
           .am-input-wrapper {
             max-width: 174px;
-            width: 100%
+            width: 100%;
           }
         }
 
@@ -382,13 +438,14 @@ export default {
         }
       }
       &-summary {
-        p, span {
+        p,
+        span {
           font-weight: 400;
           font-size: 14px;
           line-height: 20px;
           /* $shade-600 */
           color: var(--am-c-rs-text-op60);
-          margin: 0
+          margin: 0;
         }
       }
 
@@ -410,7 +467,6 @@ export default {
         }
 
         .am-fs__rs-ends {
-
           &-after {
             .am-input-wrapper {
               max-width: 40px;

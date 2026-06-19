@@ -43,12 +43,13 @@
             <AmOption
               v-for="item in customers"
               :key="item.id"
-              :disabled="
-                employeeService?.maxCapacity === appointmentCapacity &&
-                customersForm.customersIds.indexOf(item.id) === -1
-              "
+              :disabled="disableCustomerOption(item.id)"
               :value="item.id"
-              :label="item.email && customerEmailVisibility ? item.email : item.firstName + ' ' + item.lastName"
+              :label="
+                item.email && customerEmailVisibility
+                  ? item.email
+                  : item.firstName + ' ' + item.lastName
+              "
             >
               <div class="am-cap__cust-option">
                 <div class="am-cap__cust-option__heading">
@@ -82,7 +83,10 @@
         prefix="plus"
         icon="plus"
         :icon-only="pageWidth <= 540"
-        :disabled="employeeService?.maxCapacity === appointmentCapacity"
+        :disabled="
+          employeeService?.maxCapacity === appointmentCapacity &&
+          !hasWaitingListCapacity()
+        "
         @click="addCustomer"
       >
         {{ amLabels.new_customer }}
@@ -111,18 +115,22 @@
           :parent-class="`am-capai-cuf__bulk-status ${props.responsiveClass}`"
           :prefix-icon="
             bulkBookingStatus
-              ? bookingStatuses.find((i) => i.value === bulkBookingStatus).icon
+              ? getBookingStatuses(true).find(
+                  (i) => i.value === bulkBookingStatus
+                )?.icon
               : 'circle-empty'
           "
           :prefix-icon-color="
             bulkBookingStatus
-              ? bookingStatuses.find((i) => i.value === bulkBookingStatus).color
+              ? getBookingStatuses(true).find(
+                  (i) => i.value === bulkBookingStatus
+                )?.color
               : 'var(--am-c-select-text-op40)'
           "
           @change="bulkChangeStatus"
         >
           <AmOption
-            v-for="item in bookingStatuses"
+            v-for="item in getBookingStatuses(true)"
             :key="item.value"
             :value="item.value"
             :label="item.label"
@@ -191,22 +199,23 @@
           <AmSelect
             v-model="item.status"
             :prefix-icon="
-              bookingStatuses.find((i) => i.value === item.status).icon
+              getBookingStatuses(false).find((i) => i.value === item.status)
+                ?.icon
             "
             :prefix-icon-color="
-              bookingStatuses.find((i) => i.value === item.status).color
+              getBookingStatuses(false).find((i) => i.value === item.status)
+                ?.color
             "
             popper-class="am-capai-cuf__popper"
             size="small"
+            append-to=".am-fs__main-content"
             @change="(value) => changeBookingStatus(index, value)"
           >
             <AmOption
-              v-for="status in bookingStatuses"
+              v-for="status in getBookingStatuses(false)"
               :key="status.value"
               :value="status.value"
-              :label="
-                bookingStatuses.find((i) => i.value === item.status).label
-              "
+              :label="status.label"
             >
               <span
                 :class="`am-icon-${status.icon}`"
@@ -229,15 +238,13 @@
             prefix-icon="users"
             prefix-icon-color="var(--am-c-card-text)"
             size="small"
+            append-to=".am-fs__main-content"
             @change="(value) => changeBookingPersons(index, value)"
           >
             <AmOption
-              v-for="persons in employeeService?.maxCapacity"
+              v-for="persons in personsRange(item)"
               :key="persons"
-              :disabled="
-                appointmentCapacity - item.persons + persons >
-                employeeService?.maxCapacity
-              "
+              :disabled="disablePersonsOption(item, persons)"
               :value="persons"
               :label="persons"
             />
@@ -297,19 +304,13 @@
 
 <script setup>
 // * Import from Vue
-import {
-  computed,
-  ref,
-  inject,
-  onMounted
-} from 'vue'
+import { computed, ref, inject, onMounted } from 'vue'
 
 // * Import Store
 import { useStore } from 'vuex'
 import httpClient from '../../../../../../plugins/axios'
 
 // * Import Composable
-import { useAuthorizationHeaderObject } from '../../../../../../assets/js/public/panel'
 import { useFrontendCustomer } from '../../../../../../assets/js/common/customer'
 import {
   useFocusCustomers,
@@ -407,15 +408,86 @@ let customers = computed(() => store.getters['customerInfo/getCustomers'])
 // * Bulk Booking Status
 let bulkBookingStatus = ref(amSettings.general.defaultAppointmentStatus)
 
-// * Booking Statuses
-let bookingStatuses = computed(() => {
-  return useStatuses().filter((i) =>
-    !store.getters['appointment/getId']
-      ? (i.value === 'approved' || i.value === 'pending') &&
-        i.value !== 'no-show'
-      : i.value !== 'waiting'
+// * Service settings
+const serviceSettings = computed(() => {
+  try {
+    return employeeService.value?.settings
+      ? JSON.parse(employeeService.value.settings)
+      : null
+  } catch (e) {
+    return null
+  }
+})
+
+// * Waiting List settings
+const isWaitingListEnabled = computed(() => {
+  return !!(
+    amSettings.featuresIntegrations?.waitingListAppointments?.enabled &&
+    serviceSettings.value?.waitingList?.enabled
   )
 })
+
+// * Capacities (regular and waiting list)
+const regularMaxCapacity = computed(
+  () => employeeService.value?.maxCapacity || 0
+)
+const waitingListMaxCapacity = computed(() => {
+  if (!isWaitingListEnabled.value) return 0
+  return serviceSettings.value?.waitingList?.maxCapacity || 0
+})
+
+// Count current bookings by status
+const currentRegularCount = computed(() => {
+  return (store.getters['appointment/getBookings'] || [])
+    .filter((b) => b.status === 'approved' || b.status === 'pending')
+    .reduce((acc, b) => acc + (b.persons || 1), 0)
+})
+const currentWaitingCount = computed(() => {
+  return (store.getters['appointment/getBookings'] || [])
+    .filter((b) => b.status === 'waiting')
+    .reduce((acc, b) => acc + (b.persons || 1), 0)
+})
+
+// * Disable logic for customer select option
+function disableCustomerOption(customerId) {
+  // If already selected, never disable (user can remove)
+  if (customersForm.value.customersIds.indexOf(customerId) !== -1) {
+    return false
+  }
+  // Remaining regular capacity?
+  const hasRegularSpace = currentRegularCount.value < regularMaxCapacity.value
+  if (hasRegularSpace) {
+    return false
+  }
+  // If no regular space, check waiting list
+  return !hasWaitingListCapacity()
+}
+
+function hasWaitingListCapacity() {
+  if (isWaitingListEnabled.value) {
+    return currentWaitingCount.value < waitingListMaxCapacity.value
+  }
+
+  return false
+}
+
+// * Booking Statuses
+function getBookingStatuses(isGroup) {
+  const hasId = !!store.getters['appointment/getId']
+  const statuses = useStatuses()
+  const allowedStatuses = ['approved', 'pending'].concat(
+    isWaitingListEnabled.value ? ['waiting'] : []
+  )
+
+  let list = statuses
+  if (!hasId) {
+    list = statuses.filter((s) => allowedStatuses.includes(s.value))
+  }
+  if (isGroup || !isWaitingListEnabled.value) {
+    list = list.filter((s) => s.value !== 'waiting')
+  }
+  return list
+}
 
 // * Customers For Display
 let customersForDisplay = computed(() => {
@@ -429,17 +501,33 @@ let customersForDisplay = computed(() => {
 let addEditCustomerDialogVisibility = ref(false)
 
 function addedCustomer(customer) {
-  store.commit(
-    'customerInfo/setCustomersIds',
-    [customer.id].concat(store.getters['customerInfo/getCustomersIds'])
-  )
+  const existingIds = store.getters['customerInfo/getCustomersIds']
+  const isExisting = existingIds.includes(customer.id)
 
-  store.commit(
-    'customerInfo/setCustomers',
-    [customer].concat(store.getters['customerInfo/getCustomers'])
-  )
+  if (!isExisting) {
+    store.commit(
+      'customerInfo/setCustomersIds',
+      [customer.id].concat(existingIds)
+    )
+  }
 
-  selectCustomer()
+  const existingCustomers = store.getters['customerInfo/getCustomers']
+  const customerIndex = existingCustomers.findIndex((c) => c.id === customer.id)
+
+  if (customerIndex !== -1) {
+    const updatedCustomers = [...existingCustomers]
+    updatedCustomers[customerIndex] = customer
+    store.commit('customerInfo/setCustomers', updatedCustomers)
+  } else {
+    store.commit(
+      'customerInfo/setCustomers',
+      [customer].concat(existingCustomers)
+    )
+  }
+
+  if (!isExisting) {
+    selectCustomer()
+  }
 }
 
 // * Select Customer
@@ -469,18 +557,40 @@ function selectCustomer() {
 
       changedCapacity = store.getters['appointment/getBookings'].length > 1
 
+      // Determine status with capacity & waiting list logic
+      let defaultStatus =
+        settings &&
+        'general' in settings &&
+        'defaultAppointmentStatus' in settings.general
+          ? settings.general.defaultAppointmentStatus
+          : amSettings.general.defaultAppointmentStatus
+
+      // recompute current counts (not reactive inside loop)
+      let regCount = (store.getters['appointment/getBookings'] || [])
+        .filter((b) => b.status === 'approved' || b.status === 'pending')
+        .reduce((acc, b) => acc + (b.persons || 1), 0)
+      let waitCount = (store.getters['appointment/getBookings'] || [])
+        .filter((b) => b.status === 'waiting')
+        .reduce((acc, b) => acc + (b.persons || 1), 0)
+
+      let statusToSet = defaultStatus
+      if (regCount >= regularMaxCapacity.value) {
+        // No regular space, attempt waiting list
+        if (
+          isWaitingListEnabled.value &&
+          waitCount < waitingListMaxCapacity.value
+        ) {
+          statusToSet = 'waiting'
+        }
+      }
+
       store.getters['appointment/getBookings'].push(
         Object.assign(
           {
             id: null,
             customer: customers.value.find((c) => c.id === parseInt(id)),
             persons: 1,
-            status:
-              settings &&
-              'general' in settings &&
-              'defaultAppointmentStatus' in settings.general
-                ? settings.general.defaultAppointmentStatus
-                : amSettings.general.defaultAppointmentStatus,
+            status: statusToSet,
             duration: Object.keys(
               employeeService.value.customPricing.durations
             )[0],
@@ -556,17 +666,11 @@ function editCustomer(id) {
   addEditCustomerDialogVisibility.value = true
 
   httpClient
-    .get(
-      '/users/customers/' + id,
-      Object.assign(
-        {
-          params: {
-            source: 'cabinet-provider',
-          },
-        },
-        useAuthorizationHeaderObject(store)
-      )
-    )
+    .get('/users/customers/' + id, {
+      params: {
+        source: 'cabinet-provider',
+      },
+    })
     .then((response) => {
       store.commit(
         'customerInfo/setCustomer',
@@ -611,14 +715,91 @@ function bulkChangeStatus(status) {
 
 // * Change Booking Status
 function changeBookingStatus(index, value) {
-  store.commit('appointment/setBookingStatus', { index, value })
+  // Capacity-aware status change
+  const booking = store.getters['appointment/getBookings'][index]
+  if (!booking) return
+
+  if (value === 'waiting') {
+    // Allow moving to waiting if waiting capacity permits
+    if (
+      isWaitingListEnabled.value &&
+      currentWaitingCount.value -
+        (booking.status === 'waiting' ? booking.persons || 1 : 0) +
+        (booking.persons || 1) <=
+        waitingListMaxCapacity.value
+    ) {
+      store.commit('appointment/setBookingStatus', { index, value })
+    }
+    return
+  }
+
+  // Moving to regular (approved/pending)
+  const prospectiveRegularCount =
+    currentRegularCount.value -
+    (booking.status === 'approved' || booking.status === 'pending'
+      ? booking.persons || 1
+      : 0) +
+    (booking.persons || 1)
+  if (prospectiveRegularCount <= regularMaxCapacity.value) {
+    store.commit('appointment/setBookingStatus', { index, value })
+  }
 }
 
 // * ChangeBookingPersons
 function changeBookingPersons(index, value) {
-  store.commit('appointment/setBookingPersons', { index, value })
+  const booking = store.getters['appointment/getBookings'][index]
+  if (!booking) return
+  const oldPersons = booking.persons || 1
+  const delta = value - oldPersons
+  if (delta === 0) return
 
-  emits('changedSlotCondition')
+  if (booking.status === 'waiting') {
+    if (currentWaitingCount.value + delta <= waitingListMaxCapacity.value) {
+      store.commit('appointment/setBookingPersons', { index, value })
+      emits('changedSlotCondition')
+    }
+    return
+  }
+  // Regular booking
+  if (currentRegularCount.value + delta <= regularMaxCapacity.value) {
+    store.commit('appointment/setBookingPersons', { index, value })
+    emits('changedSlotCondition')
+  }
+}
+
+// * Persons range depending on status & waiting list settings
+function personsRange(booking) {
+  if (booking.status === 'waiting' && isWaitingListEnabled.value) {
+    const wl = serviceSettings.value?.waitingList || {}
+    if (wl.maxExtraPeopleEnabled) {
+      return Array.from({ length: wl.maxExtraPeople }, (_, i) => i + 1)
+    }
+    // When extra people feature not enabled, only 1 person allowed on waiting booking
+    return [1]
+  }
+  // regular booking
+  return Array.from({ length: regularMaxCapacity.value }, (_, i) => i + 1)
+}
+
+// * Disable persons option based on remaining capacity buckets
+function disablePersonsOption(booking, personsValue) {
+  if (booking.status === 'waiting') {
+    // Calculate waiting persons if this booking were set to personsValue
+    const otherWaiting = (store.getters['appointment/getBookings'] || [])
+      .filter((b) => b !== booking && b.status === 'waiting')
+      .reduce((acc, b) => acc + (b.persons || 1), 0)
+    const newTotal = otherWaiting + personsValue
+    return newTotal > waitingListMaxCapacity.value
+  }
+  // Regular status
+  const otherRegular = (store.getters['appointment/getBookings'] || [])
+    .filter(
+      (b) =>
+        b !== booking && (b.status === 'approved' || b.status === 'pending')
+    )
+    .reduce((acc, b) => acc + (b.persons || 1), 0)
+  const newTotal = otherRegular + personsValue
+  return newTotal > regularMaxCapacity.value
 }
 
 // * Change Booking Duration
@@ -900,6 +1081,14 @@ defineExpose({
   [class^='am-icon-'] {
     font-size: 24px;
     line-height: 0;
+  }
+
+  .am-icon-info-reverse,
+  .am-icon-close,
+  .am-icon-refresh,
+  .am-icon-check {
+    font-size: 18px;
+    padding: 3px;
   }
 
   .el-select-dropdown__item {

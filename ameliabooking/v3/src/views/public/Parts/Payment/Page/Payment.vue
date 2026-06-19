@@ -51,13 +51,17 @@
           <div
             v-if="available && Object.keys(availablePayments).filter(item => availablePayments[item]).length > 1"
             :key="gateway"
+            tabindex="0"
+            role="button"
             class="am-payments__method-button"
             :class="[{'am-payments__method-button__selected' : paymentGateway === gateway }, responsiveClass, `am-payments__method-button-${paymentList.length}`]"
+            :aria-label="`${getPaymentBtnString(gateway)} ${amLabels.payment_button || 'payment button'}`"
             @click="setPaymentGateway(gateway)"
+            @keydown.enter.space.prevent="setPaymentGateway(gateway)"
           >
             <img
               v-if="available"
-              :src="`${baseUrls.wpAmeliaPluginURL}/v3/src/assets/img/icons/${gateway === 'mollie' || gateway === 'wc' ? 'stripe' : gateway}.svg`"
+              :src="`${baseUrls.wpAmeliaPluginURL}/v3/src/assets/img/icons/${gateway === 'wc' ? 'online' : gateway}.svg`"
               :alt="gateway"
               :class="gateway"
             >
@@ -429,7 +433,9 @@ function getPaymentBtnString (key) {
       return amLabels['stripe']
     case 'razorpay':
       return amLabels['razorpay']
-    case 'mollie': case 'wc':
+    case 'mollie':
+      return amLabels['mollie']
+    case 'wc':
       return amLabels['on_line']
     case 'barion':
       return amLabels['barion']
@@ -573,6 +579,11 @@ export default {
         flex-direction: column;
         justify-items: center;
         height: fit-content;
+
+        &:focus {
+          border: 1px solid var(--am-c-ps-primary);
+          box-shadow: 0 1px 1px var(--am-c-ps-primary-op06);
+        }
 
         img {
           height: 24px;

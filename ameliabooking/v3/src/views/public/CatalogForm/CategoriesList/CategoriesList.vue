@@ -121,7 +121,9 @@ import {
   ref,
   computed,
   inject,
-  reactive, onMounted
+  reactive,
+  onMounted,
+  onBeforeUnmount,
 } from "vue";
 
 // * Store
@@ -145,9 +147,6 @@ let ameliaContainer = ref(null)
 // * Plugin wrapper width
 let containerWidth = ref(0)
 
-// * window resize listener
-window.addEventListener('resize', resize);
-
 // * resize function
 function resize() {
   if (ameliaContainer.value) {
@@ -156,9 +155,15 @@ function resize() {
 }
 
 onMounted(() => {
+  window.addEventListener('resize', resize)
+
   if (ameliaContainer.value) {
     containerWidth.value = ameliaContainer.value.offsetWidth
   }
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', resize)
 })
 
 let itemWidth = computed(() => {
@@ -234,7 +239,7 @@ let langDetection = computed(() => amSettings.general.usedLanguages.includes(loc
 let amLabels = computed(() => {
   let computedLabels = reactive({...labels})
 
-  if (amSettings.customizedData && amSettings.customizedData.cbf && amSettings.customizedData.cbf.categoriesList.translations) {
+  if (amSettings.customizedData?.cbf?.categoriesList?.translations) {
     let customizedLabels = amSettings.customizedData.cbf.categoriesList.translations
     Object.keys(customizedLabels).forEach(labelKey => {
       if (customizedLabels[labelKey][localLanguage.value] && langDetection.value) {

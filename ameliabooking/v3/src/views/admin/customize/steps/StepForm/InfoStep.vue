@@ -1,21 +1,22 @@
 <template>
   <div class="am-fs__main-content am-fs__info">
-
     <!-- Social Buttons -->
-    <div v-if="!licence.isLite && !licence.isStarter">
+    <div v-if="features.googleSocialLogin || features.facebookSocialLogin">
       <div class="am-fs__info-social-wrapper">
         <div class="am-fs__info-social-wrapper__label">
           {{ labelsDisplay('auto_fill_your_details') }}
         </div>
         <div class="am-fs__info-social-wrapper__social-buttons">
-          <img :src="baseUrls.wpAmeliaPluginURL + '/v3/src/assets/img/icons/google.svg'" alt="Google">
-          <img :src="baseUrls.wpAmeliaPluginURL + '/v3/src/assets/img/icons/facebook.svg'" alt="Facebook">
+          <img v-if="features.googleSocialLogin" :src="baseUrls.wpAmeliaPluginURL + '/v3/src/assets/img/icons/google.svg'" alt="Google">
+          <img v-if="features.facebookSocialLogin" :src="baseUrls.wpAmeliaPluginURL + '/v3/src/assets/img/icons/facebook.svg'" alt="Facebook">
         </div>
       </div>
 
       <!-- Social Divider -->
       <div class="am-fs__info-social-divider">
-        <span class="par-sm">{{ labelsDisplay('or_enter_details_below') }}</span>
+        <span class="par-sm">{{
+          labelsDisplay('or_enter_details_below')
+        }}</span>
       </div>
       <!-- /Social Divider -->
     </div>
@@ -27,15 +28,22 @@
       :rules="rules"
       label-position="top"
       class="am-fs__info-form"
-      :class="{'am-fs__info-form-mobile': checkScreen}"
+      :class="{ 'am-fs__info-form-mobile': checkScreen }"
     >
-      <template v-for="item in amCustomize[pageRenderKey].infoStep.order" :key="item.id">
+      <template
+        v-for="item in amCustomize[pageRenderKey].infoStep.order"
+        :key="item.id"
+      >
         <component :is="formFields[item.id]"></component>
       </template>
 
 
       <el-form-item
-          v-if="amSettings.mailchimp.subscribeFieldVisible && amCustomize[pageRenderKey].infoStep.options.email.visibility"
+          v-if="
+            amSettings.featuresIntegrations.mailchimp.enabled &&
+            amSettings.mailchimp.subscribeFieldVisible &&
+            amCustomize[pageRenderKey].infoStep.options.email.visibility
+          "
           class="am-fs__info-form__item am-subscribe"
       >
         <AmCheckbox
@@ -53,15 +61,19 @@ import FirstNameFormField from '../../fields/FirstNameFormField.vue'
 import LastNameFormField from '../../fields/LastNameFormField.vue'
 import EmailFormField from '../../fields/EmailFormField.vue'
 import PhoneFormField from '../../fields/PhoneFormField.vue'
-
-import {ref, inject, provide, computed, markRaw} from 'vue'
 import AmCheckbox from '../../../../_components/checkbox/AmCheckbox.vue'
+import { useReactiveCustomize } from '../../../../../assets/js/admin/useReactiveCustomize.js'
+
+import { ref, inject, provide, computed, markRaw } from 'vue'
 
 let langKey = inject('langKey')
 let amLabels = inject('labels')
 
 let pageRenderKey = inject('pageRenderKey')
-let amCustomize = inject('customize')
+const { amCustomize } = useReactiveCustomize()
+
+// * Features
+let features = inject('features')
 
 // * Plugin Licence
 let licence = inject('licence')
@@ -69,12 +81,16 @@ let licence = inject('licence')
 let baseUrls = inject('baseUrls')
 
 // * Label computed function
-function labelsDisplay (label) {
+function labelsDisplay(label) {
   let computedLabel = computed(() => {
-    return amCustomize.value[pageRenderKey.value].infoStep.translations
-    && amCustomize.value[pageRenderKey.value].infoStep.translations[label]
-    && amCustomize.value[pageRenderKey.value].infoStep.translations[label][langKey.value]
-      ? amCustomize.value[pageRenderKey.value].infoStep.translations[label][langKey.value]
+    return amCustomize.value[pageRenderKey.value].infoStep.translations &&
+      amCustomize.value[pageRenderKey.value].infoStep.translations[label] &&
+      amCustomize.value[pageRenderKey.value].infoStep.translations[label][
+        langKey.value
+      ]
+      ? amCustomize.value[pageRenderKey.value].infoStep.translations[label][
+          langKey.value
+        ]
       : amLabels[label]
   })
 
@@ -110,28 +126,34 @@ let rules = computed(() => {
         required: true,
         message: labelsDisplay('enter_first_name_warning'),
         trigger: ['blur', 'submit'],
-      }
+      },
     ],
     lastName: [
       {
-        required: amCustomize.value[pageRenderKey.value].infoStep.options.lastName.required,
+        required:
+          amCustomize.value[pageRenderKey.value].infoStep.options.lastName
+            .required,
         message: labelsDisplay('enter_last_name_warning'),
         trigger: ['blur', 'submit'],
-      }
+      },
     ],
     email: [
       {
-        required: amCustomize.value[pageRenderKey.value].infoStep.options.email.required,
+        required:
+          amCustomize.value[pageRenderKey.value].infoStep.options.email
+            .required,
         message: labelsDisplay('enter_valid_email_warning'),
         trigger: ['blur', 'submit'],
-      }
+      },
     ],
     phone: [
       {
-        required: amCustomize.value[pageRenderKey.value].infoStep.options.phone.required,
+        required:
+          amCustomize.value[pageRenderKey.value].infoStep.options.phone
+            .required,
         message: labelsDisplay('enter_phone_warning'),
         trigger: ['blur', 'submit'],
-      }
+      },
     ],
   }
 })
@@ -141,7 +163,7 @@ let formFields = ref({
   firstName: markRaw(FirstNameFormField),
   lastName: markRaw(LastNameFormField),
   email: markRaw(EmailFormField),
-  phone: markRaw(PhoneFormField)
+  phone: markRaw(PhoneFormField),
 })
 </script>
 
@@ -155,7 +177,7 @@ export default {
     stepSelectedData: [],
     finished: false,
     selected: false,
-  }
+  },
 }
 </script>
 
@@ -194,7 +216,7 @@ export default {
           gap: 24px;
 
           img {
-            border: 1px solid #D1D5D7;
+            border: 1px solid #d1d5d7;
             padding: 8px;
             border-radius: 4px;
             height: 40px;
@@ -211,7 +233,7 @@ export default {
         // Before & After
         &:before,
         &:after {
-          background: var(--shade-250, #D1D5D7);
+          background: var(--shade-250, #d1d5d7);
           content: '';
           height: 1px;
           width: 100%;
@@ -223,7 +245,7 @@ export default {
           font-style: normal;
           font-weight: 400;
           line-height: 24px;
-          color: var(--shade-500, #808A90);
+          color: var(--shade-500, #808a90);
           margin-left: 8px;
           margin-right: 8px;
         }
@@ -238,7 +260,11 @@ export default {
           $count: 4;
           @for $i from 0 through $count {
             &:nth-child(#{$i + 1}) {
-              animation: 600ms cubic-bezier(.45,1,.4,1.2) #{$i*100}ms am-animation-slide-up;
+              animation: 600ms
+                cubic-bezier(0.45, 1, 0.4, 1.2)
+                #{$i *
+                100}ms
+                am-animation-slide-up;
               animation-fill-mode: both;
             }
           }

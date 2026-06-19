@@ -44,6 +44,7 @@ import {
   nextTick,
   computed,
   onMounted,
+  onBeforeUnmount,
 } from 'vue'
 
 // * import from Vuex
@@ -56,6 +57,7 @@ import useRestore from '../../../assets/js/public/restore'
 import useAction from '../../../assets/js/public/actions'
 import { useAvailableCategories } from '../../../assets/js/public/catalog'
 import { useRenderAction } from '../../../assets/js/public/renderActions'
+import { getStickyOrFixedHeaderHeight } from '@/assets/js/common/utilHeaderHeight'
 
 // * Plugin Licence
 let licence = inject('licence')
@@ -73,9 +75,6 @@ const baseUrls = inject('baseUrls')
 let containerWidth = ref(0)
 provide('containerWidth', containerWidth)
 
-// * window resize listener
-window.addEventListener('resize', resize)
-
 // * resize function
 function resize() {
   if (ameliaContainer.value) {
@@ -84,6 +83,9 @@ function resize() {
 }
 
 onMounted(() => {
+  // * window resize listener
+  window.addEventListener('resize', resize)
+
   store.commit('shortcodeParams/setForm', 'catalogForm')
 
   document
@@ -99,6 +101,10 @@ onMounted(() => {
   useRenderAction('scrollForm', {
     offsetFromTop,
   })
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', resize)
 })
 
 // * Empty State
@@ -127,7 +133,7 @@ store.dispatch('entities/getEntities', {
     'taxes',
   ],
   licence: licence,
-  loadEntities: shortcodeData.value.hasApiCall || shortcodeData.value.in_dialog,
+  loadEntities: shortcodeData.value.hasApiCall || shortcodeData.value.trigger,
   showHidden: false,
   isPanel: false,
 })
@@ -152,11 +158,17 @@ provide('itemType', itemType)
 
 watch(itemType, () => {
   if (itemType.value === 'appointment') {
-    pagesArray.value.push(categoryService)
+    pagesArray.value = pagesArray.value.filter((p) => p !== categoryPackage)
+    if (!pagesArray.value.includes(categoryService)) {
+      pagesArray.value.push(categoryService)
+    }
   }
 
   if (itemType.value === 'package') {
-    pagesArray.value.push(categoryPackage)
+    pagesArray.value = pagesArray.value.filter((p) => p !== categoryService)
+    if (!pagesArray.value.includes(categoryPackage)) {
+      pagesArray.value.push(categoryPackage)
+    }
   }
 
   if (itemType.value === '') {
@@ -190,31 +202,39 @@ function iOS() {
 
 function nextPage() {
   pageIndex.value = pageIndex.value + 1
-  if (iOS()) {
-    setTimeout(() => {
-      let scrollHeightElement =
-        ameliaContainer.value.getBoundingClientRect().top +
-        window.pageYOffset -
-        offsetFromTop.value
-      window.scrollTo({
-        top: scrollHeightElement,
-        behavior: 'smooth',
-      })
-    }, 500)
-  } else {
-    let scrollHeightElement =
+
+  const measureAndScroll = () => {
+    if (!ameliaContainer.value) {
+      return
+    }
+
+    let headerHeight = getStickyOrFixedHeaderHeight({
+      root: document.body,
+    })
+
+    let scrollTop =
       ameliaContainer.value.getBoundingClientRect().top +
       window.pageYOffset -
-      offsetFromTop.value
+      offsetFromTop.value -
+      headerHeight
+
     window.scrollTo({
-      top: scrollHeightElement,
+      top: Math.max(0, scrollTop),
       behavior: 'smooth',
     })
   }
+
+  nextTick(() => {
+      if (iOS()) {
+      setTimeout(measureAndScroll, 500)
+    } else {
+      measureAndScroll()
+    }
+  })
 }
 
 function previousPage() {
-  pageIndex.value = pageIndex.value - 1
+  pageIndex.value = Math.max(pageIndex.value - 1, 0)
 }
 
 provide('changingPageFunctions', {

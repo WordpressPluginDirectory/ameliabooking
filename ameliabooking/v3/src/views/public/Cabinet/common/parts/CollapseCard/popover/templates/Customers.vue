@@ -10,12 +10,16 @@
       <div class="am-cc__customers-item">
         <div class="am-cc__customers-item_inner">
           <span class="am-cc__customers-name">
+            <span
+              v-if="item.bookingStatus === 'waiting'"
+              class="am-icon-clock am-cc__customers-waiting"
+            ></span>
             {{ item.firstName }} {{ item.lastName }}
           </span>
-          <span class="am-cc__customers-info">
+          <span v-if="!customizedOptions || customizedOptions.appointments.options.customerEmail.visibility" class="am-cc__customers-info">
             {{ item.email }}
           </span>
-          <span class="am-cc__customers-info">
+          <span v-if="!customizedOptions || customizedOptions.appointments.options.customerPhone.visibility" class="am-cc__customers-info">
             {{ item.phone }}
           </span>
         </div>
@@ -37,6 +41,10 @@ import { useResponsiveClass } from "../../../../../../../../assets/js/common/res
 let props = defineProps({
   data: {
     type: [Array, Object, String]
+  },
+  customizedOptions: {
+    type: Object,
+    required: true
   }
 })
 
@@ -83,6 +91,12 @@ export default {
       line-height: 1.428571429;
       color: var(--am-c-cc-text);
       margin: 0 0 4px;
+    }
+
+    &-waiting {
+      margin-right: 2px;
+      color: var(--am-c-cc-warning, #ffa500);
+      font-size: 18px;
     }
 
     &-info {

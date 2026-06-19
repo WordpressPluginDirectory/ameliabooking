@@ -11,15 +11,10 @@ use AmeliaBooking\Domain\Common\Exceptions\InvalidArgumentException;
  */
 final class DiscountFixedValue
 {
-    /**
-     * @var string
-     */
-    private $value;
+    private float $value;
 
     /**
-     * DiscountFixedValue constructor.
-     *
-     * @param string $value
+     * @param mixed $value
      *
      * @throws InvalidArgumentException
      */
@@ -40,12 +35,7 @@ final class DiscountFixedValue
         $this->value = (float)$value;
     }
 
-    /**
-     * Return the value from the value object
-     *
-     * @return string
-     */
-    public function getValue()
+    public function getValue(): float
     {
         return $this->value;
     }

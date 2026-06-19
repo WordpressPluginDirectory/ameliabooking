@@ -1,7 +1,7 @@
 <?php
 
 /**
- * @copyright © TMS-Plugins. All rights reserved.
+ * @copyright © Melograno Ventures. All rights reserved.
  * @licence   See LICENCE.md for license details.
  */
 
@@ -17,6 +17,35 @@ use AmeliaBooking\Infrastructure\WP\Integrations\WooCommerce\WooCommerceService;
 class HelperService
 {
     public static $jsVars = [];
+
+    /**
+     * Determine whether the site is using SSL.
+     *
+     * Supports setups behind reverse proxies where SSL is terminated
+     * before traffic reaches WordPress/PHP.
+     */
+    public static function isSSL(): bool
+    {
+        if (function_exists('is_ssl') && is_ssl()) {
+            return true;
+        }
+
+        if (isset($_SERVER['HTTP_X_FORWARDED_PROTO'])) {
+            $forwardedProtos = explode(',', (string)$_SERVER['HTTP_X_FORWARDED_PROTO']);
+            if (in_array('https', $forwardedProtos)) {
+                return true;
+            }
+        }
+
+        if (
+            function_exists('get_option') &&
+            'https' === parse_url((string)get_option('siteurl'), PHP_URL_SCHEME)
+        ) {
+            return true;
+        }
+
+        return false;
+    }
 
     /**
      * Helper method to add PHP vars to JS vars

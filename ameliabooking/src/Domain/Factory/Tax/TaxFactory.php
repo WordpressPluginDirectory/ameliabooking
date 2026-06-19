@@ -1,7 +1,7 @@
 <?php
 
 /**
- * @copyright © TMS-Plugins. All rights reserved.
+ * @copyright © Melograno Ventures. All rights reserved.
  * @licence   See LICENCE.md for license details.
  */
 
@@ -148,7 +148,7 @@ class TaxFactory
                 $taxes[$taxId] = [
                     'id'          => $taxId,
                     'name'        => $row['tax_name'],
-                    'amount'      => $row['tax_amount'],
+                    'amount'      => (float)$row['tax_amount'],
                     'type'        => $row['tax_type'],
                     'status'      => $row['tax_status'],
                     'allServices' => $row['tax_allServices'],

@@ -9,14 +9,14 @@ use AmeliaBooking\Domain\Entity\User\Provider;
 use AmeliaBooking\Domain\Factory\User\ProviderFactory;
 use AmeliaBooking\Domain\Repository\User\ProviderRepositoryInterface;
 use AmeliaBooking\Domain\Services\DateTime\DateTimeService;
+use AmeliaBooking\Domain\ValueObjects\String\DayOffType;
 use AmeliaBooking\Domain\ValueObjects\String\Status;
 use AmeliaBooking\Infrastructure\Common\Exceptions\QueryExecutionException;
 use AmeliaBooking\Infrastructure\Connection;
 use AmeliaBooking\Infrastructure\Licence\Licence;
 use AmeliaBooking\Infrastructure\WP\InstallActions\DB\Bookable\ExtrasTable;
 use AmeliaBooking\Infrastructure\WP\InstallActions\DB\Booking\AppointmentsTable;
-use AmeliaBooking\Infrastructure\WP\InstallActions\DB\Coupon\CouponsTable;
-use AmeliaBooking\Infrastructure\WP\InstallActions\DB\Coupon\CouponsToServicesTable;
+use AmeliaBooking\Infrastructure\Licence\LicenceConstants;
 use AmeliaBooking\Infrastructure\WP\InstallActions\DB\User\WPUsersTable;
 
 /**
@@ -161,7 +161,7 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
     /**
      * @param int $id
      *
-     * @return Provider
+     * @return Provider|null
      * @throws QueryExecutionException
      */
     public function getById($id)
@@ -177,10 +177,13 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
                     u.email AS user_email,
                     u.note AS note,
                     u.phone AS phone,
+                    u.countryPhoneIso AS user_countryPhoneIso,
                     u.pictureFullPath AS picture_full_path,
                     u.pictureThumbPath AS picture_thumb_path,
                     u.zoomUserId AS user_zoom_user_id,
                     u.appleCalendarId as user_apple_calendar_id,
+                    u.googleCalendarId as user_google_calendar_id,
+                    u.outlookCalendarId as user_outlook_calendar_id,
                     u.employeeAppleCalendar as user_employee_apple_calendar,
                     u.stripeConnect AS user_stripeConnect,
                     u.translations AS user_translations,
@@ -189,9 +192,17 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
                     gd.id AS google_calendar_id,
                     gd.token AS google_calendar_token,
                     gd.calendarId AS google_calendar_calendar_id,
+                    gd.insertPendingAppointments AS google_calendar_insert_pending_appointments,
+                    gd.includeBufferTime AS google_calendar_include_buffer_time,
+                    gd.title AS google_calendar_title,
+                    gd.description AS google_calendar_description,
                     od.id AS outlook_calendar_id,
                     od.token AS outlook_calendar_token,
-                    od.calendarId AS outlook_calendar_calendar_id
+                    od.calendarId AS outlook_calendar_calendar_id,
+                    od.insertPendingAppointments AS outlook_calendar_insert_pending_appointments,
+                    od.includeBufferTime AS outlook_calendar_include_buffer_time,
+                    od.title AS outlook_calendar_title,
+                    od.description AS outlook_calendar_description
                 FROM {$this->table} u
                 LEFT JOIN {$this->providersGoogleCalendarTable} gd ON gd.userId = u.id
                 LEFT JOIN {$this->providersOutlookCalendarTable} od ON od.userId = u.id
@@ -218,7 +229,7 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
                 $this->parseUserRow($row, $providerRows, $serviceRows, $providerServiceRows);
             }
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return call_user_func([static::FACTORY, 'createCollection'], $providerRows, $serviceRows, $providerServiceRows)->getItem($id);
@@ -242,10 +253,13 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
                     u.email AS user_email,
                     u.note AS note,
                     u.phone AS phone,
+                    u.countryPhoneIso AS user_countryPhoneIso,
                     u.pictureFullPath AS picture_full_path,
                     u.pictureThumbPath AS picture_thumb_path,
                     u.translations AS user_translations,
                     u.badgeId AS user_badge_id,
+                    u.googleCalendarId as user_google_calendar_id,
+                    u.outlookCalendarId as user_outlook_calendar_id,
                     lt.locationId AS user_locationId
                 FROM {$this->table} u
                 LEFT JOIN {$this->providerLocationTable} lt ON lt.userId = u.id
@@ -267,7 +281,7 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
                 $this->parseUserRow($row, $providerRows, $serviceRows, $providerServiceRows);
             }
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return call_user_func([static::FACTORY, 'createCollection'], $providerRows, $serviceRows, $providerServiceRows);
@@ -283,6 +297,9 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
      */
     public function getFiltered($criteria, $itemsPerPage)
     {
+        // Apply Lite license restriction
+        $criteria = $this->applyLiteLicenseRestriction($criteria);
+
         try {
             $wpUserTable = WPUsersTable::getTableName();
 
@@ -290,7 +307,7 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
 
             $order = '';
             if (!empty($criteria['sort'])) {
-                $orderColumn    = 'CONCAT(u.firstName, " ", u.lastName)';
+                $orderColumn    = 'CONCAT(u.firstName, \' \', u.lastName)';
                 $orderDirection = $criteria['sort'][0] === '-' ? 'DESC' : 'ASC';
                 $order          = "ORDER BY {$orderColumn} {$orderDirection}";
             }
@@ -298,17 +315,33 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
             $where = [];
 
             if (!empty($criteria['search'])) {
-                $params[':search1'] = $params[':search2'] = $params[':search3'] = $params[':search4'] =
-                    "%{$criteria['search']}%";
+                $terms = preg_split('/\s+/', trim($criteria['search']));
+                $termIndex = 0;
+                $where1 = [];
 
+                foreach ($terms as $term) {
+                    $param = ":search{$termIndex}";
+                    $params[$param] = "%{$term}%";
+
+                    $where1[] = "(
+                        u.firstName LIKE {$param}
+                        OR u.lastName LIKE {$param}
+                        OR u.email LIKE {$param}
+                        OR u.phone LIKE {$param}
+                        OR u.note LIKE {$param}
+                        OR wpUser.display_name LIKE {$param}
+                        OR u.id LIKE {$param}
+                    )";
+
+                    $termIndex++;
+                }
+
+                $where1 = implode(' AND ', $where1);
                 $where[] = "u.id IN(
                     SELECT DISTINCT(user.id)
                         FROM {$this->table} user
                         LEFT JOIN {$wpUserTable} wpUser ON user.externalId = wpUser.ID
-                        WHERE (CONCAT(user.firstName, ' ', user.lastName) LIKE :search1
-                            OR wpUser.display_name LIKE :search2
-                            OR user.email LIKE :search3
-                            OR user.note LIKE :search4)
+                        WHERE ({$where1})
                     )";
             }
 
@@ -325,6 +358,12 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
                     SELECT pst.userId FROM {$this->providerServicesTable} pst
                     WHERE pst.userId = u.id AND pst.serviceId IN (" . implode(', ', $queryServices) . ')
                 )';
+            }
+
+            if (!empty($criteria['providerStatus'])) {
+                $params[':providerStatus'] = $criteria['providerStatus'];
+
+                $where[] = 'u.status = :providerStatus';
             }
 
             if (!empty($criteria['providers'])) {
@@ -355,7 +394,7 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
 
             $where[] = "u.status NOT LIKE 'disabled'";
 
-            $where = $where ? ' AND ' . implode(' AND ', $where) : '';
+            $where = ' AND ' . implode(' AND ', $where);
 
             $limit = $this->getLimit(
                 !empty($criteria['page']) ? (int)$criteria['page'] : 0,
@@ -374,7 +413,7 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to get data from ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to get data from ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         $items = new Collection();
@@ -389,13 +428,17 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
     /**
      *
      * @param array $criteria
+     * @param bool  $filterForLicence
      *
      * @return Collection
      * @throws QueryExecutionException
      * @throws InvalidArgumentException
      */
-    public function getWithSchedule($criteria)
+    public function getWithSchedule($criteria, $filterForLicence = true)
     {
+        // Apply Lite license restriction
+        $criteria = $filterForLicence ? $this->applyLiteLicenseRestriction($criteria) : $criteria;
+
         $providerRows = [];
 
         $serviceRows = [];
@@ -440,6 +483,35 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
             }
         }
 
+        if (!empty($criteria['locations'])) {
+            $queryLocations = [];
+
+            foreach ((array)$criteria['locations'] as $index => $value) {
+                $param            = ':location' . $index;
+                $queryLocations[] = $param;
+                $params[$param]   = $value;
+            }
+
+            $where[] = "u.id IN (
+                    SELECT plt.userId FROM {$this->providerLocationTable} plt
+                    WHERE plt.userId = u.id AND plt.locationId IN ( " . implode(', ', $queryLocations) . "))";
+        }
+
+        if (!empty($criteria['services'])) {
+            $queryServices = [];
+
+            foreach ((array)$criteria['services'] as $index => $value) {
+                $param           = ':service' . $index;
+                $queryServices[] = $param;
+                $params[$param]  = $value;
+            }
+
+            $where[] = "u.id IN (
+                    SELECT pst.userId FROM {$this->providerServicesTable} pst
+                    WHERE pst.userId = u.id AND pst.serviceId IN (" . implode(', ', $queryServices) . ')
+                )';
+        }
+
         if ($queryProviders) {
             $where[] = 'u.id IN (' . implode(', ', $queryProviders) . ')';
         }
@@ -457,12 +529,12 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
 
             $userParams[':to1'] = $userParams[':to2'] = $userParams[':to3'] = $criteria['dates'][1];
         } elseif (isset($criteria['dates'][0])) {
-            $dotJoinQuery = "AND (dot.repeat = 1 OR dot.startDate >= :from1 OR dot.endDate >= :from2)";
+            $dotJoinQuery = "AND (dot.repeat = 1 OR (dot.startDate >= :from1 OR dot.endDate >= :from2))";
 
             $userParams[':from1'] = $userParams[':from2'] = $criteria['dates'][0];
         }
 
-        $where = $where ? 'WHERE ' . implode(' AND ', $where) : '';
+        $where = 'WHERE ' . implode(' AND ', $where);
 
         try {
             $statement = $this->connection->prepare(
@@ -475,6 +547,8 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
                     u.email AS user_email,
                     u.zoomUserId AS user_zoom_user_id,
                     u.appleCalendarId AS user_apple_calendar_id,
+                    u.googleCalendarId as user_google_calendar_id,
+                    u.outlookCalendarId as user_outlook_calendar_id,
                     u.employeeAppleCalendar AS user_employee_apple_calendar,
                     u.stripeConnect AS user_stripeConnect,
                     u.countryPhoneIso AS user_countryPhoneIso,
@@ -497,11 +571,12 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
                     dot.name AS dayOff_name,
                     dot.startDate AS dayOff_startDate,
                     dot.endDate AS dayOff_endDate,
-                    dot.repeat AS dayOff_repeat
+                    dot.repeat AS dayOff_repeat,
+                    dot.type AS dayOff_type
                 FROM {$this->table} u
                 LEFT JOIN {$this->providerServicesTable} pst ON pst.userId = u.id
                 LEFT JOIN {$this->providerLocationTable} plt ON plt.userId = u.id
-                LEFT JOIN {$this->providerDayOffTable} dot ON dot.userId = u.id {$dotJoinQuery}
+                LEFT JOIN {$this->providerDayOffTable} dot ON (dot.userId = u.id OR dot.userId IS null) {$dotJoinQuery}
                 {$where}
                 ORDER BY CONCAT(u.firstName, ' ', u.lastName), u.id"
             );
@@ -512,7 +587,7 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
                 $this->parseUserRow($row, $providerRows, $serviceRows, $providerServiceRows);
             }
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         /** @var Collection $providers */
@@ -562,7 +637,7 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
                 $this->parseUserRow($row, $providerRows, $serviceRows, $providerServiceRows);
             }
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         /** @var Collection $providersWithWeekDays */
@@ -624,7 +699,8 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
                 LEFT JOIN {$this->providerSpecialDayPeriodTable} sdpt ON sdpt.specialDayId = sdt.id
                 LEFT JOIN {$this->providerSpecialDayPeriodServiceTable} sdpst ON sdpst.periodId = sdpt.id
                 LEFT JOIN {$this->providerSpecialDayPeriodLocationTable} sdplt ON sdplt.periodId = sdpt.id
-                {$where}"
+                {$where}
+                ORDER BY sdt.startDate ASC"
             );
 
             $statement->execute($sdtParams);
@@ -633,7 +709,7 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
                 $this->parseUserRow($row, $providerRows, $serviceRows, $providerServiceRows);
             }
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         /** @var Collection $providersWithSpecialDays */
@@ -661,9 +737,17 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
                         gd.id AS google_calendar_id,
                         gd.token AS google_calendar_token,
                         gd.calendarId AS google_calendar_calendar_id,
+                        gd.insertPendingAppointments AS google_calendar_insert_pending_appointments,
+                        gd.includeBufferTime AS google_calendar_include_buffer_time,
+                        gd.title AS google_calendar_title,
+                        gd.description AS google_calendar_description,
                         od.id AS outlook_calendar_id,
                         od.token AS outlook_calendar_token,
-                        od.calendarId AS outlook_calendar_calendar_id
+                        od.calendarId AS outlook_calendar_calendar_id,
+                        od.insertPendingAppointments AS outlook_calendar_insert_pending_appointments,
+                        od.includeBufferTime AS outlook_calendar_include_buffer_time,
+                        od.title AS outlook_calendar_title,
+                        od.description AS outlook_calendar_description
                     FROM {$this->table} u
                     LEFT JOIN {$this->providersGoogleCalendarTable} gd ON gd.userId = u.id
                     LEFT JOIN {$this->providersOutlookCalendarTable} od ON od.userId = u.id
@@ -676,7 +760,7 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
                     $this->parseUserRow($row, $providerRows, $serviceRows, $providerServiceRows);
                 }
             } catch (\Exception $e) {
-                throw new QueryExecutionException('Unable to find by id in ' . __CLASS__, $e->getCode(), $e);
+                throw new QueryExecutionException('Unable to find by id in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
             }
 
             /** @var Collection $providersWithCalendars */
@@ -704,7 +788,7 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
             }
         }
 
-        return Licence::getEmployees($providers);
+        return $providers;
     }
 
     /**
@@ -715,6 +799,9 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
      */
     public function getCount($criteria)
     {
+        // Apply Lite license restriction
+        $criteria = $this->applyLiteLicenseRestriction($criteria);
+
         $params = [
             ':type'          => AbstractUser::USER_ROLE_PROVIDER,
             ':visibleStatus' => Status::VISIBLE,
@@ -727,17 +814,33 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
             $where = [];
 
             if (!empty($criteria['search'])) {
-                $params[':search1'] = $params[':search2'] = $params[':search3'] = $params[':search4'] =
-                    "%{$criteria['search']}%";
+                $terms = preg_split('/\s+/', trim($criteria['search']));
+                $termIndex = 0;
+                $where1 = [];
 
+                foreach ($terms as $term) {
+                    $param = ":search{$termIndex}";
+                    $params[$param] = "%{$term}%";
+
+                    $where1[] = "(
+                        u.firstName LIKE {$param}
+                        OR u.lastName LIKE {$param}
+                        OR u.email LIKE {$param}
+                        OR u.phone LIKE {$param}
+                        OR u.note LIKE {$param}
+                        OR wpUser.display_name LIKE {$param}
+                        OR u.id LIKE {$param}
+                    )";
+
+                    $termIndex++;
+                }
+
+                $where1 = implode(' AND ', $where1);
                 $where[] = "u.id IN(
                     SELECT DISTINCT(user.id)
                         FROM {$this->table} user
                         LEFT JOIN {$wpUserTable} wpUser ON user.externalId = wpUser.ID
-                        WHERE (CONCAT(user.firstName, ' ', user.lastName) LIKE :search1
-                            OR wpUser.display_name LIKE :search2
-                            OR user.email LIKE :search3
-                            OR user.note LIKE :search4)
+                        WHERE ({$where1})
                     )";
             }
 
@@ -770,6 +873,18 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
                     WHERE plt.userId = u.id AND plt.locationId IN ( " . implode(', ', $queryLocations) . "))";
             }
 
+            if (!empty($criteria['providers'])) {
+                $queryProviders = [];
+
+                foreach ((array)$criteria['providers'] as $index => $value) {
+                    $param            = ':provider' . $index;
+                    $queryProviders[] = $param;
+                    $params[$param]   = $value;
+                }
+
+                $where[] = 'u.id IN (' . implode(', ', $queryProviders) . ')';
+            }
+
             $where = $where ? ' AND ' . implode(' AND ', $where) : '';
 
             $statement = $this->connection->prepare(
@@ -782,7 +897,7 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
 
             $row = $statement->fetch()['count'];
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to get data from ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to get data from ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return $row;
@@ -872,7 +987,7 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
                 $this->parseUserRow($row, $providerRows, $serviceRows, $providerServiceRows);
             }
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return call_user_func([static::FACTORY, 'createCollection'], $providerRows, $serviceRows, $providerServiceRows);
@@ -938,7 +1053,7 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         $result = [];
@@ -1002,7 +1117,7 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         $result = [];
@@ -1061,7 +1176,7 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         $result = [];
@@ -1084,6 +1199,7 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
         $params = [
             ':type'        => AbstractUser::USER_ROLE_PROVIDER,
             ':currentDate' => $currentDateTime,
+            ':dayOffType'  => DayOffType::DAY_OFF
         ];
 
         try {
@@ -1096,7 +1212,7 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
                 dot.endDate,
                 dot.name
               FROM {$this->table} u
-              LEFT JOIN {$this->providerDayOffTable} dot ON dot.userId = u.id
+              LEFT JOIN {$this->providerDayOffTable} dot ON dot.userId = u.id AND dot.type = :dayOffType
               WHERE u.type = :type AND
               :currentDate BETWEEN dot.startDate AND dot.endDate"
             );
@@ -1105,7 +1221,7 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         $result = [];
@@ -1132,20 +1248,17 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
         $appointmentTable = AppointmentsTable::getTableName();
 
         $params = [];
-
-        $where = [];
+        $where  = [];
 
         if ($criteria['dates']) {
             $where[] = "(a.bookingStart BETWEEN :bookingFrom AND :bookingTo)";
 
             $params[':bookingFrom'] = DateTimeService::getCustomDateTimeInUtc($criteria['dates'][0]);
-
-            $params[':bookingTo'] = DateTimeService::getCustomDateTimeInUtc($criteria['dates'][1]);
+            $params[':bookingTo']   = DateTimeService::getCustomDateTimeInUtc($criteria['dates'][1]);
         }
 
         if (isset($criteria['status'])) {
-            $where[] = 'u.status = :status';
-
+            $where[]           = 'u.status = :status';
             $params[':status'] = $criteria['status'];
         }
 
@@ -1167,7 +1280,7 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to get data from ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to get data from ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         $result = [];
@@ -1191,20 +1304,16 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
     public function getAllNumberOfViews($criteria)
     {
         $params = [];
-
-        $where = [];
+        $where  = [];
 
         if ($criteria['dates']) {
-            $where[] = "(pv.date BETWEEN :bookingFrom AND :bookingTo)";
-
-            $params[':bookingFrom'] = explode(' ', $criteria['dates'][0])[0];
-
-            $params[':bookingTo'] = explode(' ', $criteria['dates'][1])[0];
+            $where[] = "(DATE_FORMAT(pv.date, '%Y-%m-%d') BETWEEN :bookingFrom AND :bookingTo)";
+            $params[':bookingFrom'] = DateTimeService::getCustomDateTimeInUtc($criteria['dates'][0]);
+            $params[':bookingTo']   = DateTimeService::getCustomDateTimeInUtc($criteria['dates'][1]);
         }
 
         if (isset($criteria['status'])) {
-            $where[] = 'u.status = :status';
-
+            $where[]           = 'u.status = :status';
             $params[':status'] = $criteria['status'];
         }
 
@@ -1226,7 +1335,7 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to get data from ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to get data from ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         $result = [];
@@ -1241,7 +1350,7 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
     /**
      * @param $providerId
      *
-     * @return string
+     * @return bool
      * @throws QueryExecutionException
      */
     public function addViewStats($providerId)
@@ -1283,26 +1392,62 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
                 );
             }
 
-            $response = $statement->execute($params);
+            $statement->execute($params);
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to add data in ' . __CLASS__, $e->getCode(), $e);
-        }
-
-        if (!$response) {
-            throw new QueryExecutionException('Unable to add data in ' . __CLASS__);
+            throw new QueryExecutionException('Unable to add data in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return true;
     }
 
     /**
+     * @param array $serviceIds
      *
      * @return array
      * @throws QueryExecutionException
      */
-    public function getProvidersServices()
+    public function getProvidersServices($serviceIds = [])
     {
+        // Apply Lite license restriction
+        $criteria = $this->applyLiteLicenseRestriction([]);
+
         try {
+            $type = AbstractUser::USER_ROLE_PROVIDER;
+
+            $params = [
+                ':type' => $type
+            ];
+
+            $where = 'WHERE u.type = :type';
+
+            // Apply provider restriction for Lite license
+            if (!empty($criteria['providers'])) {
+                $queryProviders = [];
+
+                foreach ((array)$criteria['providers'] as $index => $value) {
+                    $param = ':provider' . $index;
+                    $queryProviders[] = $param;
+                    $params[$param] = $value;
+                }
+
+                $where .= ' AND u.id IN (' . implode(', ', $queryProviders) . ')';
+            }
+
+            if (!empty($serviceIds)) {
+                $query = [];
+
+                foreach ((array)$serviceIds as $index => $value) {
+                    $param = ':serviceId' . $index;
+
+                    $query[] = $param;
+
+                    $params[$param] = $value;
+                }
+
+                $where .= ' AND st.serviceId IN (' . implode(', ', $query) . ')';
+            }
+
+
             $statement = $this->connection->prepare(
                 "SELECT
                     u.id AS user_id,
@@ -1313,19 +1458,15 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
                     st.maxCapacity AS service_maxCapacity
                 FROM {$this->table} u
                 INNER JOIN {$this->providerServicesTable} st ON st.userId = u.id
-                WHERE u.type = :type
+                {$where}
                 ORDER BY CONCAT(u.firstName, ' ', u.lastName)"
             );
 
-            $type = AbstractUser::USER_ROLE_PROVIDER;
-
-            $statement->bindParam(':type', $type);
-
-            $statement->execute();
+            $statement->execute($params);
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         $result = [];
@@ -1398,36 +1539,80 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
                 'pictureThumbPath' => isset($row['picture_thumb_path']) ? $row['picture_thumb_path'] : null,
                 'translations'     => $row['user_translations'],
                 'googleCalendar'   => [],
+                'outlookCalendar'  => [],
                 'weekDayList'      => [],
                 'dayOffList'       => [],
+                'blockTimeList'    => [],
                 'specialDayList'   => [],
                 'serviceList'      => [],
                 'timeZone'         => isset($row['user_timeZone']) ? $row['user_timeZone'] : null,
                 'badgeId'          => isset($row['badge_id']) ? $row['badge_id'] : null,
                 'appleCalendarId'  => isset($row['user_apple_calendar_id']) ? $row['user_apple_calendar_id'] : null,
+                'googleCalendarId' => isset($row['user_google_calendar_id']) ? $row['user_google_calendar_id'] : null,
+                'outlookCalendarId' => isset($row['user_outlook_calendar_id']) ? $row['user_outlook_calendar_id'] : null,
                 'employeeAppleCalendar' => isset($row['user_employee_apple_calendar']) ? $row['user_employee_apple_calendar'] : null,
                 'show'             => isset($row['user_show']) ? $row['user_show'] : 0,
             ];
         }
 
+        $rowGoogleCalendarId = isset($row['google_calendar_calendar_id']) ? $row['google_calendar_calendar_id'] : null;
+
         if (
             $googleCalendarId &&
             array_key_exists($userId, $providerRows) &&
-            empty($providerRows[$userId]['googleCalendar'])
+            (
+                empty($providerRows[$userId]['googleCalendar']) ||
+                (
+                    empty($providerRows[$userId]['googleCalendar']['calendarId']) &&
+                    !empty($rowGoogleCalendarId)
+                )
+            )
         ) {
             $providerRows[$userId]['googleCalendar']['id']         = $row['google_calendar_id'];
             $providerRows[$userId]['googleCalendar']['token']      = $row['google_calendar_token'];
-            $providerRows[$userId]['googleCalendar']['calendarId'] = isset($row['google_calendar_calendar_id']) ? $row['google_calendar_calendar_id'] : null;
+            $providerRows[$userId]['googleCalendar']['calendarId'] = $rowGoogleCalendarId;
+            $providerRows[$userId]['googleCalendar']['insertPendingAppointments'] = isset($row['google_calendar_insert_pending_appointments']) ?
+                $row['google_calendar_insert_pending_appointments'] :
+                null;
+            $providerRows[$userId]['googleCalendar']['includeBufferTime'] = isset($row['google_calendar_include_buffer_time']) ?
+                $row['google_calendar_include_buffer_time'] :
+                null;
+            $providerRows[$userId]['googleCalendar']['title'] = isset($row['google_calendar_title']) && $row['google_calendar_title'] ?
+                json_decode($row['google_calendar_title'], true) :
+                ['appointment' => '%service_name%', 'event' => '%event_name%'];
+            $providerRows[$userId]['googleCalendar']['description'] = isset($row['google_calendar_description']) && $row['google_calendar_description'] ?
+                json_decode($row['google_calendar_description'], true) :
+                ['appointment' => '', 'event' => ''];
         }
+
+        $rowOutlookCalendarId = isset($row['outlook_calendar_calendar_id']) ? $row['outlook_calendar_calendar_id'] : null;
 
         if (
             $outlookCalendarId &&
             array_key_exists($userId, $providerRows) &&
-            empty($providerRows[$userId]['outlookCalendar'])
+            (
+                empty($providerRows[$userId]['outlookCalendar']) ||
+                (
+                    empty($providerRows[$userId]['outlookCalendar']['calendarId']) &&
+                    !empty($rowOutlookCalendarId)
+                )
+            )
         ) {
             $providerRows[$userId]['outlookCalendar']['id']         = $row['outlook_calendar_id'];
             $providerRows[$userId]['outlookCalendar']['token']      = $row['outlook_calendar_token'];
-            $providerRows[$userId]['outlookCalendar']['calendarId'] = isset($row['outlook_calendar_calendar_id']) ? $row['outlook_calendar_calendar_id'] : null;
+            $providerRows[$userId]['outlookCalendar']['calendarId'] = $rowOutlookCalendarId;
+            $providerRows[$userId]['outlookCalendar']['insertPendingAppointments'] = isset($row['outlook_calendar_insert_pending_appointments']) ?
+                $row['outlook_calendar_insert_pending_appointments'] :
+                null;
+            $providerRows[$userId]['outlookCalendar']['includeBufferTime'] = isset($row['outlook_calendar_include_buffer_time']) ?
+                $row['outlook_calendar_include_buffer_time'] :
+                null;
+            $providerRows[$userId]['outlookCalendar']['title'] = isset($row['outlook_calendar_title']) && $row['outlook_calendar_title'] ?
+                json_decode($row['outlook_calendar_title'], true) :
+                ['appointment' => '%service_name%', 'event' => '%event_name%'];
+            $providerRows[$userId]['outlookCalendar']['description'] = isset($row['outlook_calendar_description']) && $row['outlook_calendar_description'] ?
+                json_decode($row['outlook_calendar_description'], true) :
+                ['appointment' => '', 'event' => ''];
         }
 
         if (
@@ -1577,13 +1762,25 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
             array_key_exists($userId, $providerRows) &&
             !array_key_exists($dayOffId, $providerRows[$userId]['dayOffList'])
         ) {
-            $providerRows[$userId]['dayOffList'][$dayOffId] = [
-                'id'        => $dayOffId,
-                'name'      => $row['dayOff_name'],
-                'startDate' => $row['dayOff_startDate'],
-                'endDate'   => $row['dayOff_endDate'],
-                'repeat'    => $row['dayOff_repeat'],
-            ];
+            if ($row['dayOff_type'] === DayOffType::DAY_OFF) {
+                $providerRows[$userId]['dayOffList'][$dayOffId] = [
+                    'id'        => $dayOffId,
+                    'name'      => $row['dayOff_name'],
+                    'startDate' => $row['dayOff_startDate'],
+                    'endDate'   => $row['dayOff_endDate'],
+                    'repeat'    => $row['dayOff_repeat'],
+                ];
+            }
+
+            if ($row['dayOff_type'] === DayOffType::BLOCK_TIME) {
+                $providerRows[$userId]['blockTimeList'][$dayOffId] = [
+                    'id'        => $dayOffId,
+                    'name'      => $row['dayOff_name'],
+                    'startDate' => $row['dayOff_startDate'],
+                    'endDate'   => $row['dayOff_endDate'],
+                    'repeat'    => $row['dayOff_repeat'],
+                ];
+            }
         }
 
         if (
@@ -1683,9 +1880,536 @@ class ProviderRepository extends UserRepository implements ProviderRepositoryInt
                 "DELETE FROM {$this->providerViewsTable} WHERE userId = :userId"
             );
 
-            return $statement->execute($params);
+            $statement->execute($params);
+            return true;
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to delete data from ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to delete data from ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
+        }
+    }
+
+    /**
+     * Get max service capacity for a specific provider
+     *
+     * @param int $providerId
+     * @param int $serviceId
+     *
+     * @return int|null
+     * @throws QueryExecutionException
+     */
+    public function getMaxCapacityByServiceId($providerId, $serviceId)
+    {
+        $params = [
+            ':userId' => $providerId,
+            ':serviceId' => $serviceId
+        ];
+
+        try {
+            $statement = $this->connection->prepare(
+                "SELECT maxCapacity 
+                FROM {$this->providerServicesTable} 
+                WHERE userId = :userId AND serviceId = :serviceId"
+            );
+
+            $statement->execute($params);
+
+            $row = $statement->fetch();
+
+            return $row ? (int)$row['maxCapacity'] : 0;
+        } catch (\Exception $e) {
+            throw new QueryExecutionException('Unable to get max capacity from ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
+        }
+    }
+
+    /**
+     * Batch update to clear googleCalendarId for all providers with a single SQL query
+     *
+     * @return void
+     * @throws QueryExecutionException
+     */
+    public function clearGoogleCalendarIds()
+    {
+        try {
+            $statement = $this->connection->prepare(
+                "UPDATE {$this->table} 
+                 SET googleCalendarId = NULL 
+                 WHERE googleCalendarId IS NOT NULL 
+                 AND type = 'provider'"
+            );
+
+            $statement->execute();
+        } catch (\Exception $e) {
+            throw new QueryExecutionException('Unable to batch clear googleCalendarId in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
+        }
+    }
+
+    /**
+     * Batch update to clear outlookCalendarId for all providers with a single SQL query
+     *
+     * @return void
+     * @throws QueryExecutionException
+     */
+    public function clearOutlookCalendarIds()
+    {
+        try {
+            $statement = $this->connection->prepare(
+                "UPDATE {$this->table} 
+                 SET outlookCalendarId = NULL 
+                 WHERE outlookCalendarId IS NOT NULL 
+                 AND type = 'provider'"
+            );
+
+            $statement->execute();
+        } catch (\Exception $e) {
+            throw new QueryExecutionException('Unable to batch clear outlookCalendarId in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
+        }
+    }
+
+    /**
+     * Apply license restriction for Lite license - forces only the first provider (smallest ID)
+     * to be returned regardless of filters
+     *
+     * @param array $criteria
+     * @return array Modified criteria array
+     * @throws QueryExecutionException
+     */
+    private function applyLiteLicenseRestriction($criteria)
+    {
+        if (!Licence::hasLicenseAccess(LicenceConstants::STARTER)) {
+            try {
+                $params = [
+                    ':type' => AbstractUser::USER_ROLE_PROVIDER
+                ];
+
+                $statement = $this->connection->prepare(
+                    "SELECT u.id
+                    FROM {$this->table} u
+                    WHERE u.type = :type 
+                    AND u.status NOT LIKE 'disabled'
+                    ORDER BY u.id ASC
+                    LIMIT 1"
+                );
+
+                $statement->execute($params);
+                $result = $statement->fetch();
+
+                if ($result) {
+                    // Force only this specific provider to be returned
+                    $criteria['providers'] = [(int)$result['id']];
+                }
+            } catch (\Exception $e) {
+                throw new QueryExecutionException('Unable to apply Lite license restriction in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
+            }
+        }
+
+        return $criteria;
+    }
+
+    /**
+     * Update the calendarId for a specific Google Calendar account row.
+     *
+     * @param int         $accountId
+     * @param string|null $calendarId
+     *
+     * @return void
+     * @throws QueryExecutionException
+     */
+    public function updateGoogleCalendarCalendarIdByAccountId($accountId, $calendarId)
+    {
+        try {
+            $statement = $this->connection->prepare(
+                "UPDATE {$this->providersGoogleCalendarTable}
+                SET calendarId = :calendarId
+                WHERE id = :accountId"
+            );
+
+            $statement->bindParam(':calendarId', $calendarId);
+            $statement->bindParam(':accountId', $accountId);
+
+            $statement->execute();
+        } catch (\Exception $e) {
+            throw new QueryExecutionException(
+                'Unable to update Google Calendar calendarId in ' . __CLASS__ . ': ' . $e->getMessage(),
+                $e->getCode(),
+                $e
+            );
+        }
+    }
+
+    /**
+     * Get all Google Calendar accounts for a provider
+     *
+     * @param int $providerId
+     *
+     * @return array
+     * @throws QueryExecutionException
+     */
+    public function getGoogleCalendarAccounts($providerId)
+    {
+        $accounts = [];
+
+        try {
+            $statement = $this->connection->prepare(
+                "SELECT id, token, calendarId, blockedCalendars
+                FROM {$this->providersGoogleCalendarTable}
+                WHERE userId = :userId"
+            );
+
+            $statement->bindParam(':userId', $providerId);
+            $statement->execute();
+
+            while ($row = $statement->fetch()) {
+                $blockedCalendars = [];
+                if (isset($row['blockedCalendars']) && $row['blockedCalendars']) {
+                    $blockedCalendars = json_decode($row['blockedCalendars'], true) ?: [];
+                }
+                $accounts[] = [
+                    'id'               => $row['id'],
+                    'token'            => $row['token'],
+                    'calendarId'       => $row['calendarId'],
+                    'blockedCalendars' => $blockedCalendars,
+                ];
+            }
+        } catch (\Exception $e) {
+            throw new QueryExecutionException('Unable to get Google Calendar accounts in ' . __CLASS__, $e->getCode(), $e);
+        }
+
+        return $accounts;
+    }
+
+
+    /**
+     * Update blocked calendars for a Google Calendar account
+     *
+     * @param int   $accountId
+     * @param array $blockedCalendars
+     *
+     * @return void
+     * @throws QueryExecutionException
+     */
+    public function updateGoogleCalendarBlockedCalendars($accountId, $blockedCalendars)
+    {
+        try {
+            $blockedCalendarsJson = json_encode($blockedCalendars);
+
+            if ($blockedCalendarsJson === false) {
+                throw new QueryExecutionException(
+                    'Unable to encode blocked calendars to JSON in ' . __CLASS__ . '. Error: ' . json_last_error_msg()
+                );
+            }
+
+            $statement = $this->connection->prepare(
+                "UPDATE {$this->providersGoogleCalendarTable}
+                SET blockedCalendars = :blockedCalendars
+                WHERE id = :accountId"
+            );
+
+            $statement->bindParam(':blockedCalendars', $blockedCalendarsJson);
+            $statement->bindParam(':accountId', $accountId);
+
+            $statement->execute();
+        } catch (\Exception $e) {
+            throw new QueryExecutionException(
+                'Unable to update blocked calendars in ' . __CLASS__ . ': ' . $e->getMessage(),
+                $e->getCode(),
+                $e
+            );
+        }
+    }
+
+    /**
+     * Update Google Calendar account token (used when refreshing expired tokens)
+     *
+     * @param int    $accountId
+     * @param string $token
+     *
+     * @return bool
+     * @throws QueryExecutionException
+     */
+    public function updateGoogleCalendarAccountToken($accountId, $token)
+    {
+        try {
+            $statement = $this->connection->prepare(
+                "UPDATE {$this->providersGoogleCalendarTable}
+                SET token = :token
+                WHERE id = :accountId"
+            );
+
+            $statement->bindParam(':token', $token);
+            $statement->bindParam(':accountId', $accountId);
+
+            $result = $statement->execute();
+
+            if (!$result) {
+                throw new QueryExecutionException('Unable to update Google Calendar account token in ' . __CLASS__);
+            }
+
+            return $result;
+        } catch (\Exception $e) {
+            throw new QueryExecutionException('Unable to update Google Calendar account token in ' . __CLASS__, $e->getCode(), $e);
+        }
+    }
+
+    /**
+     * Update Google Calendar account settings (insertPendingAppointments, includeBufferTime, title, description)
+     *
+     * @param int   $providerId
+     * @param array $settings
+     *
+     * @return bool
+     * @throws QueryExecutionException
+     */
+    public function updateGoogleCalendarAccountSettings($providerId, $settings)
+    {
+        try {
+            $updateFields = [];
+            $params = [':userId' => $providerId];
+
+            if (isset($settings['insertPendingAppointments'])) {
+                $updateFields[] = 'insertPendingAppointments = :insertPendingAppointments';
+                $params[':insertPendingAppointments'] = (bool)$settings['insertPendingAppointments'];
+            }
+
+            if (isset($settings['includeBufferTime'])) {
+                $updateFields[] = 'includeBufferTime = :includeBufferTime';
+                $params[':includeBufferTime'] = (bool)$settings['includeBufferTime'];
+            }
+
+            if (isset($settings['title'])) {
+                $updateFields[] = 'title = :title';
+                $params[':title'] = json_encode($settings['title']);
+            }
+
+            if (isset($settings['description'])) {
+                $updateFields[] = 'description = :description';
+                $params[':description'] = json_encode($settings['description']);
+            }
+
+            if (empty($updateFields)) {
+                return true;
+            }
+
+            $statement = $this->connection->prepare(
+                "UPDATE {$this->providersGoogleCalendarTable}
+                SET " . implode(', ', $updateFields) . "
+                WHERE userId = :userId"
+            );
+
+            foreach ($params as $key => $value) {
+                $statement->bindValue($key, $value);
+            }
+
+            return $statement->execute();
+        } catch (\Exception $e) {
+            throw new QueryExecutionException(
+                'Unable to update Google Calendar account settings in ' . __CLASS__ . ': ' . $e->getMessage(),
+                $e->getCode(),
+                $e
+            );
+        }
+    }
+
+    /**
+     * Get all Google Calendar accounts for a provider
+     *
+     * @param int $providerId
+     *
+     * @return array
+     * @throws QueryExecutionException
+     */
+    public function getOutlookCalendarAccounts($providerId)
+    {
+        $accounts = [];
+
+        try {
+            $statement = $this->connection->prepare(
+                "SELECT id, token, calendarId, blockedCalendars, insertPendingAppointments, includeBufferTime, title, description
+                FROM {$this->providersOutlookCalendarTable}
+                WHERE userId = :userId"
+            );
+
+            $statement->bindParam(':userId', $providerId);
+            $statement->execute();
+
+            while ($row = $statement->fetch()) {
+                $blockedCalendars = [];
+                if (isset($row['blockedCalendars']) && $row['blockedCalendars']) {
+                    $blockedCalendars = json_decode($row['blockedCalendars'], true) ?: [];
+                }
+                $accounts[] = [
+                    'id'                        => $row['id'],
+                    'token'                     => $row['token'],
+                    'calendarId'                => $row['calendarId'],
+                    'blockedCalendars'          => $blockedCalendars,
+                    'insertPendingAppointments' => isset($row['insertPendingAppointments']) ? $row['insertPendingAppointments'] : null,
+                    'includeBufferTime'         => isset($row['includeBufferTime']) ? $row['includeBufferTime'] : null,
+                    'title'                     => isset($row['title']) && $row['title'] ? json_decode($row['title'], true) : null,
+                    'description'               => isset($row['description']) && $row['description'] ? json_decode($row['description'], true) : null,
+                ];
+            }
+        } catch (\Exception $e) {
+            throw new QueryExecutionException('Unable to get Outlook Calendar accounts in ' . __CLASS__, $e->getCode(), $e);
+        }
+
+        return $accounts;
+    }
+
+    /**
+     * Update blocked calendars for a Outlook Calendar account
+     *
+     * @param int   $accountId
+     * @param array $blockedCalendars
+     *
+     * @return void
+     * @throws QueryExecutionException
+     */
+    public function updateOutlookCalendarBlockedCalendars($accountId, $blockedCalendars)
+    {
+        try {
+            $blockedCalendarsJson = json_encode($blockedCalendars);
+
+            if ($blockedCalendarsJson === false) {
+                throw new QueryExecutionException(
+                    'Unable to encode blocked calendars to JSON in ' . __CLASS__ . '. Error: ' . json_last_error_msg()
+                );
+            }
+
+            $statement = $this->connection->prepare(
+                "UPDATE {$this->providersOutlookCalendarTable}
+                SET blockedCalendars = :blockedCalendars
+                WHERE id = :accountId"
+            );
+
+            $statement->bindParam(':blockedCalendars', $blockedCalendarsJson);
+            $statement->bindParam(':accountId', $accountId);
+
+            $statement->execute();
+        } catch (\Exception $e) {
+            throw new QueryExecutionException(
+                'Unable to update blocked calendars in ' . __CLASS__ . ': ' . $e->getMessage(),
+                $e->getCode(),
+                $e
+            );
+        }
+    }
+
+    /**
+     * Update the calendarId for a specific Outlook Calendar account row
+     *
+     * @param int         $accountId
+     * @param string|null $calendarId
+     *
+     * @return void
+     * @throws QueryExecutionException
+     */
+    public function updateOutlookCalendarCalendarIdByAccountId($accountId, $calendarId)
+    {
+        try {
+            $statement = $this->connection->prepare(
+                "UPDATE {$this->providersOutlookCalendarTable}
+                SET calendarId = :calendarId
+                WHERE id = :accountId"
+            );
+
+            $statement->bindParam(':calendarId', $calendarId);
+            $statement->bindParam(':accountId', $accountId);
+
+            $statement->execute();
+        } catch (\Exception $e) {
+            throw new QueryExecutionException(
+                'Unable to update Outlook Calendar calendarId in ' . __CLASS__ . ': ' . $e->getMessage(),
+                $e->getCode(),
+                $e
+            );
+        }
+    }
+
+    /**
+     * Update Outlook Calendar account token (used when refreshing expired tokens)
+     *
+     * @param int    $accountId
+     * @param string $token
+     *
+     * @return void
+     * @throws QueryExecutionException
+     */
+    public function updateOutlookCalendarAccountToken($accountId, $token)
+    {
+        try {
+            $statement = $this->connection->prepare(
+                "UPDATE {$this->providersOutlookCalendarTable}
+                SET token = :token
+                WHERE id = :accountId"
+            );
+
+            $statement->bindParam(':token', $token);
+            $statement->bindParam(':accountId', $accountId);
+
+            $result = $statement->execute();
+
+            if (!$result) {
+                throw new QueryExecutionException('Unable to update Outlook Calendar account token in ' . __CLASS__);
+            }
+        } catch (\Exception $e) {
+            throw new QueryExecutionException('Unable to update Outlook Calendar account token in ' . __CLASS__, $e->getCode(), $e);
+        }
+    }
+
+    /**
+     * Update Outlook Calendar account settings (insertPendingAppointments, includeBufferTime, title, description)
+     *
+     * @param int   $providerId
+     * @param array $settings
+     *
+     * @return void
+     * @throws QueryExecutionException
+     */
+    public function updateOutlookCalendarAccountSettings($providerId, $settings)
+    {
+        try {
+            $updateFields = [];
+            $params = [':userId' => $providerId];
+
+            if (isset($settings['insertPendingAppointments'])) {
+                $updateFields[] = 'insertPendingAppointments = :insertPendingAppointments';
+                $params[':insertPendingAppointments'] = (bool)$settings['insertPendingAppointments'];
+            }
+
+            if (isset($settings['includeBufferTime'])) {
+                $updateFields[] = 'includeBufferTime = :includeBufferTime';
+                $params[':includeBufferTime'] = (bool)$settings['includeBufferTime'];
+            }
+
+            if (isset($settings['title'])) {
+                $updateFields[] = 'title = :title';
+                $params[':title'] = json_encode($settings['title']);
+            }
+
+            if (isset($settings['description'])) {
+                $updateFields[] = 'description = :description';
+                $params[':description'] = json_encode($settings['description']);
+            }
+
+            if (empty($updateFields)) {
+                return;
+            }
+
+            $statement = $this->connection->prepare(
+                "UPDATE {$this->providersOutlookCalendarTable}
+                SET " . implode(', ', $updateFields) . "
+                WHERE userId = :userId"
+            );
+
+            foreach ($params as $key => $value) {
+                $statement->bindValue($key, $value);
+            }
+
+            $statement->execute();
+        } catch (\Exception $e) {
+            throw new QueryExecutionException(
+                'Unable to update Outlook Calendar account settings in ' . __CLASS__ . ': ' . $e->getMessage(),
+                $e->getCode(),
+                $e
+            );
         }
     }
 }

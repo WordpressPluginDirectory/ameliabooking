@@ -19,6 +19,8 @@ use AmeliaBooking\Domain\Entity\User\Customer;
 use AmeliaBooking\Domain\Factory\User\UserFactory;
 use AmeliaBooking\Domain\Services\Settings\SettingsService;
 use AmeliaBooking\Domain\ValueObjects\Number\Integer\Id;
+use AmeliaBooking\Domain\ValueObjects\String\Name;
+use AmeliaBooking\Domain\ValueObjects\String\Phone;
 use AmeliaBooking\Infrastructure\Common\Container;
 use AmeliaBooking\Infrastructure\Common\Exceptions\QueryExecutionException;
 use AmeliaBooking\Infrastructure\Repository\Bookable\Service\PackageCustomerRepository;
@@ -32,7 +34,6 @@ use AmeliaBooking\Infrastructure\Repository\Payment\PaymentRepository;
 use AmeliaBooking\Infrastructure\Repository\User\UserRepository;
 use AmeliaBooking\Infrastructure\Services\Mailchimp\AbstractMailchimpService;
 use Exception;
-use Interop\Container\Exception\ContainerException;
 use Slim\Exception\ContainerValueNotFoundException;
 
 /**
@@ -42,13 +43,9 @@ use Slim\Exception\ContainerValueNotFoundException;
  */
 class CustomerApplicationService extends UserApplicationService
 {
-    private $container;
+    private Container $container;
 
     /**
-     * CustomerApplicationService constructor.
-     *
-     * @param Container $container
-     *
      * @throws \InvalidArgumentException
      */
     public function __construct(Container $container)
@@ -70,16 +67,8 @@ class CustomerApplicationService extends UserApplicationService
 
         $user = UserFactory::create($fields);
 
-        if (!$user instanceof AbstractUser) {
-            $result->setResult(CommandResult::RESULT_ERROR);
-            $result->setMessage('Could not create a new user entity.');
-
-            return $result;
-        }
-
         /** @var UserRepository $userRepository */
         $userRepository = $this->container->get('domain.users.repository');
-
 
         if ($oldUser = $userRepository->getByEmail($user->getEmail()->getValue())) {
             $result->setResult(CommandResult::RESULT_CONFLICT);
@@ -98,7 +87,7 @@ class CustomerApplicationService extends UserApplicationService
                 /** @var UserApplicationService $userAS */
                 $userAS = $this->container->get('application.user.service');
 
-                $userAS->setWpUserIdForNewUser($userId, $user);
+                $userAS->setWpUserIdForNewUser($userId, $user, Entities::CUSTOMER);
             }
 
             $result->setResult(CommandResult::RESULT_SUCCESS);
@@ -158,14 +147,31 @@ class CustomerApplicationService extends UserApplicationService
         /** @var AbstractUser $loggedInUser */
         $loggedInUser = $this->container->get('logged.in.user');
 
-        if ($loggedInUser) {
-            if ($loggedInUser->getType() === AbstractUser::USER_ROLE_ADMIN) {
-                $userData['type'] = AbstractUser::USER_ROLE_CUSTOMER;
+        if (
+            $loggedInUser &&
+            (
+                $loggedInUser->getType() === AbstractUser::USER_ROLE_ADMIN ||
+                $loggedInUser->getType() === AbstractUser::USER_ROLE_MANAGER
+            )
+        ) {
+            $userData['type'] = AbstractUser::USER_ROLE_CUSTOMER;
 
-                $userData['externalId'] = null;
-            } elseif ($loggedInUser->getType() === AbstractUser::USER_ROLE_MANAGER) {
-                $userData['type'] = AbstractUser::USER_ROLE_MANAGER;
-            }
+            $userData['externalId'] = null;
+        } elseif (
+            $loggedInUser &&
+            $loggedInUser->getType() === AbstractUser::USER_ROLE_CUSTOMER &&
+            $loggedInUser->getExternalId()
+        ) {
+            $userData['type'] = AbstractUser::USER_ROLE_CUSTOMER;
+
+            $userData['externalId'] = $loggedInUser->getExternalId()->getValue();
+        } elseif (
+            $loggedInUser &&
+            $loggedInUser->getType() === AbstractUser::USER_ROLE_CUSTOMER
+        ) {
+            $userData['type'] = AbstractUser::USER_ROLE_CUSTOMER;
+
+            $userData['externalId'] = null;
         }
 
         /** @var Customer $user */
@@ -198,14 +204,40 @@ class CustomerApplicationService extends UserApplicationService
             ) {
                 $result->setResult(CommandResult::RESULT_ERROR);
                 $result->setData($userWithSameMail ? ['emailError' => true] : ['phoneError' => true]);
-            } elseif (
-                empty($userWithSameValue->getEmail()->getValue()) && !empty($user->getEmail())
-            ) {
-                $userRepository->updateFieldById(
-                    $userWithSameValue->getId()->getValue(),
-                    $user->getEmail()->getValue(),
-                    'email'
-                );
+            } else {
+                if (empty($userWithSameValue->getEmail()->getValue()) && !empty($user->getEmail())) {
+                    $userRepository->updateFieldById(
+                        $userWithSameValue->getId()->getValue(),
+                        $user->getEmail()->getValue(),
+                        'email'
+                    );
+                    $userWithSameValue->setEmail($user->getEmail());
+                }
+
+                if (
+                    empty($userWithSameValue->getPhone() ? $userWithSameValue->getPhone()->getValue() : null) &&
+                    !empty($user->getPhone() ? $user->getPhone()->getValue() : null)
+                ) {
+                    $userRepository->updateFieldById(
+                        $userWithSameValue->getId()->getValue(),
+                        $user->getPhone()->getValue(),
+                        'phone'
+                    );
+                    $userWithSameValue->setPhone(new Phone($user->getPhone()->getValue()));
+
+                    if (
+                        empty($userWithSameValue->getCountryPhoneIso() ? $userWithSameValue->getCountryPhoneIso()->getValue() : null) &&
+                        !empty($user->getCountryPhoneIso() ? $user->getCountryPhoneIso()->getValue() : null)
+                    ) {
+                        $userRepository->updateFieldById(
+                            $userWithSameValue->getId()->getValue(),
+                            $user->getCountryPhoneIso()->getValue(),
+                            'countryPhoneIso'
+                        );
+
+                        $userWithSameValue->setCountryPhoneIso(new Name($user->getCountryPhoneIso()->getValue()));
+                    }
+                }
             }
 
             return $userWithSameValue;
@@ -245,7 +277,6 @@ class CustomerApplicationService extends UserApplicationService
      * @param bool     $isNewCustomer
      *
      * @return void
-     * @throws ContainerException
      */
     public function setWPUserForCustomer($customer, $isNewCustomer)
     {
@@ -260,10 +291,8 @@ class CustomerApplicationService extends UserApplicationService
 
             try {
                 if ($customer->getExternalId()) {
-                    $userAS->setWpUserIdForExistingUser($customer->getId()->getValue(), $customer);
-                } else {
-                    $userAS->setWpUserIdForNewUser($customer->getId()->getValue(), $customer);
-
+                    $userAS->setWpUserIdForExistingUser($customer->getId()->getValue(), $customer, Entities::CUSTOMER);
+                } elseif ($userAS->setWpUserIdForNewUser($customer->getId()->getValue(), $customer, Entities::CUSTOMER)) {
                     do_action('AmeliaCustomerWPCreated', $customer->toArray(), $this->container);
                     do_action('amelia_customer_wp_created', $customer->toArray(), $this->container);
                 }
@@ -320,7 +349,9 @@ class CustomerApplicationService extends UserApplicationService
         /** @var AbstractMailchimpService $mailchimpService */
         $mailchimpService = $this->container->get('infrastructure.mailchimp.service');
 
-        /** @var Collection $appointments */
+        /** @var SettingsService $settingsService */
+        $settingsService = $this->container->get('domain.settings.service');
+
         $appointments = $appointmentRepository->getFiltered(
             [
                 'customerId' => $customer->getId()->getValue()
@@ -423,7 +454,10 @@ class CustomerApplicationService extends UserApplicationService
             }
         }
 
-        if ($customer->getEmail() && $customer->getEmail()->getValue()) {
+        if (
+            $settingsService->isFeatureEnabled('mailchimp') &&
+            $customer->getEmail() && $customer->getEmail()->getValue()
+        ) {
             $mailchimpService->deleteSubscriber($customer->getEmail()->getValue());
         }
 

@@ -129,6 +129,7 @@
           :show-estimated-pricing="props.appointment.id && 'estimatedPricingVisibility' in props.customizedOptions ? props.customizedOptions.estimatedPricingVisibility.visibility : false"
           :show-indicator-pricing="props.appointment.id && 'indicatorPricingVisibility' in props.customizedOptions ? props.customizedOptions.indicatorPricingVisibility.visibility : false"
           :show-slot-pricing="props.appointment.id && 'slotPricingVisibility' in props.customizedOptions ? props.customizedOptions.slotPricingVisibility.visibility : false"
+          :show-calendar-date-busyness="false"
           :label-slots-selected="labels.date_time_slots_selected"
           :fetched-slots="null"
           :service-id="parseInt(props.appointment.serviceId)"
@@ -194,7 +195,6 @@ import AmAlert from "../../../../_components/alert/AmAlert.vue";
 import Calendar from "../../../Parts/Calendar.vue";
 
 // * Composables
-import { useAuthorizationHeaderObject } from "../../../../../assets/js/public/panel";
 import {
   useUtcValue,
   useUtcValueOffset,
@@ -546,9 +546,9 @@ function rescheduleBooking () {
   }
 
   httpClient.post(
-    '/bookings/reassign/' + props.appointment.bookings.filter(i => i.status === 'approved' || i.status === 'pending')[0].id,
+    '/bookings/reassign/' + props.appointment.bookings.filter(i => i.status === 'approved' || i.status === 'pending' || i.status === 'waiting')[0].id,
       bookingData,
-    Object.assign(useAuthorizationHeaderObject(store), {params: {source: 'cabinet-' + cabinetType.value}})
+    {params: {source: 'cabinet-' + cabinetType.value}}
   ).then(() => {
     calendarRef.value.calendarSlotsLoading = false
     emits('success', {message: amLabels.value.appointment_rescheduled})
@@ -621,8 +621,7 @@ function packageBookingApp () {
 
   httpClient.post(
     '/bookings',
-    data,
-    useAuthorizationHeaderObject(store)
+    data
   ).then((response) => {
     calendarRef.value.calendarSlotsLoading = false
     useCreateBookingSuccess(store, response)
@@ -699,9 +698,9 @@ function useSlotsCallback(
     let dates = useSortedDateStrings(Object.keys(slots))
 
     return {
-      calendarStartDate: dates[0],
+      calendarStartDate: dates.length ? dates[0] : null,
       calendarEventSlots: [],
-      calendarEventDate: dates[0],
+      calendarEventDate: null,
       calendarEventSlot: null,
     }
   }

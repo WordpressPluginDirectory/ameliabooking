@@ -1,7 +1,7 @@
 <?php
 
 /**
- * @copyright © TMS-Plugins. All rights reserved.
+ * @copyright © Melograno Ventures. All rights reserved.
  * @licence   See LICENCE.md for license details.
  */
 
@@ -35,9 +35,10 @@ class AbstractEntityRepository extends AbstractRepository
                 "DELETE FROM {$this->table} WHERE entityId = :entityId AND entityType = :entityType"
             );
 
-            return $statement->execute($params);
+            $statement->execute($params);
+            return true;
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to delete entities in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to delete entities in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
     }
 }

@@ -12,14 +12,26 @@
       <span class="am-ff__item-label" v-html="props.label" />
     </template>
     <AmInputPhone
+      :key="`phone-${countryCode}-${props.refreshTrigger}`"
       v-model="model"
-      :name="props.itemName"
+      v-model:country-code="countryCode"
       :placeholder="props.placeholder"
-      :default-code="props.defaultCode"
+      :validation-error="true"
+      :error="props.phoneError"
       :disabled="props.disabled"
+      :phone-input-attributes="{ name: props.itemName }"
       style="position: relative"
-      @country-phone-iso-updated="countryPhoneIsoUpdated"
-    />
+      @data="handleData"
+    >
+      <template v-if="props.noResultsLabel" #no-results>
+        {{ props.noResultsLabel }}
+      </template>
+    </AmInputPhone>
+    <template #error v-if="props.errorMessage">
+      <span class="el-form-item__error">
+        {{ props.errorMessage }}
+      </span>
+    </template>
     <div
       v-if="props.isWhatsApp"
       class="am-whatsapp-opt-in-text"
@@ -39,7 +51,6 @@ import {
   inject,
   ref,
   toRefs,
-  onMounted
 } from "vue";
 
 // * Composables
@@ -50,6 +61,10 @@ let props = defineProps({
   modelValue: {
     type: [String, Number, Object, Array],
     required: true
+  },
+  countryCode: {
+    type: String,
+    default: ''
   },
   itemName: {
     type: String,
@@ -84,18 +99,26 @@ let props = defineProps({
     type: [Boolean, String, Number],
     default: false
   },
-  countryPhoneIso: {
-    type: [String, Object, Array, Number],
-    required: true
-  },
   disabled: {
     type: Boolean,
     default: false
+  },
+  errorMessage: {
+    type: String,
+    default: ''
+  },
+  noResultsLabel: {
+    type: String,
+    default: ''
+  },
+  refreshTrigger: {
+    type: Number,
+    default: 0
   }
 })
 
 // * Define Emits
-const emits = defineEmits(['update:modelValue', 'update:countryPhoneIso'])
+const emits = defineEmits(['update:modelValue', 'update:countryCode', 'handlePhoneData'])
 
 // * Component model
 let { modelValue } = toRefs(props)
@@ -106,15 +129,16 @@ let model = computed({
   }
 })
 
-function countryPhoneIsoUpdated (val) {
-  emits('update:countryPhoneIso', val)
-}
-
-onMounted(() => {
-  if (props.defaultCode) {
-    emits('update:countryPhoneIso', props.defaultCode.toLowerCase())
+const countryCode = computed({
+  get: () => props.countryCode,
+  set: (val) => {
+    emits('update:countryCode', val)
   }
 })
+
+function handleData (val) {
+  emits('handlePhoneData', val)
+}
 
 // * Colors
 let amColors = inject('amColors')

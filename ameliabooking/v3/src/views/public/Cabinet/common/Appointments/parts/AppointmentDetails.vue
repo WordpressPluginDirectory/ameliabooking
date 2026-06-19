@@ -166,7 +166,7 @@
           :value="slot"
           :label="slot"
         >
-          {{ getFrontedFormattedTime(slot) }} <span style="float: right;">{{ getTimePrice(slot) }}</span>
+          {{ getFrontedFormattedTime(slot, 'UTC') }} <span style="float: right;">{{ getTimePrice(slot) }}</span>
         </AmOption>
       </AmSelect>
     </el-form-item>
@@ -491,6 +491,7 @@ function isPaymentLinkEnabled (serviceId) {
   && entitySettings.payments
   && 'paymentLinks' in entitySettings.payments
   && entitySettings.payments.paymentLinks
+  && 'enabled' in entitySettings.payments.paymentLinks
       ? entitySettings.payments.paymentLinks
       : amSettings.payments.paymentLinks
 

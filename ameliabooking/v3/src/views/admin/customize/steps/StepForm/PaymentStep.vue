@@ -8,34 +8,52 @@
       </div>
 
       <div class="am-fs__payments-price">
-        <component :is="componentTypes[bookableType]" :payment-gateway="paymentGateway"></component>
+        <component
+          :is="componentTypes[bookableType]"
+          :payment-gateway="paymentGateway"
+        ></component>
       </div>
 
       <AmCheckbox
-        v-if="paymentGateway !== 'onSite'"
+        v-if="paymentGateway !== 'onSite' && features.depositPayment"
         v-model="paymentDeposit"
         class="am-fs__payments-full"
         :label="labelsDisplay('full_amount_consent')"
-        :class="{'am-fs__payments-full-checked': paymentDeposit}"
+        :class="{ 'am-fs__payments-full-checked': paymentDeposit }"
       >
       </AmCheckbox>
 
-      <p v-if="!licence.isLite && !licence.isStarter" class="am-fs__payments-method">
+      <p
+        v-if="!licence.isLite && !licence.isStarter"
+        class="am-fs__payments-method"
+      >
         {{ labelsDisplay('payment_method') }}
       </p>
-      <div v-if="!licence.isLite && !licence.isStarter" class="am-fs__payments-main">
+      <div
+        v-if="!licence.isLite && !licence.isStarter"
+        class="am-fs__payments-main"
+      >
         <div class="am-fs__payments-main-cards">
           <div
-            v-for="(available ,gateway) in availablePayments"
+            v-for="(available, gateway) in availablePayments"
             :key="gateway"
             class="am-fs__payments-main-button"
-            :class="{'am-fs__payments-main-button_selected' : paymentGateway === gateway }"
+            :class="{
+              'am-fs__payments-main-button_selected':
+                paymentGateway === gateway,
+            }"
             @click="setPaymentGateway(gateway)"
           >
             <img :src="baseUrls.wpAmeliaPluginURL + '/v3/src/assets/img/icons/' + gateway + '.svg'" :alt="gateway" />
             <div>
-              <p>{{ gateway === 'onSite' ? labelsDisplay('on_site') :
-                  paymentsBtnText.filter(item => item.key === gateway)[0].text }}</p>
+              <p>
+                {{
+                  gateway === 'onSite'
+                    ? labelsDisplay('on_site')
+                    : paymentsBtnText.filter((item) => item.key === gateway)[0]
+                        .text
+                }}
+              </p>
             </div>
           </div>
         </div>
@@ -43,8 +61,11 @@
       <div class="am-fs__payments-sentence">
         <p>
           {{
-            paymentGateway === 'onSite' ? labelsDisplay('payment_onsite_sentence') :
-                (paymentGateway === 'mollie' || paymentGateway === 'wc') ? labelsDisplay('payment_wc_mollie_sentence') : ''
+            paymentGateway === 'onSite'
+              ? labelsDisplay('payment_onsite_sentence')
+              : paymentGateway === 'mollie' || paymentGateway === 'wc'
+              ? labelsDisplay('payment_wc_mollie_sentence')
+              : ''
           }}
         </p>
       </div>
@@ -57,17 +78,21 @@ import AmCheckbox from '../../../../_components/checkbox/AmCheckbox.vue'
 import AppointmentInfo from '../parts/AppointmentInfo.vue'
 import PaymentPackageInfo from '../parts/PaymentPackageInfo.vue'
 import { inject, ref, markRaw, computed } from 'vue'
-import { useColorTransparency } from "../../../../../assets/js/common/colorManipulation";
-
-// * Plugin Licence
-let licence = inject('licence')
+import { useColorTransparency } from '../../../../../assets/js/common/colorManipulation'
+import { useReactiveCustomize } from '../../../../../assets/js/admin/useReactiveCustomize.js'
 
 let props = defineProps({
   globalClass: {
     type: String,
-    default: ''
-  }
+    default: '',
+  },
 })
+
+// * Plugin Licence
+let licence = inject('licence')
+
+// * Features
+let features = inject('features')
 
 let bookableType = inject('bookableType')
 
@@ -77,7 +102,7 @@ let langKey = inject('langKey')
 let amLabels = inject('labels')
 
 let pageRenderKey = inject('pageRenderKey')
-let amCustomize = inject('customize')
+const { amCustomize } = useReactiveCustomize()
 
 // * Payment Part
 const componentTypes = {
@@ -91,22 +116,26 @@ const availablePayments = {
   onSite: true,
   stripe: true,
   payPal: true,
-  razorpay: true
+  razorpay: true,
 }
 
 let paymentGateway = ref('onSite')
 
-function setPaymentGateway (gateway) {
+function setPaymentGateway(gateway) {
   paymentGateway.value = gateway
 }
 
 // * Label computed function
-function labelsDisplay (label) {
+function labelsDisplay(label) {
   let computedLabel = computed(() => {
-    return amCustomize.value[pageRenderKey.value].paymentStep.translations
-    && amCustomize.value[pageRenderKey.value].paymentStep.translations[label]
-    && amCustomize.value[pageRenderKey.value].paymentStep.translations[label][langKey.value]
-      ? amCustomize.value[pageRenderKey.value].paymentStep.translations[label][langKey.value]
+    return amCustomize.value[pageRenderKey.value].paymentStep.translations &&
+      amCustomize.value[pageRenderKey.value].paymentStep.translations[label] &&
+      amCustomize.value[pageRenderKey.value].paymentStep.translations[label][
+        langKey.value
+      ]
+      ? amCustomize.value[pageRenderKey.value].paymentStep.translations[label][
+          langKey.value
+        ]
       : amLabels[label]
   })
 
@@ -116,27 +145,48 @@ function labelsDisplay (label) {
 // * Colors
 let amColors = inject('amColors')
 const cssVars = computed(() => {
-  return  {
-    '--am-c-ps-price-bgr': useColorTransparency(amColors.value.colorBtnPrim, 0.05),
+  return {
+    '--am-c-ps-price-bgr': useColorTransparency(
+      amColors.value.colorBtnPrim,
+      0.05
+    ),
     '--am-c-ps-total-price': amColors.value.colorBtnPrim,
-    '--am-c-ps-text-op50': useColorTransparency(amColors.value.colorMainText, 0.5),
-    '--am-c-ps-text-op25': useColorTransparency(amColors.value.colorMainText, 0.25),
-    '--am-c-ps-text-op20': useColorTransparency(amColors.value.colorMainText, 0.2),
-    '--am-c-ps-text-op06': useColorTransparency(amColors.value.colorMainText, 0.06),
+    '--am-c-ps-text-op50': useColorTransparency(
+      amColors.value.colorMainText,
+      0.5
+    ),
+    '--am-c-ps-text-op25': useColorTransparency(
+      amColors.value.colorMainText,
+      0.25
+    ),
+    '--am-c-ps-text-op20': useColorTransparency(
+      amColors.value.colorMainText,
+      0.2
+    ),
+    '--am-c-ps-text-op06': useColorTransparency(
+      amColors.value.colorMainText,
+      0.06
+    ),
     '--am-c-ps-primary': amColors.value.colorPrimary,
-    '--am-c-ps-primary-op10': useColorTransparency(amColors.value.colorPrimary, 0.1),
-    '--am-c-ps-primary-op06': useColorTransparency(amColors.value.colorPrimary, 0.06)
+    '--am-c-ps-primary-op10': useColorTransparency(
+      amColors.value.colorPrimary,
+      0.1
+    ),
+    '--am-c-ps-primary-op06': useColorTransparency(
+      amColors.value.colorPrimary,
+      0.06
+    ),
   }
 })
 
 let paymentsBtnText = []
 
-Object.keys(availablePayments).forEach(key => {
-  paymentsBtnText.push({key, text:getPaymentBtnString(key)})
+Object.keys(availablePayments).forEach((key) => {
+  paymentsBtnText.push({ key, text: getPaymentBtnString(key) })
 })
 
-function getPaymentBtnString (key) {
-  switch(key) {
+function getPaymentBtnString(key) {
+  switch (key) {
     case 'onSite':
       return amLabels['on_site']
     case 'payPal':
@@ -163,7 +213,7 @@ export default {
     stepSelectedData: [],
     finished: false,
     selected: false,
-  }
+  },
 }
 </script>
 
@@ -173,7 +223,7 @@ export default {
   --am-c-ps-border: var(--am-c-inp-border);
 
   .am-fs__main-content.am-fs__payments {
-    padding-top:0;
+    padding-top: 0;
   }
 
   .am-fs__payments {
@@ -181,7 +231,11 @@ export default {
       $count: 6;
       @for $i from 0 through $count {
         &:nth-child(#{$i + 1}) {
-          animation: 600ms cubic-bezier(.45,1,.4,1.2) #{$i*100}ms am-animation-slide-up;
+          animation: 600ms
+            cubic-bezier(0.45, 1, 0.4, 1.2)
+            #{$i *
+            100}ms
+            am-animation-slide-up;
           animation-fill-mode: both;
         }
       }
@@ -235,7 +289,6 @@ export default {
       }
 
       .el-checkbox {
-
         &__input {
           height: 32px;
           line-height: 32px;

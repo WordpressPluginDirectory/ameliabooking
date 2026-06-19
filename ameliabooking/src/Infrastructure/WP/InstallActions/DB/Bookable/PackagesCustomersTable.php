@@ -23,6 +23,8 @@ class PackagesCustomersTable extends AbstractDatabaseTable
     {
         $table = self::getTableName();
 
+        $charsetCollate = self::getCharsetCollate();
+
         $token = Token::MAX_LENGTH;
 
         return "CREATE TABLE {$table}  (
@@ -38,7 +40,8 @@ class PackagesCustomersTable extends AbstractDatabaseTable
                   `bookingsCount` INT(5) DEFAULT NULL,
                   `couponId` INT(11) DEFAULT NULL,
                   `token` VARCHAR({$token}) NULL,
+                  `ivyEntryId` INT(11) DEFAULT NULL,
                   PRIMARY KEY (`id`)
-                ) DEFAULT CHARSET=utf8 COLLATE utf8_general_ci";
+                ) {$charsetCollate};";
     }
 }

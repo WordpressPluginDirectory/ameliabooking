@@ -21,7 +21,7 @@ class PeriodRepository extends AbstractRepository
      * @param Period $entity
      * @param int    $weekDayId
      *
-     * @return bool
+     * @return int
      * @throws QueryExecutionException
      */
     public function add($entity, $weekDayId)
@@ -55,12 +55,9 @@ class PeriodRepository extends AbstractRepository
               )"
             );
 
-            $res = $statement->execute($params);
-            if (!$res) {
-                throw new QueryExecutionException('Unable to add data in ' . __CLASS__);
-            }
+            $statement->execute($params);
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to add data in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to add data in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return $this->connection->lastInsertId();
@@ -70,7 +67,7 @@ class PeriodRepository extends AbstractRepository
      * @param Period $entity
      * @param int    $id
      *
-     * @return int
+     * @return void
      * @throws QueryExecutionException
      */
     public function update($entity, $id)
@@ -98,14 +95,9 @@ class PeriodRepository extends AbstractRepository
                 id = :id"
             );
 
-            $res = $statement->execute($params);
-            if (!$res) {
-                throw new QueryExecutionException('Unable to save data in ' . __CLASS__);
-            }
-
-            return $res;
+            $statement->execute($params);
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to save data in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to save data in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
     }
 }

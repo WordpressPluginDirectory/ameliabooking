@@ -1,9 +1,15 @@
 <template>
-  <div class="am-fs__ps" :class="[props.globalClass, {'am-fs__ps-popup': inPopup}]" :style="cssVars">
+  <div
+    class="am-fs__ps"
+    :class="[props.globalClass, { 'am-fs__ps-popup': inPopup }]"
+    :style="cssVars"
+  >
     <template v-for="pack in packages" :key="pack.id">
       <div
         class="am-fs__ps-item"
-        :class="{'am-fs__ps-item__selected': (selected === pack.name && !inPopup)}"
+        :class="{
+          'am-fs__ps-item__selected': selected === pack.name && !inPopup,
+        }"
         @click="clickedCard(pack.name)"
       >
         <div class="am-fs__ps-item__info">
@@ -11,12 +17,18 @@
             {{ pack.name }}
           </p>
           <div class="am-fs__ps-price__wrapper">
-            <p class="am-fs__ps-discount">{{`${labelsDisplay('discount_save')} 10%`}}</p>
+            <p class="am-fs__ps-discount">
+              {{ `${labelsDisplay('discount_save')} 10%` }}
+            </p>
             <p class="am-fs__ps-price">90$</p>
           </div>
         </div>
         <div class="am-fs__ps-item__services">
-          <span v-for="book in pack.bookable" :key="book.id" class="am-fs__ps-item__services-inner">
+          <span
+            v-for="book in pack.bookable"
+            :key="book.id"
+            class="am-fs__ps-item__services-inner"
+          >
             {{ `${book.serviceName} x ${book.quantity}` }}
           </span>
         </div>
@@ -26,18 +38,19 @@
 </template>
 
 <script setup>
-import {inject, computed, ref} from 'vue';
-import { useColorTransparency } from '../../../../../assets/js/common/colorManipulation.js';
+import { inject, computed, ref } from 'vue'
+import { useColorTransparency } from '../../../../../assets/js/common/colorManipulation.js'
+import { useReactiveCustomize } from '../../../../../assets/js/admin/useReactiveCustomize.js'
 
 let props = defineProps({
   globalClass: {
     type: String,
-    default: ''
-  }
+    default: '',
+  },
 })
 
 let { inPopup } = inject('inPopup', {
-  inPopup: ref(false)
+  inPopup: ref(false),
 })
 
 let selected = ref(false)
@@ -45,96 +58,96 @@ let packages = [
   {
     id: 1,
     name: 'Package 1',
-    bookable:[
+    bookable: [
       {
         serviceName: 'Service 1',
-        quantity: 5
+        quantity: 5,
       },
       {
         serviceName: 'Service 2',
-        quantity: 3
+        quantity: 3,
       },
       {
         serviceName: 'Service 3',
-        quantity: 7
+        quantity: 7,
       },
-    ]
+    ],
   },
   {
     id: 2,
     name: 'Package 2',
-    bookable:[
+    bookable: [
       {
         serviceName: 'Service 1',
-        quantity: 5
+        quantity: 5,
       },
       {
         serviceName: 'Service 2',
-        quantity: 3
+        quantity: 3,
       },
       {
         serviceName: 'Service 3',
-        quantity: 7
+        quantity: 7,
       },
-    ]
+    ],
   },
   {
     id: 3,
     name: 'Package 3',
-    bookable:[
+    bookable: [
       {
         serviceName: 'Service 1',
-        quantity: 5
+        quantity: 5,
       },
       {
         serviceName: 'Service 2',
-        quantity: 3
+        quantity: 3,
       },
       {
         serviceName: 'Service 3',
-        quantity: 7
+        quantity: 7,
       },
-    ]
+    ],
   },
   {
     id: 4,
     name: 'Package 4',
-    bookable:[
+    bookable: [
       {
         serviceName: 'Service 1',
-        quantity: 5
+        quantity: 5,
       },
       {
         serviceName: 'Service 2',
-        quantity: 3
+        quantity: 3,
       },
       {
         serviceName: 'Service 3',
-        quantity: 7
+        quantity: 7,
       },
-    ]
+    ],
   },
   {
     id: 5,
     name: 'Package 5',
-    bookable:[
+    bookable: [
       {
         serviceName: 'Service 1',
-        quantity: 5
+        quantity: 5,
       },
       {
         serviceName: 'Service 2',
-        quantity: 3
+        quantity: 3,
       },
       {
         serviceName: 'Service 3',
-        quantity: 7
+        quantity: 7,
       },
-    ]
-  }
+    ],
+  },
 ]
 
-function clickedCard (name) {
+function clickedCard(name) {
   selected.value = name
 }
 
@@ -142,15 +155,19 @@ let langKey = inject('langKey')
 let amLabels = inject('labels')
 
 let pageRenderKey = inject('pageRenderKey')
-let amCustomize = inject('customize')
+const { amCustomize } = useReactiveCustomize()
 
 // * Label computed function
-function labelsDisplay (label) {
+function labelsDisplay(label) {
   let computedLabel = computed(() => {
-    return amCustomize.value[pageRenderKey.value].packageStep.translations
-    && amCustomize.value[pageRenderKey.value].packageStep.translations[label]
-    && amCustomize.value[pageRenderKey.value].packageStep.translations[label][langKey.value]
-      ? amCustomize.value[pageRenderKey.value].packageStep.translations[label][langKey.value]
+    return amCustomize.value[pageRenderKey.value].packageStep.translations &&
+      amCustomize.value[pageRenderKey.value].packageStep.translations[label] &&
+      amCustomize.value[pageRenderKey.value].packageStep.translations[label][
+        langKey.value
+      ]
+      ? amCustomize.value[pageRenderKey.value].packageStep.translations[label][
+          langKey.value
+        ]
       : amLabels[label]
   })
 
@@ -158,17 +175,38 @@ function labelsDisplay (label) {
 }
 
 // * Global colors
-let amColors = inject('amColors');
+let amColors = inject('amColors')
 let cssVars = computed(() => {
   return {
     '--am-c-ps-text': amColors.value.colorMainText,
-    '--am-c-ps-text-op60': useColorTransparency(amColors.value.colorMainText, 0.6),
-    '--am-c-ps-text-op20': useColorTransparency(amColors.value.colorMainText, 0.2),
-    '--am-c-ps-text-op06': useColorTransparency(amColors.value.colorMainText, 0.06),
-    '--am-c-primary-op10': useColorTransparency(amColors.value.colorPrimary, 0.10),
-    '--am-c-scroll-op30': useColorTransparency(amColors.value.colorPrimary, 0.30),
-    '--am-c-scroll-op10': useColorTransparency(amColors.value.colorPrimary, 0.10),
-    '--am-c-success-op10': useColorTransparency(amColors.value.colorSuccess, 0.10),
+    '--am-c-ps-text-op60': useColorTransparency(
+      amColors.value.colorMainText,
+      0.6
+    ),
+    '--am-c-ps-text-op20': useColorTransparency(
+      amColors.value.colorMainText,
+      0.2
+    ),
+    '--am-c-ps-text-op06': useColorTransparency(
+      amColors.value.colorMainText,
+      0.06
+    ),
+    '--am-c-primary-op10': useColorTransparency(
+      amColors.value.colorPrimary,
+      0.1
+    ),
+    '--am-c-scroll-op30': useColorTransparency(
+      amColors.value.colorPrimary,
+      0.3
+    ),
+    '--am-c-scroll-op10': useColorTransparency(
+      amColors.value.colorPrimary,
+      0.1
+    ),
+    '--am-c-success-op10': useColorTransparency(
+      amColors.value.colorSuccess,
+      0.1
+    ),
   }
 })
 </script>
@@ -183,7 +221,7 @@ export default {
     stepSelectedData: [],
     finished: false,
     selected: false,
-  }
+  },
 }
 </script>
 
@@ -192,7 +230,7 @@ export default {
   #amelia-container {
     .am-fs {
       &__ps {
-        display:flex;
+        display: flex;
         flex-direction: column;
         justify-content: space-between;
         width: 100%;

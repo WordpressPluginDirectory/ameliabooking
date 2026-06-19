@@ -2,8 +2,7 @@
   <div
     ref="dateTimeRef"
     class="am-fs-dt__calendar"
-    :class="[props.globalClass, {'am-oxvisible': (recurringPopupVisibility || packagesVisibility)}]"
-    tabindex="0"
+    :class="[props.globalClass, {'am-oxvisible': (packagesVisibility)}]"
   >
     <div v-if="limitPerEmployeeError" ref="limitError" class="am-fs__payments-error" >
       <AmAlert
@@ -25,7 +24,10 @@
       :show-estimated-pricing="estimatedPricingVisibility"
       :show-indicator-pricing="indicatorPricingVisibility"
       :show-slot-pricing="slotPricingVisibility"
+      :show-people-waiting="peopleWaitingVisibility"
+      :show-calendar-date-busyness="calendarDateBusynessVisibility"
       :label-slots-selected="amLabels.date_time_slots_selected"
+      :label-waiting-list="amLabels.waiting_list"
       :fetched-slots="null"
       :service-id="cartItem ? cartItem.serviceId : 0"
       :date="date"
@@ -39,6 +41,7 @@
     <!-- Recurring Appointment -->
     <AmSlidePopup
       v-if="service.recurringCycle !== 'disabled' && notLastDay && cart.length <= 1"
+      ref="recurringPopupRef"
       :visibility="recurringPopupVisibility"
       class="am-fs-dt__calendar__recurring"
     >
@@ -85,7 +88,9 @@ import {
   computed,
   onMounted,
   watchEffect,
-  reactive
+  reactive,
+  watch,
+  nextTick
 } from "vue";
 import AmButton from "../../../_components/button/AmButton.vue";
 import AmSlidePopup from "../../../_components/slide-popup/AmSlidePopup.vue";
@@ -169,6 +174,23 @@ let slotPricingVisibility = computed(() => {
   return defaultCustomizeSettings.sbsNew.dateTimeStep.options.slotPricingVisibility.visibility
 })
 
+// * Waiting List - Show People Waiting
+let peopleWaitingVisibility = computed(() => {
+  if ('peopleWaitingVisibility' in amCustomize.dateTimeStep.options) {
+    return amCustomize.dateTimeStep.options.peopleWaitingVisibility.visibility
+  }
+
+  return defaultCustomizeSettings.sbsNew.dateTimeStep.options.peopleWaitingVisibility.visibility
+})
+
+let calendarDateBusynessVisibility = computed(() => {
+  if ('calendarDateBusynessVisibility' in amCustomize.dateTimeStep.options) {
+    return amCustomize.dateTimeStep.options.calendarDateBusynessVisibility.visibility
+  }
+
+  return defaultCustomizeSettings.sbsNew.dateTimeStep.options.calendarDateBusynessVisibility.visibility
+})
+
 const store = useStore()
 
 // * Amelia Settings
@@ -187,7 +209,7 @@ let langDetection = computed(() => amSettings.general.usedLanguages.includes(loc
 let amLabels = computed(() => {
   let computedLabels = reactive({...globalLabels})
 
-  if (amSettings.customizedData && amSettings.customizedData.sbsNew && amSettings.customizedData.sbsNew.dateTimeStep.translations) {
+  if (amSettings.customizedData?.sbsNew?.dateTimeStep?.translations) {
     let customizedLabels = amSettings.customizedData.sbsNew.dateTimeStep.translations
     Object.keys(customizedLabels).forEach(labelKey => {
       if (customizedLabels[labelKey][localLanguage.value] && langDetection.value) {
@@ -263,6 +285,12 @@ let packagesVisibility = ref(
 )
 provide('packagesVisibility', packagesVisibility)
 
+watch(packagesVisibility, (isVisible) => {
+  if (!isVisible && dateTimeRef.value) {
+    dateTimeRef.value.focus()
+  }
+})
+
 
 /**************
  * Navigation *
@@ -296,7 +324,10 @@ watchEffect(() => {
 
     usePaymentError(store, '')
 
-    if (service.recurringCycle !== 'disabled' && service.recurringCycle !== null && notLastDay.value && cart.length <= 1) {
+    if (
+      service.recurringCycle !== 'disabled' && service.recurringCycle !== null && notLastDay.value && cart.length <= 1
+      && !store.getters['appointmentWaitingListOptions/getIsWaitingListSlot']
+    ) {
       recurringPopupVisibility.value = true
     } else {
       let bookingFailed = useFillAppointments(store)
@@ -365,6 +396,7 @@ provide('useDeselectedDate', useDeselectedDate)
 let service = reactive({})
 
 let recurringPopupVisibility = ref(false)
+let recurringPopupRef = ref(null)
 
 let { goToRecurringStep } = inject('goToRecurringStep', {
   goToRecurringStep: () => {}
@@ -372,6 +404,18 @@ let { goToRecurringStep } = inject('goToRecurringStep', {
 
 let { removeRecurringStep } = inject('removeRecurringStep', {
   removeRecurringStep: () => {}
+})
+
+// * Focus management for keyboard navigation on Recurring Appointment Popup
+watch(recurringPopupVisibility, async (isVisible) => {
+  if (isVisible) {
+    // Wait for DOM to update
+    await nextTick()
+    let footerButton = recurringPopupRef.value?.$el?.querySelector('.am-button--secondary')
+    if (footerButton) {
+      footerButton.focus()
+    }
+  }
 })
 
 let notLastDay = computed(() => {
@@ -498,7 +542,10 @@ onMounted(() => {
 
   let hasItem = index in items
 
-  if (hasItem && cartItem.value.services[cartItem.value.serviceId].list.length > 1) {
+  if (
+    (hasItem && cartItem.value.services[cartItem.value.serviceId].list.length > 1) ||
+    store.getters['appointmentWaitingListOptions/getIsWaitingListSlot']
+  ) {
     removeRecurringStep()
   }
 
@@ -514,6 +561,10 @@ onMounted(() => {
   }
 
   loadCounter.value++
+
+  if (dateTimeRef.value && !packagesVisibility.value) {
+    dateTimeRef.value.focus()
+  }
 })
 </script>
 

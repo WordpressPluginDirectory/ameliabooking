@@ -23,6 +23,8 @@ class CustomerBookingsTable extends AbstractDatabaseTable
     {
         $table = self::getTableName();
 
+        $charsetCollate = self::getCharsetCollate();
+
         $token = Token::MAX_LENGTH;
 
         return "CREATE TABLE {$table} (
@@ -44,8 +46,9 @@ class CustomerBookingsTable extends AbstractDatabaseTable
                     `created` DATETIME NULL,
                     `actionsCompleted` TINYINT(1) NULL,
                     `qrCodes` TEXT NULL,
+                    `ivyEntryId` INT(11) DEFAULT NULL,
                     PRIMARY KEY (`id`)
-                ) DEFAULT CHARSET=utf8 COLLATE utf8_general_ci";
+                ) {$charsetCollate};";
     }
 
     /**

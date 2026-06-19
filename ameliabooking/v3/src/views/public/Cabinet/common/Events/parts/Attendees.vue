@@ -1,13 +1,9 @@
 <template>
-  <div
-    ref="attendeesContainer"
-    class="am-capei-att"
-    :style="cssVars"
-  >
+  <div ref="attendeesContainer" class="am-capei-att" :style="cssVars">
     <AmAlert
       v-if="alertVisibility"
       ref="alertContainer"
-      :type= "alertType"
+      :type="alertType"
       :show-border="true"
       :close-after="5000"
       custom-class="am-cap__alert"
@@ -126,10 +122,7 @@
                 class="am-capei-att__card-inner"
                 :class="props.responsiveClass"
               >
-                <div
-                  class="am-capei-att__info"
-                  :class="props.responsiveClass"
-                >
+                <div class="am-capei-att__info" :class="props.responsiveClass">
                   <!-- Customer Name -->
                   <div
                     class="am-capei-customer__name"
@@ -144,7 +137,10 @@
                   <!-- /Customer Name -->
 
                   <div
-                    v-if="((item.customer.phone && customerPhoneVisibility) || (item.customer.email && customerEmailVisibility))"
+                    v-if="
+                      (item.customer.phone && customerPhoneVisibility) ||
+                      (item.customer.email && customerEmailVisibility)
+                    "
                     class="am-capei-customer__data-wrapper"
                   >
                     <!-- Customer Phone -->
@@ -237,13 +233,27 @@
                 </div>
               </div>
 
-              <div v-if="amSettings.appointments.qrCodeEvents.enabled && item.qrCodes" class="am-capei-att__card-etickets">
+              <div
+                v-if="
+                  amSettings.featuresIntegrations.eTickets.enabled &&
+                  item.qrCodes
+                "
+                class="am-capei-att__card-etickets"
+              >
                 <div class="am-capei-att__card-etickets__label">
                   {{ amLabels.checked_in }}:
                 </div>
-                <div v-for="(val, date) in (getQrCodesBooking(item.qrCodes))" :key="date" class="am-capei-att__card-etickets__item">
-                  <span class="am-capei-att__card-etickets__date">{{date}}:</span>
-                  <span class="am-capei-att__card-etickets__capacity">{{val}}</span>
+                <div
+                  v-for="(val, date) in getQrCodesBooking(item.qrCodes)"
+                  :key="date"
+                  class="am-capei-att__card-etickets__item"
+                >
+                  <span class="am-capei-att__card-etickets__date"
+                    >{{ date }}:</span
+                  >
+                  <span class="am-capei-att__card-etickets__capacity">{{
+                    val
+                  }}</span>
                 </div>
               </div>
 
@@ -257,10 +267,8 @@
             </div>
 
             <AmPagination
-              v-if="
-                approvedBookingsCount > amSettings.general.itemsPerPageBackEnd
-              "
-              :page-size="amSettings.general.itemsPerPageBackEnd"
+              v-if="approvedBookingsCount > amSettings.general.itemsPerPage"
+              :page-size="amSettings.general.itemsPerPage"
               :pager-count="5"
               layout="prev, pager, next"
               :total="approvedBookingsCount"
@@ -277,7 +285,7 @@
       <!-- Waiting List -->
       <el-tab-pane
         v-if="
-          amSettings.appointments.waitingListEvents.enabled &&
+          amSettings.featuresIntegrations.waitingList.enabled &&
           eventSettings !== null &&
           'waitingList' in eventSettings &&
           eventSettings.waitingList.enabled
@@ -296,10 +304,7 @@
                 class="am-capei-att__card-inner"
                 :class="props.responsiveClass"
               >
-                <div
-                  class="am-capei-att__info"
-                  :class="props.responsiveClass"
-                >
+                <div class="am-capei-att__info" :class="props.responsiveClass">
                   <!-- Customer Name -->
                   <div
                     class="am-capei-customer__name"
@@ -314,7 +319,10 @@
                   <!-- /Customer Name -->
 
                   <div
-                    v-if="((item.customer.phone && customerPhoneVisibility) || (item.customer.email && customerEmailVisibility))"
+                    v-if="
+                      (item.customer.phone && customerPhoneVisibility) ||
+                      (item.customer.email && customerEmailVisibility)
+                    "
                     class="am-capei-customer__data-wrapper"
                   >
                     <!-- Customer Phone -->
@@ -416,10 +424,8 @@
             </div>
 
             <AmPagination
-              v-if="
-                waitingBookingsCount > amSettings.general.itemsPerPageBackEnd
-              "
-              :page-size="amSettings.general.itemsPerPageBackEnd"
+              v-if="waitingBookingsCount > amSettings.general.itemsPerPage"
+              :page-size="amSettings.general.itemsPerPage"
               :pager-count="5"
               layout="prev, pager, next"
               :total="waitingBookingsCount"
@@ -477,9 +483,7 @@ import { useStore } from 'vuex'
 // * Import from Library
 import httpClient from '../../../../../../plugins/axios'
 
-
 // * Composables
-import { useAuthorizationHeaderObject } from '../../../../../../assets/js/public/panel'
 import { useUrlParams } from '../../../../../../assets/js/common/helper'
 import { useColorTransparency } from '../../../../../../assets/js/common/colorManipulation'
 import {
@@ -504,7 +508,7 @@ import AmPagination from '../../../../../_components/pagination/AmPagination.vue
 import EmptyState from '../../parts/EmptyState.vue'
 import Attendee from './Attendee.vue'
 import CancelPopup from '../../parts/CancelPopup.vue'
-import AmAlert from "../../../../../_components/alert/AmAlert.vue";
+import AmAlert from '../../../../../_components/alert/AmAlert.vue'
 
 // * Component properties
 let props = defineProps({
@@ -539,8 +543,16 @@ const shortcodeData = inject('shortcodeData')
 let amCustomize = inject('amCustomize')
 
 // * Customized options
-let customerPhoneVisibility = computed(() => shortcodeData.value.cabinetType === 'employee' ? amCustomize.value.events.options.customerPhone.visibility : true)
-let customerEmailVisibility = computed(() => shortcodeData.value.cabinetType === 'employee' ? amCustomize.value.events.options.customerEmail.visibility : true)
+let customerPhoneVisibility = computed(() =>
+  shortcodeData.value.cabinetType === 'employee'
+    ? amCustomize.value.events.options.customerPhone.visibility
+    : true
+)
+let customerEmailVisibility = computed(() =>
+  shortcodeData.value.cabinetType === 'employee'
+    ? amCustomize.value.events.options.customerEmail.visibility
+    : true
+)
 
 // * Alert block
 let alertContainer = ref(null)
@@ -549,9 +561,9 @@ let alertType = ref('success')
 
 let alertMessage = ref('')
 
-function closeAlert () {
+function closeAlert() {
   alertVisibility.value = false
-  store.commit('cabinet/setPaymentLinkError', {value: false, type: 'event'})
+  store.commit('cabinet/setPaymentLinkError', { value: false, type: 'event' })
 }
 
 let eventAttendeeVisibility = ref(false)
@@ -604,7 +616,7 @@ function promptRemoveAttendee(item, isWaiting) {
 // * Page Content width
 let attendeesContainer = ref(null)
 
-function savedAttendee () {
+function savedAttendee() {
   store.commit('attendee/setActive', false)
 
   alertVisibility.value = true
@@ -616,7 +628,9 @@ function savedAttendee () {
     }, 500)
   }
 
-  getBookings(activeTab.value === 'approved' ? ['approved', 'canceled'] : ['waiting'])
+  getBookings(
+    activeTab.value === 'approved' ? ['approved', 'canceled'] : ['waiting']
+  )
 
   closedAttendee()
 }
@@ -707,24 +721,16 @@ function getBookings(statuses, page = 1) {
   }
 
   httpClient
-    .get(
-      '/bookings/events',
-      Object.assign(
-        useAuthorizationHeaderObject(store),
-        {
-          params: useUrlParams(
-            {
-              source: 'cabinet-provider',
-              statuses: statuses,
-              page: page,
-              limit: parseInt(amSettings.general.itemsPerPageBackEnd),
-              events: [props.event.id],
-              customers: customerId.value ? [customerId.value] : [],
-            }
-          ),
-        }
-      )
-    )
+    .get('/bookings/events', {
+      params: useUrlParams({
+        source: 'cabinet-provider',
+        statuses: statuses,
+        page: page,
+        limit: parseInt(amSettings.general.itemsPerPage),
+        events: [props.event.id],
+        customers: customerId.value ? [customerId.value] : [],
+      }),
+    })
     .then((response) => {
       if (statuses[0] === 'approved') {
         bookedCount.value = response.data.data.attendeeCount
@@ -781,11 +787,20 @@ function updateBookingStatus(id, status) {
         status: status,
         bookings: [{ status: status }],
       },
-      Object.assign(useAuthorizationHeaderObject(store), {
+      {
         params: { source: 'cabinet-provider' },
-      })
+      }
     )
-    .then(() => {})
+    .then((result) => {
+      alertVisibility.value = true
+      alertMessage.value = amLabels.value.event_status_changed + (amLabels.value[result.data.data.booking.status]).toLowerCase()
+
+      if (attendeesContainer.value && alertContainer.value) {
+        setTimeout(function () {
+          useScrollTo(attendeesContainer.value, alertContainer.value.$el, 0, 300)
+        }, 500)
+      }
+    })
     .catch((e) => {
       console.log(e)
     })
@@ -818,14 +833,11 @@ function removeEventAttendee() {
     .post(
       '/events/bookings/delete/' + targetAttendee.value.id,
       useBackAttendee(store),
-      Object.assign(
-        useAuthorizationHeaderObject(store),
-        {
-          params: {
-            source: 'cabinet-provider',
-          },
-        }
-      )
+      {
+        params: {
+          source: 'cabinet-provider',
+        },
+      }
     )
     .then(() => {
       bookingsPageChange(approvedBookingsPage.value)
@@ -836,17 +848,19 @@ function removeEventAttendee() {
     })
 }
 
-let attendeeStatuses = ref(useAttendeeStatuses().filter(
-    i => (
-      !amSettings.appointments.waitingListEvents.enabled ||
-      (
-        eventSettings.value
-          ? 'waitingList' in eventSettings.value && !eventSettings.value.waitingList.enabled
-          : true
-      ) ? i.value !== 'waiting' : true
-    ) && (
-      !amSettings.roles.enableNoShowTag ? i.value !== 'no-show' : true
-    )
+let attendeeStatuses = ref(
+  useAttendeeStatuses().filter(
+    (i) =>
+      (!amSettings.featuresIntegrations.waitingList.enabled ||
+      (eventSettings.value
+        ? 'waitingList' in eventSettings.value &&
+          !eventSettings.value.waitingList.enabled
+        : true)
+        ? i.value !== 'waiting'
+        : true) &&
+      (!amSettings.featuresIntegrations.noShowTag.enabled
+        ? i.value !== 'no-show'
+        : true)
   )
 )
 
@@ -865,30 +879,79 @@ let placesLabels = computed(() => {
     : amLabels.value.attendees
 })
 
-function getQrCodesBooking (qrCodes) {
-  const tickets = JSON.parse(qrCodes)
-  const eDates = {}
+function getQrCodesBooking(qrCodes) {
+  if (!qrCodes) {
+    return {}
+  }
 
-  tickets.forEach(ticket => {
-    if (ticket.type !== 'booking') {
-      for (const [date, scanned] of Object.entries(ticket.dates)) {
-        (eDates[date] = eDates[date] || []).push(scanned)
-      }
+  let tickets = []
+
+  try {
+    tickets = JSON.parse(qrCodes)
+  } catch (error) {
+    return {}
+  }
+
+  if (!Array.isArray(tickets)) {
+    return {}
+  }
+
+  const periodDates = new Set()
+
+  if (!Array.isArray(props.event?.periods)) {
+    return {}
+  }
+
+  props.event.periods.forEach((period) => {
+    if (!period?.periodStart || !period?.periodEnd) {
+      return
+    }
+
+    const startDate = new Date(period.periodStart.split(' ')[0])
+    const endDate = new Date(period.periodEnd.split(' ')[0])
+
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+      return
+    }
+
+    const currentDate = new Date(startDate)
+
+    while (currentDate <= endDate) {
+      periodDates.add(currentDate.toISOString().split('T')[0])
+      currentDate.setDate(currentDate.getDate() + 1)
     }
   })
 
+  const eDates = {}
+
+  periodDates.forEach((date) => {
+    eDates[date] = { scanned: 0, total: 0 }
+
+    tickets.forEach((ticket) => {
+      if (ticket.type !== 'booking') {
+        eDates[date].total += 1
+
+        if (ticket.dates && ticket.dates[date]) {
+          eDates[date].scanned += 1
+        }
+      }
+    })
+  })
+
   return Object.fromEntries(
-    Object.entries(eDates).map(([date, scans]) => [
-      date,
-      `${scans.filter(Boolean).length}/${scans.length}`
-    ])
+    Object.entries(eDates)
+      .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
+      .map(([date, counts]) => [date, `${counts.scanned}/${counts.total}`])
   )
 }
 
 onMounted(() => {
   getBookings(['approved', 'canceled'])
 
-  store.commit('customerInfo/setCustomers', store.getters['auth/getPreloadedCustomers'])
+  store.commit(
+    'customerInfo/setCustomers',
+    store.getters['auth/getPreloadedCustomers']
+  )
 })
 
 // * Colors
@@ -1147,6 +1210,14 @@ export default {
   [class^='am-icon-'] {
     font-size: 24px;
     line-height: 0;
+  }
+
+  .am-icon-info-reverse,
+  .am-icon-close,
+  .am-icon-refresh,
+  .am-icon-check {
+    font-size: 18px;
+    padding: 3px;
   }
 
   .el-select-dropdown__item {

@@ -15,13 +15,25 @@
       </span>
     </template>
     <AmInputPhone
-      v-model="infoFormData.phone"
+      :key="`phone-${countryCode}-${props.refreshTrigger}`"
+      v-model="model"
+      v-model:country-code="countryCode"
       :placeholder="amLabels.enter_phone"
-      :default-code="settings.general.phoneDefaultCountryCode === 'auto' ? '' : settings.general.phoneDefaultCountryCode.toLowerCase()"
-      name="phone"
+      :validation-error="true"
+      :error="props.phoneError"
+      :phone-input-attributes="{ name: 'phone' }"
       style="position: relative"
-      @country-phone-iso-updated="(val) => {emits('countryPhoneIsoUpdated', val)}"
-    />
+      @data="handleData"
+    >
+      <template #no-results>
+        {{ amLabels.no_results_found }}
+      </template>
+    </AmInputPhone>
+    <template #error v-if="props.errorMessage">
+      <span class="el-form-item__error">
+        {{ props.errorMessage }}
+      </span>
+    </template>
     <div v-if="whatsAppSetUp() && !props.phoneError" class="am-whatsapp-opt-in-text">
       {{ amLabels.whatsapp_opt_in_text }}
     </div>
@@ -38,7 +50,6 @@ import {
   computed,
   inject,
   ref,
-  onMounted,
 } from "vue";
 
 // * Composables
@@ -47,15 +58,48 @@ import {
 } from "../../../../../assets/js/common/colorManipulation";
 
 // * Emits
-const emits = defineEmits([
-  'countryPhoneIsoUpdated',
-])
 
 // * Props
 let props = defineProps({
+  modelValue: {
+    type: String,
+    default: ''
+  },
+  countryCode: {
+    type: String,
+    default: ''
+  },
   phoneError: {
     type: Boolean,
     default: false
+  },
+  errorMessage: {
+    type: String,
+    default: ''
+  },
+  refreshTrigger: {
+    type: Number,
+    default: 0
+  }
+})
+
+let emits = defineEmits([
+  'update:modelValue',
+  'update:countryCode',
+  'handlePhoneData'
+])
+
+const model = computed({
+  get: () => props.modelValue,
+  set: (val) => {
+    emits('update:modelValue', val)
+  }
+})
+
+const countryCode = computed({
+  get: () => props.countryCode,
+  set: (val) => {
+    emits('update:countryCode', val)
   }
 })
 
@@ -77,18 +121,13 @@ let amLabels = inject('amLabels')
 // * Customize
 let amCustomize = inject('amCustomize')
 
-// * Form field data
-let infoFormData = inject('infoFormData')
-
 function whatsAppSetUp () {
-  return settings.notifications.whatsAppEnabled && settings.notifications.whatsAppAccessToken && settings.notifications.whatsAppBusinessID && settings.notifications.whatsAppPhoneID
+  return settings.notifications.whatsAppEnabled
 }
 
-onMounted(() => {
-  if (settings.general.phoneDefaultCountryCode && settings.general.phoneDefaultCountryCode !== 'auto') {
-    emits('countryPhoneIsoUpdated', settings.general.phoneDefaultCountryCode.toLowerCase())
-  }
-})
+function handleData(val) {
+  emits('handlePhoneData', val)
+}
 
 defineExpose({
   primeFieldRef

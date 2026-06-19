@@ -10,8 +10,11 @@ use AmeliaBooking\Domain\Services\DateTime\DateTimeService;
 use AmeliaBooking\Domain\ValueObjects\String\BookingStatus;
 use AmeliaBooking\Domain\ValueObjects\String\Status;
 use AmeliaBooking\Infrastructure\Common\Exceptions\QueryExecutionException;
+use AmeliaBooking\Infrastructure\WP\InstallActions\DB\Bookable\PackagesCustomersTable;
 use AmeliaBooking\Infrastructure\WP\InstallActions\DB\Booking\AppointmentsTable;
 use AmeliaBooking\Infrastructure\WP\InstallActions\DB\Booking\CustomerBookingsTable;
+use AmeliaBooking\Infrastructure\WP\InstallActions\DB\Booking\CustomerBookingsToEventsPeriodsTable;
+use AmeliaBooking\Infrastructure\WP\InstallActions\DB\Booking\EventsPeriodsTable;
 use AmeliaBooking\Infrastructure\WP\InstallActions\DB\User\WPUsersTable;
 
 /**
@@ -35,6 +38,9 @@ class CustomerRepository extends UserRepository implements CustomerRepositoryInt
             $wpUserTable       = WPUsersTable::getTableName();
             $bookingsTable     = CustomerBookingsTable::getTableName();
             $appointmentsTable = AppointmentsTable::getTableName();
+            $eventsPeriodsTable = EventsPeriodsTable::getTableName();
+            $bookingsEventsPeriodsTable = CustomerBookingsToEventsPeriodsTable::getTableName();
+            $packagesCustomersTable = PackagesCustomersTable::getTableName();
 
             $params = [
                 ':type_customer'        => AbstractUser::USER_ROLE_CUSTOMER,
@@ -49,8 +55,14 @@ class CustomerRepository extends UserRepository implements CustomerRepositoryInt
 
             $order = '';
             if (!empty($criteria['sort'])) {
-                $column         = $criteria['sort'][0] === '-' ? substr($criteria['sort'], 1) : $criteria['sort'];
-                $orderColumn    = $column === 'customer' ? 'CONCAT(u.firstName, " ", u.lastName)' : 'lastAppointment';
+                $column      = $criteria['sort'][0] === '-' ? substr($criteria['sort'], 1) : $criteria['sort'];
+
+                $orderColumns = [
+                    'customer'        => 'CONCAT(u.firstName, \' \', u.lastName)',
+                    'total-bookings'  => 'totalBookings',
+                ];
+                $orderColumn = $orderColumns[$column] ?? 'lastBooking';
+
                 $orderDirection = $criteria['sort'][0] === '-' ? 'DESC' : 'ASC';
                 $order          = "ORDER BY {$orderColumn} {$orderDirection}";
 
@@ -58,14 +70,25 @@ class CustomerRepository extends UserRepository implements CustomerRepositoryInt
             }
 
             if (!empty($criteria['search'])) {
-                $params[':search1'] = $params[':search2'] = $params[':search3'] = $params[':search4'] = $params[':search5'] =
-                    "%{$criteria['search']}%";
+                $terms = preg_split('/\s+/', trim($criteria['search']));
+                $termIndex = 0;
 
-                $where[] = "((CONCAT(u.firstName, ' ', u.lastName) LIKE :search1
-                            OR wpu.display_name LIKE :search2
-                            OR u.email LIKE :search3
-                            OR u.phone LIKE :search4
-                            OR u.note LIKE :search5))";
+                foreach ($terms as $term) {
+                    $param = ":search{$termIndex}";
+                    $params[$param] = "%{$term}%";
+
+                    $where[] = "(
+                        u.firstName LIKE {$param}
+                        OR u.lastName LIKE {$param}
+                        OR u.email LIKE {$param}
+                        OR u.phone LIKE {$param}
+                        OR u.note LIKE {$param}
+                        OR wpu.display_name LIKE {$param}
+                        OR u.id LIKE {$param}
+                    )";
+
+                    $termIndex++;
+                }
             }
 
             if (!empty($criteria['customers'])) {
@@ -80,8 +103,10 @@ class CustomerRepository extends UserRepository implements CustomerRepositoryInt
             }
 
             $statsFields = '
+                NULL as lastBooking,
                 NULL as lastAppointment,
-                0 as totalAppointments,
+                NULL as lastEvent,
+                0 as totalBookings,
                 0 as countPendingAppointments,
                 0 as countAppointmentBookings,
                 0 as countEventBookings,
@@ -95,22 +120,35 @@ class CustomerRepository extends UserRepository implements CustomerRepositoryInt
                 $params[':bookingPendingStatus'] = BookingStatus::PENDING;
 
                 $statsFields = "
+                    COALESCE(GREATEST(MAX(app.bookingStart), MAX(ep.periodStart)),
+                     MAX(app.bookingStart), MAX(ep.periodStart), MAX(pc.purchased)) as lastBooking,
                     MAX(app.bookingStart) as lastAppointment,
-                    COUNT(cb.id) as totalAppointments,
+                    MAX(ep.periodStart) as lastEvent,
+                    MAX(pc.purchased) as lastPackage,
+                    COUNT(DISTINCT cb.id) as totalBookings,
                     SUM(case when cb.status = :bookingPendingStatus then 1 else 0 end) as countPendingAppointments,
                     COUNT(DISTINCT CASE WHEN cb.appointmentId IS NOT NULL THEN cb.id ELSE NULL END) as countAppointmentBookings,
                     COUNT(DISTINCT CASE WHEN cb.appointmentId IS NULL THEN cb.id ELSE NULL END) as countEventBookings,
+                    COUNT(pc.customerId) as countPackagePurchases,
                 ";
 
                 $statsJoins = "
                     LEFT JOIN {$bookingsTable} cb ON u.id = cb.customerId
                     LEFT JOIN {$appointmentsTable} app ON app.id = cb.appointmentId
+                    LEFT JOIN {$bookingsEventsPeriodsTable} bep ON bep.customerBookingId = cb.id
+                    LEFT JOIN {$eventsPeriodsTable} ep ON ep.id = bep.eventPeriodId
+                    LEFT JOIN {$packagesCustomersTable} pc ON pc.customerId = u.id
                 ";
 
                 if (!empty($criteria['noShow'])) {
-                    $having = "HAVING (SUM(case when cb.status = 'no-show' then 1 else 0 end)) " . ($criteria['noShow'] === "3" ? '>=' : '=') . ":noShow";
-
-                    $params[':noShow'] = $criteria['noShow'];
+                    $having = "HAVING (";
+                    foreach ($criteria['noShow'] as $index => $noShowId) {
+                        $param = ':noShow' . $index;
+                        $params[$param] = $noShowId;
+                        $having .= ($index === 0 ? "" : " OR ") . "(COUNT(DISTINCT CASE WHEN cb.status = 'no-show' THEN cb.id ELSE NULL END) " .
+                            ($noShowId === "3" ? '>=' : '=') . " " . $param . ")";
+                    }
+                    $having .= ")";
                 }
             }
 
@@ -152,22 +190,31 @@ class CustomerRepository extends UserRepository implements CustomerRepositoryInt
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to get data from ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to get data from ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         $items = [];
         foreach ($rows as $row) {
             $row['id']         = (int)$row['id'];
             $row['externalId'] = $row['externalId'] === null ? $row['externalId'] : (int)$row['externalId'];
-            $row['lastAppointment'] = $row['lastAppointment'] ?
-                DateTimeService::getCustomDateTimeFromUtc($row['lastAppointment']) : $row['lastAppointment'];
+            $row['lastBooking'] = !empty($row['lastBooking']) ? DateTimeService::getCustomDateTimeFromUtc($row['lastBooking']) : $row['lastBooking'];
+            $row['lastAppointment'] = !empty($row['lastAppointment']) ?
+                DateTimeService::getCustomDateTimeFromUtc($row['lastAppointment']) :
+                $row['lastAppointment'];
+            $row['lastEvent'] = !empty($row['lastEvent']) ? DateTimeService::getCustomDateTimeFromUtc($row['lastEvent']) : $row['lastEvent'];
+            $row['lastPackage'] = !empty($row['lastPackage']) ? DateTimeService::getCustomDateTimeFromUtc($row['lastPackage']) : null;
+
+            $row['totalBookings'] = (int)$row['totalBookings'];
+            $row['totalAppointments'] = (int)$row['countAppointmentBookings'];
+            $row['totalEvents'] = (int)$row['countEventBookings'];
+            $row['totalPackages'] = !empty($row['countPackagePurchases']) ? (int)$row['countPackagePurchases'] : 0;
 
             // Fix for customFields being encoded multiple times
             if ($row['customFields'] && !is_array(json_decode($row['customFields'], true))) {
                 $row['customFields'] = null;
             }
 
-            $items[(int)$row['id']] = $row;
+            $items[$row['id']] = $row;
         }
 
         return $items;
@@ -186,22 +233,32 @@ class CustomerRepository extends UserRepository implements CustomerRepositoryInt
         $params = [
             ':type_customer' => AbstractUser::USER_ROLE_CUSTOMER,
             ':type_admin'    => AbstractUser::USER_ROLE_ADMIN,
-            ':statusVisible' => Status::VISIBLE,
         ];
 
         $where = [
             'u.type IN (:type_customer, :type_admin)',
-            'u.status = :statusVisible'
         ];
 
         if (!empty($criteria['search'])) {
-            $params[':search1'] = $params[':search2'] = $params[':search3'] = $params[':search4'] =
-                "%{$criteria['search']}%";
+            $terms = preg_split('/\s+/', trim($criteria['search']));
+            $termIndex = 0;
 
-            $where[] = "((CONCAT(u.firstName, ' ', u.lastName) LIKE :search1
-                            OR wpu.display_name LIKE :search2
-                            OR u.email LIKE :search3
-                            OR u.note LIKE :search4))";
+            foreach ($terms as $term) {
+                $param = ":search{$termIndex}";
+                $params[$param] = "%{$term}%";
+
+                $where[] = "(
+                        u.firstName LIKE {$param}
+                        OR u.lastName LIKE {$param}
+                        OR u.email LIKE {$param}
+                        OR u.phone LIKE {$param}
+                        OR u.note LIKE {$param}
+                        OR wpu.display_name LIKE {$param}
+                        OR u.id LIKE {$param}
+                    )";
+
+                $termIndex++;
+            }
         }
 
         if (!empty($criteria['customers'])) {
@@ -218,11 +275,16 @@ class CustomerRepository extends UserRepository implements CustomerRepositoryInt
         if (!empty($criteria['noShow'])) {
             $bookingsTable = CustomerBookingsTable::getTableName();
 
-            $params[':noShow'] = $criteria['noShow'];
+            $noShowWhere = "exists (SELECT COUNT(*) as c FROM {$bookingsTable} cb WHERE cb.status='no-show' AND cb.customerId=u.id HAVING ";
 
-            $where[] =
-                "(SELECT COUNT(*) FROM {$bookingsTable} cb WHERE cb.status='no-show' AND cb.customerId=u.id)" .
-                ($criteria['noShow'] === "3" ? '>=' : '=') . " :noShow";
+            foreach ($criteria['noShow'] as $index => $noShowId) {
+                $param = ':noShow' . $index;
+                $params[$param] = $noShowId;
+                $noShowWhere .= ($index === 0 ? "" : " OR ") . "c " . ($noShowId === "3" ? '>=' : '=') . $param;
+            }
+            $noShowWhere .= ")";
+
+            $where[] = $noShowWhere;
         }
 
         $where = $where ? 'WHERE ' . implode(' AND ', $where) : '';
@@ -240,7 +302,7 @@ class CustomerRepository extends UserRepository implements CustomerRepositoryInt
 
             $rows = $statement->fetch()['count'];
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to get data from ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to get data from ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return $rows;
@@ -279,7 +341,7 @@ class CustomerRepository extends UserRepository implements CustomerRepositoryInt
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to get data from ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to get data from ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return $rows;
@@ -307,6 +369,7 @@ class CustomerRepository extends UserRepository implements CustomerRepositoryInt
             u.email AS email,
             u.note AS note,
             u.phone AS phone,
+            u.countryPhoneIso AS countryPhoneIso,
             u.gender AS gender,
             u.birthday AS birthday,
             u.status AS status
@@ -340,7 +403,7 @@ class CustomerRepository extends UserRepository implements CustomerRepositoryInt
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find event by id in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find event by id in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         $items = new Collection();

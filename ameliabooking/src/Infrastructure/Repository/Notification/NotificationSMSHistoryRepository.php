@@ -17,7 +17,7 @@ class NotificationSMSHistoryRepository extends AbstractRepository
     /**
      * @param $data
      *
-     * @return bool
+     * @return int
      *
      * @throws QueryExecutionException
      * @throws \Exception
@@ -61,14 +61,11 @@ class NotificationSMSHistoryRepository extends AbstractRepository
                 )"
             );
 
-            $res = $statement->execute($params);
-            if (!$res) {
-                throw new QueryExecutionException('Unable to add data in ' . __CLASS__);
-            }
+            $statement->execute($params);
 
             return $this->connection->lastInsertId();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to add data in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to add data in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
     }
 
@@ -116,25 +113,21 @@ class NotificationSMSHistoryRepository extends AbstractRepository
                 WHERE id = :id"
             );
 
-            $res = $statement->execute($params);
+            $statement->execute($params);
 
-            if (!$res) {
-                throw new QueryExecutionException('Unable to save data in ' . __CLASS__);
-            }
-
-            return $res;
+            return true;
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to save data in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to save data in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
     }
 
     /**
-     * @param int    $id
+     * @param int $id
      *
-     * @return array
+     * @return array|null
      * @throws QueryExecutionException
      */
-    public function getById($id)
+    public function getItemById($id)
     {
         try {
             $statement = $this->connection->prepare(
@@ -149,7 +142,7 @@ class NotificationSMSHistoryRepository extends AbstractRepository
 
             $row = $statement->fetch();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         if (!$row) {
@@ -206,7 +199,7 @@ class NotificationSMSHistoryRepository extends AbstractRepository
                 $row['dateTime'] = DateTimeService::getCustomDateTimeFromUtc($row['dateTime']);
             }
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to get data from ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to get data from ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return $rows;
@@ -244,7 +237,7 @@ class NotificationSMSHistoryRepository extends AbstractRepository
 
             $row = $statement->fetch()['count'];
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to get data from ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to get data from ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return $row;

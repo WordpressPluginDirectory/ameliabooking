@@ -4,7 +4,7 @@ namespace AmeliaBooking\Application\Controller\Notification;
 
 use AmeliaBooking\Application\Commands\Notification\UpdateSMSNotificationHistoryCommand;
 use AmeliaBooking\Application\Controller\Controller;
-use Slim\Http\Request;
+use AmeliaVendor\Psr\Http\Message\ServerRequestInterface as Request;
 
 /**
  * Class UpdateSMSNotificationHistoryController
@@ -20,7 +20,8 @@ class UpdateSMSNotificationHistoryController extends Controller
         'status',
         'price',
         'dateTime',
-        'logId'
+        'logId',
+        'signature'
     ];
 
     /**

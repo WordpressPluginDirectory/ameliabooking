@@ -7,7 +7,10 @@
       label-position="top"
       class="am-fs__init-form"
     >
-      <template v-for="item in amCustomize[pageRenderKey][stepName].order" :key="item.id">
+      <template
+        v-for="item in amCustomize[pageRenderKey][stepName].order"
+        :key="item.id"
+      >
         <component :is="formFields[item.id]"></component>
       </template>
     </el-form>
@@ -20,23 +23,21 @@
       <BringingAnyone></BringingAnyone>
       <template #footer>
         <AmButton
-          v-if="amSettings.appointments.bringingAnyoneLogic === 'additional'"
           category="secondary"
-          :type="amCustomize[pageRenderKey].bringingAnyone.options.secondaryButton.buttonType"
+          :type="
+            amCustomize[pageRenderKey].bringingAnyone.options.secondaryButton
+              .buttonType
+          "
         >
           {{ labelsDisplay('bringing_no', 'bringingAnyone') }}
         </AmButton>
         <AmButton
-          v-if="amSettings.appointments.bringingAnyoneLogic === 'additional'"
-          :type="amCustomize[pageRenderKey].bringingAnyone.options.primaryButton.buttonType"
+          :type="
+            amCustomize[pageRenderKey].bringingAnyone.options.primaryButton
+              .buttonType
+          "
         >
           {{ labelsDisplay('bringing_yes', 'bringingAnyone') }}
-        </AmButton>
-        <AmButton
-            v-else
-            :type="amCustomize[pageRenderKey].bringingAnyone.options.primaryFooterButton.buttonType"
-        >
-          {{  labelsDisplay('continue', 'bringingAnyone') }}
         </AmButton>
       </template>
     </AmSlidePopup>
@@ -49,7 +50,9 @@
       </p>
       <div class="am-fs__ps-popup">
         <div
-          v-if="amCustomize[pageRenderKey].packageStep.options.heading.visibility"
+          v-if="
+            amCustomize[pageRenderKey].packageStep.options.heading.visibility
+          "
           class="am-fs__ps-popup__heading"
         >
           {{ labelsDisplay('package_heading', 'packageStep') }}
@@ -63,10 +66,13 @@
       <template #footer>
         <AmButton
           class="am-fs__ps-popup__btn"
-          :class="`am-fs__ps-popup__btn${checkScreen ? '-mobile':''}`"
+          :class="`am-fs__ps-popup__btn${checkScreen ? '-mobile' : ''}`"
           category="primary"
           size="medium"
-          :type="amCustomize[pageRenderKey].packageStep.options.primaryButton.buttonType"
+          :type="
+            amCustomize[pageRenderKey].packageStep.options.primaryButton
+              .buttonType
+          "
           :suffix="pill"
         >
           {{ labelsDisplay('continue_without_package', 'packageStep') }}
@@ -90,7 +96,10 @@ import ServiceFormField from '../../fields/ServiceFormField.vue'
 import LocationFormField from '../../fields/LocationFormField.vue'
 import EmployeeFormField from '../../fields/EmployeeFormField.vue'
 import { ref, provide, markRaw, inject, defineComponent, computed } from 'vue'
-import {useColorTransparency} from "../../../../../assets/js/common/colorManipulation";
+
+// * Import composables
+import { useReactiveCustomize } from '../../../../../assets/js/admin/useReactiveCustomize.js'
+import { useColorTransparency } from '../../../../../assets/js/common/colorManipulation'
 
 const amSettings = inject('settings')
 
@@ -105,15 +114,19 @@ let amLabels = inject('labels')
 let stepName = inject('stepName')
 let subStepName = inject('subStepName')
 let pageRenderKey = inject('pageRenderKey')
-let amCustomize = inject('customize')
+const { amCustomize } = useReactiveCustomize()
 
 // * Label computed function
-function labelsDisplay (label, stepKey) {
+function labelsDisplay(label, stepKey) {
   let computedLabel = computed(() => {
-    return amCustomize.value[pageRenderKey.value][stepKey].translations
-    && amCustomize.value[pageRenderKey.value][stepKey].translations[label]
-    && amCustomize.value[pageRenderKey.value][stepKey].translations[label][langKey.value]
-      ? amCustomize.value[pageRenderKey.value][stepKey].translations[label][langKey.value]
+    return amCustomize.value[pageRenderKey.value][stepKey].translations &&
+      amCustomize.value[pageRenderKey.value][stepKey].translations[label] &&
+      amCustomize.value[pageRenderKey.value][stepKey].translations[label][
+        langKey.value
+      ]
+      ? amCustomize.value[pageRenderKey.value][stepKey].translations[label][
+          langKey.value
+        ]
       : amLabels[label]
   })
 
@@ -124,45 +137,52 @@ function labelsDisplay (label, stepKey) {
 let initFormData = ref({
   service: null,
   location: null,
-  employee: null
+  employee: null,
 })
 provide('formData', initFormData)
 
 // * Form validation rules
 let rules = computed(() => {
-  return {service: [
-    {
-      required: true,
-      message: labelsDisplay('please_select_service', 'initStep'),
-      trigger: ['blur', 'change'],
-    }
-  ],
-  location: [
-    {
-      required: amCustomize.value[pageRenderKey.value][stepName.value].options.location.required,
-      message: labelsDisplay('please_select_location', 'initStep'),
-      trigger: ['blur', 'change'],
-    }
-  ],
-  employee: [
-    {
-      required: amCustomize.value[pageRenderKey.value][stepName.value].options.employee.required,
-      message: labelsDisplay('please_select_employee', 'initStep'),
-      trigger: ['blur', 'change'],
-    }
-  ],}
+  return {
+    service: [
+      {
+        required: true,
+        message: labelsDisplay('please_select_service', 'initStep'),
+        trigger: ['blur', 'change'],
+      },
+    ],
+    location: [
+      {
+        required:
+          amCustomize.value[pageRenderKey.value][stepName.value].options
+            .location.required,
+        message: labelsDisplay('please_select_location', 'initStep'),
+        trigger: ['blur', 'change'],
+      },
+    ],
+    employee: [
+      {
+        required:
+          amCustomize.value[pageRenderKey.value][stepName.value].options
+            .employee.required,
+        message: labelsDisplay('please_select_employee', 'initStep'),
+        trigger: ['blur', 'change'],
+      },
+    ],
+  }
 })
 
 // * Form Fields Array
 let formFields = ref({
   service: markRaw(ServiceFormField),
-  location: !licence.isLite && !licence.isStarter ? markRaw(LocationFormField) : null,
+  location:
+    !licence.isLite && !licence.isStarter ? markRaw(LocationFormField) : null,
   employee: !licence.isLite ? markRaw(EmployeeFormField) : null,
 })
 
 // * Step contains slide popups
 let inPopup = ref(true)
-provide('inPopup', {inPopup})
+provide('inPopup', { inPopup })
 
 // * Bringing Anyone With You
 let bringingAnyoneVisibility = computed(() => {
@@ -175,21 +195,27 @@ let packagesVisibility = computed(() => {
 })
 
 let pill = defineComponent({
-  template: `<div class="am-fs__ps-pill">$60 USD</div>`
+  template: `<div class="am-fs__ps-pill">$60 USD</div>`,
 })
 
 // * Global colors
-let amColors = inject('amColors');
+let amColors = inject('amColors')
 let cssPackage = computed(() => {
   return {
-    '--am-c-ps-text-op60': useColorTransparency(amColors.value.colorMainText, 0.6),
-    '--am-c-ps-text-op20': useColorTransparency(amColors.value.colorMainText, 0.2),
+    '--am-c-ps-text-op60': useColorTransparency(
+      amColors.value.colorMainText,
+      0.6
+    ),
+    '--am-c-ps-text-op20': useColorTransparency(
+      amColors.value.colorMainText,
+      0.2
+    ),
   }
 })
 
 // Container Width
 let cWidth = inject('containerWidth', 0)
-let checkScreen = computed(() => cWidth.value < 560 || (cWidth.value - 240 < 520))
+let checkScreen = computed(() => cWidth.value < 560 || cWidth.value - 240 < 520)
 </script>
 
 <script>
@@ -202,7 +228,7 @@ export default {
     stepSelectedData: [],
     finished: false,
     selected: false,
-  }
+  },
 }
 </script>
 
@@ -226,7 +252,11 @@ export default {
             $count: 3;
             @for $i from 0 through $count {
               &:nth-child(#{$i + 1}) {
-                animation: 600ms cubic-bezier(.45,1,.4,1.2) #{$i*100}ms am-animation-slide-up;
+                animation: 600ms
+                  cubic-bezier(0.45, 1, 0.4, 1.2)
+                  #{$i *
+                  100}ms
+                  am-animation-slide-up;
                 animation-fill-mode: both;
               }
             }
@@ -259,8 +289,8 @@ export default {
 
       &__popup-x {
         position: absolute;
-        top:16px;
-        right:16px;
+        top: 16px;
+        right: 16px;
         cursor: pointer;
         color: var(--am-c-main-text);
         margin: 0;
@@ -306,19 +336,20 @@ export default {
             margin: 20px 0;
             color: var(--am-c-ps-text-op60);
 
-            &:before, &:after{
-              content: "";
+            &:before,
+            &:after {
+              content: '';
               flex: 1 1;
               border-bottom: 1px solid var(--am-c-ps-text-op20);
               margin: auto;
             }
 
             &:before {
-              margin-right: 10px
+              margin-right: 10px;
             }
 
             &:after {
-              margin-left: 10px
+              margin-left: 10px;
             }
           }
 

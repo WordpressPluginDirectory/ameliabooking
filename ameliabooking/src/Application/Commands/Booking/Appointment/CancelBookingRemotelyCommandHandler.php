@@ -5,6 +5,7 @@ namespace AmeliaBooking\Application\Commands\Booking\Appointment;
 use AmeliaBooking\Application\Commands\CommandHandler;
 use AmeliaBooking\Application\Commands\CommandResult;
 use AmeliaBooking\Application\Common\Exceptions\AccessDeniedException;
+use AmeliaBooking\Application\Services\Booking\BookingFallbackService;
 use AmeliaBooking\Application\Services\User\CustomerApplicationService;
 use AmeliaBooking\Domain\Common\Exceptions\BookingCancellationException;
 use AmeliaBooking\Domain\Entity\Booking\Appointment\CustomerBooking;
@@ -48,7 +49,6 @@ class CancelBookingRemotelyCommandHandler extends CommandHandler
      * @throws QueryExecutionException
      * @throws InvalidArgumentException
      * @throws AccessDeniedException
-     * @throws \Interop\Container\Exception\ContainerException
      * @throws NotFoundException
      */
     public function handle(CancelBookingRemotelyCommand $command)
@@ -70,9 +70,18 @@ class CancelBookingRemotelyCommandHandler extends CommandHandler
         /** @var CustomerBooking $booking */
         $booking = $bookingRepository->getById((int)$command->getArg('id'));
 
+        /** @var SettingsService $settingsService */
+        $settingsService = $this->container->get('domain.settings.service');
+
+        $notificationSettings = $settingsService->getCategorySettings('notifications');
+
         if (!$booking) {
-            $result->setData(['message' => "Booking doesn't exists"]);
-            return $result;
+            if (!empty($notificationSettings['cancelErrorUrl'])) {
+                $result->setUrl($notificationSettings['cancelErrorUrl']);
+                return $result;
+            }
+
+            return $result->setHtml(BookingFallbackService::getFallbackHtml('failed'));
         }
 
         $token = $bookingRepository->getToken((int)$command->getArg('id'));
@@ -87,11 +96,22 @@ class CancelBookingRemotelyCommandHandler extends CommandHandler
             throw new AccessDeniedException('You are not allowed to update booking status');
         }
 
+        if ($booking->getStatus()->getValue() === BookingStatus::CANCELED) {
+            if (!empty($command->getField('fromForm'))) {
+                $result->setData(['fromForm' => true]);
+                return $result;
+            }
+
+            if (!empty($notificationSettings['cancelSuccessUrl'])) {
+                $result->setUrl($notificationSettings['cancelSuccessUrl']);
+                return $result;
+            }
+
+            return $result->setHtml(BookingFallbackService::getFallbackHtml('canceled'));
+        }
+
         /** @var ReservationServiceInterface $reservationService */
         $reservationService = $this->container->get('application.reservation.service')->get($type);
-
-        /** @var SettingsService $settingsService */
-        $settingsService = $this->container->get('domain.settings.service');
 
         $status = BookingStatus::CANCELED;
 
@@ -108,15 +128,13 @@ class CancelBookingRemotelyCommandHandler extends CommandHandler
                     [
                     'type'    => $type,
                     'status'  => $status,
-                    'message' => BackendStrings::getAppointmentStrings()['appointment_status_changed'] . strtolower(BackendStrings::getCommonStrings()[$status])
+                    'message' => BackendStrings::get('appointment_status_changed') . strtolower(BackendStrings::get($status))
                     ]
                 )
             );
         } catch (BookingCancellationException $e) {
             $result->setResult(CommandResult::RESULT_ERROR);
         }
-
-        $notificationSettings = $settingsService->getCategorySettings('notifications');
 
         if (!empty($command->getField('fromForm'))) {
             $result->setData(['fromForm' => true]);
@@ -127,12 +145,21 @@ class CancelBookingRemotelyCommandHandler extends CommandHandler
             $result->setUrl($notificationSettings['cancelSuccessUrl']);
 
             do_action('amelia_after_booking_canceled', $booking ? $booking->toArray() : null);
-        } elseif ($notificationSettings['cancelErrorUrl'] && $result->getResult() === CommandResult::RESULT_ERROR) {
-            $result->setUrl($notificationSettings['cancelErrorUrl']);
-        } else {
-            $result->setUrl('/');
+
+            return $result;
         }
 
-        return $result;
+        if ($notificationSettings['cancelErrorUrl'] && $result->getResult() === CommandResult::RESULT_ERROR) {
+            $result->setUrl($notificationSettings['cancelErrorUrl']);
+
+            return $result;
+        }
+
+        // No redirect URL defined - show fallback page
+        if ($result->getResult() === CommandResult::RESULT_SUCCESS) {
+            return $result->setHtml(BookingFallbackService::getFallbackHtml('canceled'));
+        }
+
+        return $result->setHtml(BookingFallbackService::getFallbackHtml('cancel_error'));
     }
 }

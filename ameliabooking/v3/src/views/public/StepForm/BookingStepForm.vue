@@ -210,8 +210,12 @@
           </div>
           <div
             class="am-fs-sb__menu"
+            tabindex="0"
+            :aria-label="amLabels.collapse_menu"
             :class="sidebarCollapseItemsClass"
             @click="sidebarCollapsed = !sidebarCollapsed"
+            @keydown.enter="sidebarCollapsed = !sidebarCollapsed"
+            @keydown.space.prevent="sidebarCollapsed = !sidebarCollapsed"
           >
             <Transition name="fade">
               <span v-if="!sidebarCollapsed" class="am-fs-sb__menu-text">
@@ -244,8 +248,7 @@
         <MainContentFooter
           :second-button-show="
             stepsArray[stepIndex] === congratulationsStep &&
-            amSettings.roles.customerCabinet.enabled &&
-            amSettings.roles.customerCabinet.pageUrl !== null
+            !!amSettings.roles.customerCabinet.pageUrl
           "
           :add-to-cart-button-show="
             useCartStep(store) && stepsArray[stepIndex] === cartStep
@@ -279,6 +282,7 @@
       v-if="shortcodeData.show !== 'packages' && !shortcodeData.package"
       ref="ameliaContainer"
       class="am-no-services"
+      :style="cssVars"
     >
       <img
         :src="
@@ -306,7 +310,7 @@
       v-else
       ref="ameliaContainer"
       class="am-no-services"
-      style="height: 100%"
+      :style="{height: '100%', ...cssVars}"
     >
       <img
         :src="
@@ -536,12 +540,21 @@ watch(ready, (current) => {
     setShortcodeParams()
 
     let preselected = store.getters['entities/getPreselected']
+
+    let selectionPackages = store.getters['entities/filteredPackages'](
+      store.getters['booking/getSelection']
+    )
+
     empty.value =
       store.getters['entities/getServices'].length === 0 ||
       store.getters['entities/getEmployees'].length === 0 ||
       (store.getters['entities/getPackages'].length === 0 &&
         (shortcodeData.value.show === 'packages' ||
-          preselected.package.length > 0))
+          preselected.package.length > 0)) ||
+      ((shortcodeData.value.show === 'packages' ||
+        preselected.show === 'packages' ||
+        preselected.package.length > 1) &&
+        selectionPackages.length === 0)
 
     let restore = useRestore(store, shortcodeData.value)
 
@@ -685,7 +698,7 @@ store.dispatch('entities/getEntities', {
     'taxes',
   ],
   licence: licence,
-  loadEntities: shortcodeData.value.hasApiCall || shortcodeData.value.in_dialog,
+  loadEntities: shortcodeData.value.hasApiCall || shortcodeData.value.trigger,
   showHidden: false,
   isPanel: false,
 })
@@ -764,6 +777,13 @@ let langDetection = computed(() =>
 )
 
 let cart = useCart(store)
+
+// * Steps flags and boolean values - we use these flags and booleans to achieve certain functionalities on pages
+// * preventRebuildRecurringBookingData flag prevents the recurring booking data from being rebuilt when navigating back to the recurring summary step
+const preventRebuildRecurringBookingData = ref(false)
+provide('stepsFlagsAndBooleans', {
+  preventRebuildRecurringBookingData,
+})
 
 // * Computed labels
 let amLabels = computed(() => {
@@ -1316,6 +1336,11 @@ provide('addPaymentsStep', { addPaymentsStep })
 
 provide('removePaymentsStep', { removePaymentsStep })
 
+// Provide cart step controls for child components (e.g., Calendar) so they can hide cart during waiting list selection
+provide('addCartStep', { addCartStep: () => addCartStep(stepIndex.value) })
+
+provide('removeCartStep', { removeCartStep })
+
 function addPaymentsStep() {
   stepsArray.value.splice(stepsArray.value.length - 1, 0, paymentStep)
 
@@ -1334,12 +1359,16 @@ function addCartStep(index) {
   stepChanger(stepsArray, [], [cartStep], index)
 
   stepChanger(sidebarSteps, [], [], index)
+
+  sidebarDataUpdate()
 }
 
 function removeCartStep() {
   stepChanger(stepsArray, ['CartStep'], [], stepIndex.value)
 
   stepChanger(sidebarSteps, ['CartStep'], [], stepIndex.value)
+
+  sidebarDataUpdate()
 }
 
 /**
@@ -1353,6 +1382,40 @@ let selectedServiceExtras = computed(() => {
 
   return service ? service.extras : []
 })
+
+// * Appointment Waiting List: populate module on service selection
+watch(() => store.getters['booking/getServiceId'], (newServiceId) => {
+  // Reset first
+  store.dispatch('appointmentWaitingListOptions/resetWaitingOptions')
+
+  if (!newServiceId) return
+
+  let globalEnabled = !!(amSettings.featuresIntegrations?.waitingListAppointments?.enabled)
+  if (!globalEnabled) return
+
+  let service = store.getters['entities/getService'](newServiceId)
+  if (!service || !service.settings) return
+
+  let serviceSettings = null
+  try {
+    serviceSettings = JSON.parse(service.settings)
+  } catch (e) {
+    serviceSettings = null
+  }
+  if (!serviceSettings || !serviceSettings.waitingList || !serviceSettings.waitingList.enabled) return
+
+  const wl = serviceSettings.waitingList
+  // Backend may not yet supply peopleWaiting for appointments; default 0
+  let waitingPayload = {
+    enabled: !!wl.enabled,
+    maxCapacity: wl.maxCapacity || 0,
+    maxExtraPeople: wl.maxExtraPeople || 0,
+    maxExtraPeopleEnabled: !!wl.maxExtraPeopleEnabled,
+    peopleWaiting: wl.peopleWaiting || 0,
+    isWaitingListSlot: false
+  }
+  store.commit('appointmentWaitingListOptions/setAllData', waitingPayload)
+}, { immediate: true })
 
 /**
  * Add or Remove steps from Steps Array
@@ -1438,6 +1501,13 @@ function previousStep() {
 
         sidebarDataUpdate()
       }
+    }
+
+    if (
+      stepIndex.value > 0 &&
+      stepsArray.value[stepIndex.value - 1]?.name === recurringSummary.name
+    ) {
+      preventRebuildRecurringBookingData.value = true
     }
 
     if (
@@ -1544,7 +1614,15 @@ let keepPaymentStep = computed(() =>
   !empty.value ? (useCart(store).length ? usePrepaidPrice(store) !== 0 : useCheckingIfAllNotFree(store)) : true
 )
 
+// Appointment waiting list flag
+const isWaitingListBooking = computed(() => store.getters['appointmentWaitingListOptions/getIsWaitingListSlot'])
+
 watchEffect(() => {
+  // If waiting list, remove payment step
+  if (isWaitingListBooking.value) {
+    removePaymentsStep()
+    return
+  }
   if (!isRestored.value && !keepPaymentStep.value) {
     removePaymentsStep()
   } else if (!isRestored.value) {
@@ -1690,6 +1768,8 @@ let amColors = computed(() => {
 })
 provide('amColors', amColors)
 
+let borderCalculation = computed(() => containerWidth.value !== 0 && containerWidth.value > 560 ? sidebarVisibility.value || sidebarCollapsed.value : false)
+
 let cssVars = computed(() => {
   return {
     '--am-c-primary': amColors.value.colorPrimary,
@@ -1737,7 +1817,7 @@ let cssVars = computed(() => {
         ? '592px'
         : '760px'
       : '520px',
-    '--am-brad-main': sidebarVisibility.value
+    '--am-brad-main': borderCalculation.value
       ? isRtl.value
         ? '0.5rem 0 0 0.5rem'
         : '0 0.5rem 0.5rem 0'
@@ -1928,6 +2008,8 @@ onMounted(() => {
     max-width: 760px;
     height: 460px;
     width: 100%;
+    background: var(--am-c-main-bgr);
+    border-radius: 8px;
 
     p {
       margin-bottom: 8px;

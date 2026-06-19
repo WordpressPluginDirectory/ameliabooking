@@ -19,7 +19,9 @@ function getDefaultEvent() {
     gallery: [],
     translations: null,
 
-    periods: [{startDate: null, endDate: null, startTime: null, endTime: null}],
+    periods: [
+      { startDate: null, endDate: null, startTime: null, endTime: null },
+    ],
     bookingOpens: {
       disabled: true,
       date: '',
@@ -181,7 +183,7 @@ export default {
     },
 
     getNotifyParticipants(state) {
-      return state.notifyParticipants
+      return !!state.notifyParticipants
     },
 
     getParentId(state) {

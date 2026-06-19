@@ -55,7 +55,7 @@
       </div>
     </div>
 
-    <div v-if="!licence.isStarter" class="am-capei-price__block">
+    <div v-if="amSettings.featuresIntegrations.depositPayment.enabled && !licence.isStarter" class="am-capei-price__block">
       <div class="am-capei-price__block-header">
         <div class="am-capei-price__block-header__text">
           {{ amLabels.deposit_enabled }}
@@ -121,7 +121,7 @@
     </div>
 
     <div
-      v-if="!licence.isStarter"
+      v-if="(event.id || amSettings.featuresIntegrations.tickets.enabled) && !licence.isStarter"
       class="am-capei-price__block"
     >
       <div class="am-capei-price__block-header">
@@ -555,6 +555,9 @@ let store = useStore()
 
 // * Labels
 let amLabels = inject('amLabels')
+
+// * Root Settings
+const amSettings = inject('settings')
 
 // * Language
 let localLanguage = inject('localLanguage')

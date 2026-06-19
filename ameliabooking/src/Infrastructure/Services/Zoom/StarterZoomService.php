@@ -1,7 +1,7 @@
 <?php
 
 /**
- * @copyright © TMS-Plugins. All rights reserved.
+ * @copyright © Melograno Ventures. All rights reserved.
  * @licence   See LICENCE.md for license details.
  */
 
@@ -33,7 +33,7 @@ class StarterZoomService extends AbstractZoomService
      *
      * @return array
      */
-    public function execute($requestUrl, $data, $method)
+    public function execute($requestUrl, $data, $method, $zoomSettings = [])
     {
         return [];
     }
@@ -43,6 +43,16 @@ class StarterZoomService extends AbstractZoomService
      * @return array
      */
     public function getUsers()
+    {
+        return [];
+    }
+
+    /**
+     * @param array $zoomSettings
+     *
+     * @return array
+     */
+    public function validateCredentials($zoomSettings)
     {
         return [];
     }

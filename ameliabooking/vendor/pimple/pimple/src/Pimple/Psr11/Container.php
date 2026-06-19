@@ -27,7 +27,7 @@
 namespace Pimple\Psr11;
 
 use Pimple\Container as PimpleContainer;
-use AmeliaPsr\Container\ContainerInterface;
+use AmeliaVendor\Psr\Container\ContainerInterface;
 
 /**
  * PSR-11 compliant wrapper.
@@ -43,12 +43,12 @@ final class Container implements ContainerInterface
         $this->pimple = $pimple;
     }
 
-    public function get($id)
+    public function get(string $id)
     {
         return $this->pimple[$id];
     }
 
-    public function has($id)
+    public function has(string $id): bool
     {
         return isset($this->pimple[$id]);
     }

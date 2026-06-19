@@ -1,7 +1,7 @@
 <?php
 
 /**
- * @copyright © TMS-Plugins. All rights reserved.
+ * @copyright © Melograno Ventures. All rights reserved.
  * @licence   See LICENCE.md for license details.
  */
 
@@ -48,7 +48,6 @@ class EventPlaceholderService extends PlaceholderService
      *
      * @return array
      *
-     * @throws \Interop\Container\Exception\ContainerException
      */
     public function getEntityPlaceholdersDummyData($type)
     {
@@ -112,79 +111,79 @@ class EventPlaceholderService extends PlaceholderService
             'zoom_host_url_date'        => $type === 'email' ?
                 '<ul>' .
                     '<li><a href="#">' .
-                        date_i18n($dateFormat, $periodStartDate) . ' ' . BackendStrings::getCommonStrings()['zoom_click_to_start'] .
+                        date_i18n($dateFormat, $periodStartDate) . ' ' . BackendStrings::get('zoom_click_to_start') .
                     '</a></li>' .
                     '<li><a href="#">' .
-                        date_i18n($dateFormat, $periodEndDate) . ' ' . BackendStrings::getCommonStrings()['zoom_click_to_start'] .
+                        date_i18n($dateFormat, $periodEndDate) . ' ' . BackendStrings::get('zoom_click_to_start') .
                     '</a></li>' .
                 '</ul>' : date_i18n($dateFormat, $periodStartDate) . ': ' . 'http://start_zoom_meeting_link.com',
             'zoom_host_url_date_time'   => $type === 'email' ?
                 '<ul>' .
                     '<li><a href="#">' .
-                        date_i18n($dateFormat . ' ' . $timeFormat, $timestamp) . BackendStrings::getCommonStrings()['zoom_click_to_start'] .
+                        date_i18n($dateFormat . ' ' . $timeFormat, $timestamp) . BackendStrings::get('zoom_click_to_start') .
                     '</a></li>' .
                     '<li><a href="#">' .
-                        date_i18n($dateFormat . ' ' . $timeFormat, $timestamp) . BackendStrings::getCommonStrings()['zoom_click_to_start'] .
+                        date_i18n($dateFormat . ' ' . $timeFormat, $timestamp) . BackendStrings::get('zoom_click_to_start') .
                     '</a></li>' .
                 '</ul>' : date_i18n($dateFormat . ' ' . $timeFormat, $timestamp) . ': ' . 'http://start_zoom_meeting_link.com',
             'zoom_join_url_date'        => $type === 'email' ?
                 '<ul>' .
                     '<li><a href="#">' .
-                        date_i18n($dateFormat, $periodStartDate) . ' ' . BackendStrings::getCommonStrings()['zoom_click_to_join'] .
+                        date_i18n($dateFormat, $periodStartDate) . ' ' . BackendStrings::get('zoom_click_to_join') .
                     '</a></li>' .
                     '<li><a href="#">' .
-                        date_i18n($dateFormat, $periodEndDate) . ' ' . BackendStrings::getCommonStrings()['zoom_click_to_join'] .
+                        date_i18n($dateFormat, $periodEndDate) . ' ' . BackendStrings::get('zoom_click_to_join') .
                     '</a></li>' .
                 '</ul>' : date_i18n($dateFormat, $periodStartDate) . ': ' . 'http://join_zoom_meeting_link.com',
             'zoom_join_url_date_time'   => $type === 'email' ?
                 '<ul>' .
                     '<li><a href="#">' .
-                        date_i18n($dateFormat . ' ' . $timeFormat, $timestamp) . BackendStrings::getCommonStrings()['zoom_click_to_join'] .
+                        date_i18n($dateFormat . ' ' . $timeFormat, $timestamp) . BackendStrings::get('zoom_click_to_join') .
                     '</a></li>' .
                     '<li><a href="#">' .
-                        date_i18n($dateFormat . ' ' . $timeFormat, $timestamp) . BackendStrings::getCommonStrings()['zoom_click_to_join'] .
+                        date_i18n($dateFormat . ' ' . $timeFormat, $timestamp) . BackendStrings::get('zoom_click_to_join') .
                     '</a></li>' .
                 '</ul>' : date_i18n($dateFormat . ' ' . $timeFormat, $timestamp) . ': ' . 'http://join_zoom_meeting_link.com' ,
             'google_meet_url_date'        => $type === 'email' ?
                 '<ul>' .
-                '<li><a href="#">' . date_i18n($dateFormat, $periodStartDate) . ' ' . BackendStrings::getCommonStrings()['google_meet_join'] . '</a></li>' .
-                '<li><a href="#">' . date_i18n($dateFormat, $periodEndDate) . ' ' . BackendStrings::getCommonStrings()['google_meet_join'] . '</a></li>' .
+                '<li><a href="#">' . date_i18n($dateFormat, $periodStartDate) . ' ' . BackendStrings::get('google_meet_join') . '</a></li>' .
+                '<li><a href="#">' . date_i18n($dateFormat, $periodEndDate) . ' ' . BackendStrings::get('google_meet_join') . '</a></li>' .
                 '</ul>' : date_i18n($dateFormat, $periodStartDate) . ': ' . 'https://join_google_meet_link.com',
             'google_meet_url_date_time'   => $type === 'email' ?
                 '<ul>' .
                 '<li><a href="#">' .
-                    date_i18n($dateFormat . ' ' . $timeFormat, $timestamp) . BackendStrings::getCommonStrings()['google_meet_join'] .
+                    date_i18n($dateFormat . ' ' . $timeFormat, $timestamp) . BackendStrings::get('google_meet_join') .
                 '</a></li>' .
                 '<li><a href="#">' .
-                    date_i18n($dateFormat . ' ' . $timeFormat, $timestamp) . BackendStrings::getCommonStrings()['google_meet_join'] .
+                    date_i18n($dateFormat . ' ' . $timeFormat, $timestamp) . BackendStrings::get('google_meet_join') .
                 '</a></li>' .
                 '</ul>' : date_i18n($dateFormat . ' ' . $timeFormat, $timestamp) . ': ' . 'https://join_google_meet_link.com' ,
             'microsoft_teams_url_date'        => $type === 'email' ?
                 '<ul>' .
-                '<li><a href="#">' . date_i18n($dateFormat, $periodStartDate) . ' ' . BackendStrings::getCommonStrings()['microsoft_teams_join'] . '</a></li>' .
-                '<li><a href="#">' . date_i18n($dateFormat, $periodEndDate) . ' ' . BackendStrings::getCommonStrings()['microsoft_teams_join'] . '</a></li>' .
+                '<li><a href="#">' . date_i18n($dateFormat, $periodStartDate) . ' ' . BackendStrings::get('microsoft_teams_join') . '</a></li>' .
+                '<li><a href="#">' . date_i18n($dateFormat, $periodEndDate) . ' ' . BackendStrings::get('microsoft_teams_join') . '</a></li>' .
                 '</ul>' : date_i18n($dateFormat, $periodStartDate) . ': ' . 'https://join_microsoft_teams_link.com',
             'microsoft_teams_url_date_time'   => $type === 'email' ?
                 '<ul>' .
                 '<li><a href="#">' .
-                    date_i18n($dateFormat . ' ' . $timeFormat, $timestamp) . BackendStrings::getCommonStrings()['microsoft_teams_join'] .
+                    date_i18n($dateFormat . ' ' . $timeFormat, $timestamp) . BackendStrings::get('microsoft_teams_join') .
                 '</a></li>' .
                 '<li><a href="#">' .
-                    date_i18n($dateFormat . ' ' . $timeFormat, $timestamp) . BackendStrings::getCommonStrings()['microsoft_teams_join'] .
+                    date_i18n($dateFormat . ' ' . $timeFormat, $timestamp) . BackendStrings::get('microsoft_teams_join') .
                 '</a></li>' .
                 '</ul>' : date_i18n($dateFormat . ' ' . $timeFormat, $timestamp) . ': ' . 'https://join_microsoft_teams_link.com' ,
             'lesson_space_url_date'        => $type === 'email' ?
                 '<ul>' .
-                '<li><a href="#">' . date_i18n($dateFormat, $periodStartDate) . ' ' . BackendStrings::getCommonStrings()['lesson_space_join'] . '</a></li>' .
-                '<li><a href="#">' . date_i18n($dateFormat, $periodEndDate) . ' ' . BackendStrings::getCommonStrings()['lesson_space_join'] . '</a></li>' .
+                '<li><a href="#">' . date_i18n($dateFormat, $periodStartDate) . ' ' . BackendStrings::get('lesson_space_join') . '</a></li>' .
+                '<li><a href="#">' . date_i18n($dateFormat, $periodEndDate) . ' ' . BackendStrings::get('lesson_space_join') . '</a></li>' .
                 '</ul>' : date_i18n($dateFormat, $periodStartDate) . ': ' . 'https://lesson_space.com/room-id',
             'lesson_space_url_date_time'   => $type === 'email' ?
                 '<ul>' .
                 '<li><a href="#">' .
-                    date_i18n($dateFormat . ' ' . $timeFormat, $timestamp) . BackendStrings::getCommonStrings()['lesson_space_join'] .
+                    date_i18n($dateFormat . ' ' . $timeFormat, $timestamp) . BackendStrings::get('lesson_space_join') .
                 '</a></li>' .
                 '<li><a href="#">' .
-                    date_i18n($dateFormat . ' ' . $timeFormat, $timestamp) . BackendStrings::getCommonStrings()['lesson_space_join'] .
+                    date_i18n($dateFormat . ' ' . $timeFormat, $timestamp) . BackendStrings::get('lesson_space_join') .
                 '</a></li>' .
                 '</ul>' : date_i18n($dateFormat . ' ' . $timeFormat, $timestamp) . ': ' . 'https://lesson_space.com/room-id',
             'event_description'         => 'Event Description',
@@ -212,7 +211,6 @@ class EventPlaceholderService extends PlaceholderService
      * @throws \Slim\Exception\ContainerValueNotFoundException
      * @throws NotFoundException
      * @throws QueryExecutionException
-     * @throws \Interop\Container\Exception\ContainerException
      * @throws \Exception
      */
     public function getEventPlaceholdersData(
@@ -263,7 +261,6 @@ class EventPlaceholderService extends PlaceholderService
      * @throws \Slim\Exception\ContainerValueNotFoundException
      * @throws NotFoundException
      * @throws QueryExecutionException
-     * @throws \Interop\Container\Exception\ContainerException
      * @throws \Exception
      */
     public function getPlaceholdersData(
@@ -340,6 +337,9 @@ class EventPlaceholderService extends PlaceholderService
         $data['invoice_number'] = $placeholders['payment_invoice_number'];
         $data['invoice_method'] = !empty($placeholders['payment_gateway_title']) ? $placeholders['payment_gateway_title'] : $placeholders['payment_type'];
         $data['invoice_issued'] = $placeholders['payment_created'];
+        $data['invoice_issued_xml'] = $placeholders['payment_created_xml'];
+        $data['invoice_dates']  = [$placeholders['event_start_date']];
+        $data['invoice_dates_xml']  = [$placeholders['event_start_date_xml']];
 
         $data['customer_custom_fields'] = array_filter($placeholders, function ($key) {
             return strpos($key, 'invoice_custom_field_') === 0;
@@ -362,7 +362,6 @@ class EventPlaceholderService extends PlaceholderService
      * @throws \Slim\Exception\ContainerValueNotFoundException
      * @throws \AmeliaBooking\Infrastructure\Common\Exceptions\QueryExecutionException
      * @throws \AmeliaBooking\Infrastructure\Common\Exceptions\NotFoundException
-     * @throws \Interop\Container\Exception\ContainerException
      * @throws \Exception
      */
     private function getEventData($event, $bookingKey = null, $token = null, $type = null)
@@ -467,6 +466,7 @@ class EventPlaceholderService extends PlaceholderService
                 'employee_note'             => $provider['note'],
                 'employee_description'      => $userDescription,
                 'employee_phone'            => $provider['phone'],
+                'employee_phone_country'    => $provider['countryPhoneIso'],
                 'employee_email'            => $provider['email'],
                 'employee_name_email_phone' =>
                     (sizeof($event['providers']) > 1 ? $liStartTag : '') .
@@ -634,28 +634,28 @@ class EventPlaceholderService extends PlaceholderService
                 $eventZoomStartDateList[]     =  $type === 'email' ?
                     (
                         $liStartTag .
-                        '<a href="' . $startUrl . '">' . $dateString . ' ' . BackendStrings::getCommonStrings()['zoom_click_to_start'] . '</a>' .
+                        '<a href="' . $startUrl . '">' . $dateString . ' ' . BackendStrings::get('zoom_click_to_start') . '</a>' .
                         $liEndTag
                     )
                     : $dateString . ': ' . $startUrl;
                 $eventZoomStartDateTimeList[] = $type === 'email' ?
                     (
                         $liStartTag .
-                        '<a href="' . $startUrl . '">' . $dateTimeString . ' ' . BackendStrings::getCommonStrings()['zoom_click_to_start'] . '</a>' .
+                        '<a href="' . $startUrl . '">' . $dateTimeString . ' ' . BackendStrings::get('zoom_click_to_start') . '</a>' .
                         $liEndTag
                     )
                     : $dateTimeString . ': ' . $startUrl;
                 $eventZoomJoinDateList[]      = $type === 'email' ?
                     (
                         $liStartTag .
-                        '<a href="' . $joinUrl . '">' . $dateString . ' ' . BackendStrings::getCommonStrings()['zoom_click_to_join'] . '</a>' .
+                        '<a href="' . $joinUrl . '">' . $dateString . ' ' . BackendStrings::get('zoom_click_to_join') . '</a>' .
                         $liEndTag
                     )
                     : $dateString . ': ' . $joinUrl;
                 $eventZoomJoinDateTimeList[]  = $type === 'email' ?
                     (
                         $liStartTag .
-                        '<a href="' . $joinUrl . '">' . $dateTimeString . ' ' . BackendStrings::getCommonStrings()['zoom_click_to_join'] . '</a>' .
+                        '<a href="' . $joinUrl . '">' . $dateTimeString . ' ' . BackendStrings::get('zoom_click_to_join') . '</a>' .
                         $liEndTag
                     )
                     : $dateTimeString . ': ' . $joinUrl;
@@ -667,14 +667,14 @@ class EventPlaceholderService extends PlaceholderService
                 $eventGoogleMeetDateList[]     = $type === 'email' ?
                     (
                         $liStartTag .
-                        '<a href="' . $googleMeetUrl . '">' . $dateString . ' ' . BackendStrings::getCommonStrings()['google_meet_join'] . '</a>' .
+                        '<a href="' . $googleMeetUrl . '">' . $dateString . ' ' . BackendStrings::get('google_meet_join') . '</a>' .
                         $liEndTag
                     )
                     : $dateString . ': ' . $googleMeetUrl;
                 $eventGoogleMeetDateTimeList[] = $type === 'email' ?
                     (
                         $liStartTag .
-                        '<a href="' . $googleMeetUrl . '">' . $dateTimeString . ' ' . BackendStrings::getCommonStrings()['google_meet_join'] . '</a>' .
+                        '<a href="' . $googleMeetUrl . '">' . $dateTimeString . ' ' . BackendStrings::get('google_meet_join') . '</a>' .
                         $liEndTag
                     )
                     : $dateTimeString . ': ' . $googleMeetUrl;
@@ -686,14 +686,14 @@ class EventPlaceholderService extends PlaceholderService
                 $eventMicrosoftTeamsDateList[]     = $type === 'email' ?
                     (
                         $liStartTag .
-                        '<a href="' . $microsoftTeamsUrl . '">' . $dateString . ' ' . BackendStrings::getCommonStrings()['microsoft_teams_join'] . '</a>' .
+                        '<a href="' . $microsoftTeamsUrl . '">' . $dateString . ' ' . BackendStrings::get('microsoft_teams_join') . '</a>' .
                         $liEndTag
                     )
                     : $dateString . ': ' . $microsoftTeamsUrl;
                 $eventMicrosoftTeamsDateTimeList[] = $type === 'email' ?
                     (
                         $liStartTag .
-                        '<a href="' . $microsoftTeamsUrl . '">' . $dateTimeString . ' ' . BackendStrings::getCommonStrings()['microsoft_teams_join'] . '</a>' .
+                        '<a href="' . $microsoftTeamsUrl . '">' . $dateTimeString . ' ' . BackendStrings::get('microsoft_teams_join') . '</a>' .
                         $liEndTag
                     )
                     : $dateTimeString . ': ' . $microsoftTeamsUrl;
@@ -705,14 +705,14 @@ class EventPlaceholderService extends PlaceholderService
                 $eventLessonSpaceDateList[]     = $type === 'email' ?
                     (
                         $liStartTag .
-                        '<a href="' . $lessonSpaceUrl . '">' . $dateString . ' ' . BackendStrings::getCommonStrings()['lesson_space_join'] . '</a>' .
+                        '<a href="' . $lessonSpaceUrl . '">' . $dateString . ' ' . BackendStrings::get('lesson_space_join') . '</a>' .
                         $liEndTag
                     )
                     : $dateString . ': ' . $lessonSpaceUrl;
                 $eventLessonSpaceDateTimeList[] = $type === 'email' ?
                     (
                         $liStartTag .
-                        '<a href="' . $lessonSpaceUrl . '">' . $dateTimeString . ' ' . BackendStrings::getCommonStrings()['lesson_space_join'] . '</a>' .
+                        '<a href="' . $lessonSpaceUrl . '">' . $dateTimeString . ' ' . BackendStrings::get('lesson_space_join') . '</a>' .
                         $liEndTag
                     )
                     : $dateTimeString . ': ' . $lessonSpaceUrl;
@@ -824,7 +824,12 @@ class EventPlaceholderService extends PlaceholderService
                     /** @var EventTicket $ticket */
                     $ticket = $eventTicketRepository->getById($bookingToEventTicket['eventTicketId']);
 
-                    if ($bookingToEventTicket['price']) {
+                    $hasTicketPrice = array_key_exists('price', $bookingToEventTicket) &&
+                        $bookingToEventTicket['price'] !== null &&
+                        $bookingToEventTicket['price'] !== '';
+                    $ticketPrice = $hasTicketPrice ? $bookingToEventTicket['price'] : null;
+
+                    if ($hasTicketPrice) {
                         if ($ticketsPriceByDateRange && $ticketsPriceByDateRange->getItem($key)->getDateRangePrice()) {
                             $ticket->setPrice(new Price($ticketsPriceByDateRange->getItem($key)->getDateRangePrice()->getValue()));
                         }
@@ -841,13 +846,13 @@ class EventPlaceholderService extends PlaceholderService
 
                         $eventPrices[] = $helperService->getFormattedPrice($ticket->getPrice()->getValue());
                         $ticketsPrice +=
-                            $bookingToEventTicket['persons'] * $bookingToEventTicket['price'];
+                            $bookingToEventTicket['persons'] * $ticketPrice;
                     }
 
-                    $invoiceItems[] = $invoiceItems[] = [
+                    $invoiceItems[] = [
                         'item_id' => $bookingToEventTicket['id'],
                         'item_name' => $event['name'] . ' - ' . $ticket->getName()->getValue(),
-                        'invoice_unit_price' => $bookingToEventTicket['price'],
+                        'invoice_unit_price' => $hasTicketPrice ? $ticketPrice : $ticket->getPrice()->getValue(),
                         'invoice_qty' => $bookingToEventTicket['persons'],
                     ];
                 }
@@ -901,7 +906,12 @@ class EventPlaceholderService extends PlaceholderService
                     $ticketsPrice = 0;
                     $eventPrices  = [];
                     foreach ($booking['ticketsData'] as $key => $bookingToEventTicket) {
-                        if ($bookingToEventTicket['price']) {
+                        $hasTicketPrice = array_key_exists('price', $bookingToEventTicket) &&
+                            $bookingToEventTicket['price'] !== null &&
+                            $bookingToEventTicket['price'] !== '';
+                        $ticketPrice = $hasTicketPrice ? $bookingToEventTicket['price'] : null;
+
+                        if ($hasTicketPrice) {
                             /** @var EventTicket $ticket */
                             $ticket = $eventTicketRepository->getById($bookingToEventTicket['eventTicketId']);
 
@@ -919,7 +929,7 @@ class EventPlaceholderService extends PlaceholderService
 
                             $eventPrices[] = $helperService->getFormattedPrice($ticket->getPrice()->getValue());
                             $ticketsPrice +=
-                                $bookingToEventTicket['persons'] * $bookingToEventTicket['price'];
+                                $bookingToEventTicket['persons'] * $ticketPrice;
                         }
                     }
                 }
@@ -999,6 +1009,7 @@ class EventPlaceholderService extends PlaceholderService
             'zoom_join_url_date_time'  => count($eventZoomJoinDateTimeList) === 0 ?
                 '' : $ulStartTag . implode('', $eventZoomJoinDateTimeList) . $ulEndTag,
             'event_start_date'         => date_i18n($dateFormat, $eventStartDateTime->getTimestamp()),
+            'event_start_date_xml'     => date_i18n('Y-m-d', $eventStartDateTime->getTimestamp()),
             'event_end_date'           => date_i18n($dateFormat, $eventEndDateTime->getTimestamp()),
             'event_start_date_time'    => date_i18n(
                 $dateFormat . ' ' . $timeFormat,

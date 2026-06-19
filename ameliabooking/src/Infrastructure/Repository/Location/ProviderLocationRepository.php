@@ -38,12 +38,9 @@ class ProviderLocationRepository extends AbstractRepository
                 (:userId, :locationId)"
             );
 
-            $res = $statement->execute($params);
-            if (!$res) {
-                throw new QueryExecutionException('Unable to add data in ' . __CLASS__);
-            }
+            $statement->execute($params);
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to add data in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to add data in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return $this->connection->lastInsertId();
@@ -60,16 +57,17 @@ class ProviderLocationRepository extends AbstractRepository
         try {
             $statement = $this->connection->prepare("DELETE FROM {$this->table} WHERE userId = :userId");
             $statement->bindParam(':userId', $userId);
-            return $statement->execute();
+            $statement->execute();
+            return true;
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to delete data from ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to delete data from ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
     }
 
     /**
      * @param ProviderLocation $entity
      *
-     * @return int
+     * @return void
      * @throws QueryExecutionException
      */
     public function update($entity)
@@ -88,14 +86,9 @@ class ProviderLocationRepository extends AbstractRepository
                 WHERE userId = :userId"
             );
 
-            $res = $statement->execute($params);
-            if (!$res) {
-                throw new QueryExecutionException('Unable to save data in ' . __CLASS__);
-            }
+            $statement->execute($params);
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to save data in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to save data in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
-
-        return $this->connection->lastInsertId();
     }
 }

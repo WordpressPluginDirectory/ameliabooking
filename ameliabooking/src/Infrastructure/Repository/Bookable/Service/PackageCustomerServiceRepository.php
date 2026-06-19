@@ -11,6 +11,7 @@ use AmeliaBooking\Infrastructure\Common\Exceptions\QueryExecutionException;
 use AmeliaBooking\Infrastructure\Connection;
 use AmeliaBooking\Infrastructure\Repository\AbstractRepository;
 use AmeliaBooking\Infrastructure\WP\InstallActions\DB\Bookable\PackagesCustomersTable;
+use AmeliaBooking\Infrastructure\WP\InstallActions\DB\Bookable\PackagesTable;
 use AmeliaBooking\Infrastructure\WP\InstallActions\DB\Booking\CustomerBookingsTable;
 use AmeliaBooking\Infrastructure\WP\InstallActions\DB\Payment\PaymentsTable;
 use AmeliaBooking\Infrastructure\WP\InstallActions\DB\User\UsersTable;
@@ -73,12 +74,9 @@ class PackageCustomerServiceRepository extends AbstractRepository
                 (:packageCustomerId, :serviceId, :providerId, :locationId, :bookingsCount)"
             );
 
-            $res = $statement->execute($params);
-            if (!$res) {
-                throw new QueryExecutionException('Unable to add data in ' . __CLASS__);
-            }
+            $statement->execute($params);
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to add data in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to add data in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return $this->connection->lastInsertId();
@@ -94,6 +92,7 @@ class PackageCustomerServiceRepository extends AbstractRepository
     public function getByCriteria($criteria, $empty = false)
     {
         $bookingsTable = CustomerBookingsTable::getTableName();
+        $packagesTable = PackagesTable::getTableName();
 
         $params = [];
 
@@ -145,10 +144,32 @@ class PackageCustomerServiceRepository extends AbstractRepository
             $params[':to1'] = DateTimeService::getCustomDateTimeInUtc($criteria['dates'][1]);
         }
 
-        if (!empty($criteria['customerId'])) {
-            $params[':customerId'] = $criteria['customerId'];
+        if (!empty($criteria['customers'])) {
+            $queryCustomers = [];
 
-            $where[] = 'pc.customerId = :customerId';
+            foreach ($criteria['customers'] as $index => $value) {
+                $param = ':customer' . $index;
+
+                $queryCustomers[] = $param;
+
+                $params[$param] = $value;
+            }
+
+            $where[] = 'cu.id IN (' . implode(', ', $queryCustomers) . ')';
+        }
+
+        if (!empty($criteria['status'])) {
+            $queryStatus = [];
+
+            foreach ($criteria['status'] as $index => $value) {
+                $param = ':status' . $index;
+
+                $queryStatus[] = $param;
+
+                $params[$param] = $value;
+            }
+
+            $where[] = 'pc.status IN (' . implode(', ', $queryStatus) . ')';
         }
 
         if (!empty($criteria['services'])) {
@@ -215,6 +236,9 @@ class PackageCustomerServiceRepository extends AbstractRepository
                     pc.status AS package_customer_status,
                     pc.bookingsCount AS package_customer_bookingsCount,
                     pc.couponId AS package_customer_couponId,
+                    pc.ivyEntryId AS package_customer_ivyEntryId,
+                    
+                    pa.name as package_name,
                     
                     pcs.id AS package_customer_service_id,
                     pcs.serviceId AS package_customer_service_serviceId,
@@ -240,9 +264,11 @@ class PackageCustomerServiceRepository extends AbstractRepository
                     cu.lastName AS customer_lastName,
                     cu.email AS customer_email,
                     cu.phone AS customer_phone,
+                    cu.countryPhoneIso AS customer_countryPhoneIso,
                     cu.status AS customer_status
                 FROM {$this->table} pcs
                 INNER JOIN {$this->packagesCustomersTable} pc ON pcs.packageCustomerId = pc.id
+                INNER JOIN {$packagesTable} pa ON pa.id = pc.packageId
                 INNER JOIN {$usersTable} cu ON cu.id = pc.customerId
                 LEFT JOIN {$this->paymentsTable} p ON p.packageCustomerId = pc.id
                 {$where}"
@@ -252,9 +278,57 @@ class PackageCustomerServiceRepository extends AbstractRepository
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return call_user_func([static::FACTORY, 'createCollection'], $rows);
+    }
+
+    /**
+     * Get available service IDs for a package customer
+     *
+     * @param int $packageCustomerId
+     * @return array
+     * @throws QueryExecutionException
+     */
+    public function getAvailableServiceIds($packageCustomerId)
+    {
+        $bookingsTable = CustomerBookingsTable::getTableName();
+
+        $packagesCustomersTable = PackagesCustomersTable::getTableName();
+
+        try {
+            $statement = $this->connection->prepare(
+                "SELECT 
+                    pcs.id,
+                    pcs.serviceId
+                FROM {$packagesCustomersTable} pc
+                INNER JOIN {$this->table} pcs ON pc.id = pcs.packageCustomerId
+                LEFT JOIN (
+                    SELECT packageCustomerServiceId, COUNT(*) as booking_count
+                    FROM {$bookingsTable}
+                    WHERE status IN ('approved', 'pending')
+                    GROUP BY packageCustomerServiceId
+                ) cb ON cb.packageCustomerServiceId = pcs.id
+                WHERE pc.id = :packageCustomerId AND (
+                    (pc.bookingsCount = 0 AND (cb.booking_count IS NULL OR cb.booking_count < pcs.bookingsCount)) OR
+                    (pc.bookingsCount != 0 AND (cb.booking_count IS NULL OR cb.booking_count < pc.bookingsCount))
+                )
+                GROUP BY pcs.id, pcs.serviceId"
+            );
+
+            $params = [
+                ':packageCustomerId' => $packageCustomerId
+            ];
+
+            $statement->execute($params);
+
+            $results = $statement->fetchAll();
+
+            // Convert results to associative array with id as key and serviceId as value
+            return array_column($results, 'serviceId', 'id');
+        } catch (\Exception $e) {
+            throw new QueryExecutionException('Unable to get available service ids in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
+        }
     }
 }

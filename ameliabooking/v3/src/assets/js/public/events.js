@@ -4,7 +4,7 @@ import {useUrlParams} from "../common/helper";
 function useEvents (params, callback) {
   httpClient.get(
     '/events',
-    {params: useUrlParams(params)}
+    {params: useUrlParams(Object.assign({bookings: false}, params))}
   ).then(response => {
     callback(response.data.data.events)
   }).catch(() => {
@@ -37,7 +37,7 @@ function useMinTicketPrice (event) {
   event.customTickets.forEach(ticket => {
     if (ticket.enabled) {
       let tPrice = ticket.price
-      if (ticket.dateRangePrice) {
+      if (ticket.dateRangePrice != null) {
         tPrice = ticket.dateRangePrice
       }
       priceArray.push(tPrice)
@@ -54,7 +54,7 @@ function useCheckIfEventNotFree (event) {
     event.customTickets.forEach(ticket => {
       if (ticket.enabled) {
         let tPrice = ticket.price
-        if (ticket.dateRangePrice) {
+        if (ticket.dateRangePrice != null) {
           tPrice = ticket.dateRangePrice
         }
 

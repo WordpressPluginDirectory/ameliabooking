@@ -1,12 +1,13 @@
 <template>
   <div class="am-fs__extras" :style="cssVars">
     <div class="am-fs__extras-heading">
-      <span v-if="extrasOptions.heading.visibility" class="am-fs__extras-heading-main">
-        {{labelsDisplay('extras_available')}}
-      </span>
       <span
-        class="am-fs__extras-heading-required am-error-text"
+        v-if="extrasOptions.heading.visibility"
+        class="am-fs__extras-heading-main"
       >
+        {{ labelsDisplay('extras_available') }}
+      </span>
+      <span class="am-fs__extras-heading-required am-error-text">
         {{ `${labelsDisplay('min_req_extras_colon')} 2` }}
       </span>
     </div>
@@ -25,19 +26,37 @@
               </span>
               <span class="am-fs__extras-card__header-right">
                 <span class="card-text">
-                  {{useFormattedPrice(extra.price)}}
+                  {{ useFormattedPrice(extra.price) }}
                 </span>
-                <AmInputNumber v-model="extra.quantity" :max="extra.maxQuantity" :min="0" size="small"/>
+                <AmInputNumber
+                  v-model="extra.quantity"
+                  :max="extra.maxQuantity"
+                  :min="0"
+                  size="small"
+                />
               </span>
             </div>
           </template>
           <template #default>
-            <div v-if="extrasOptions.description.visibility || extrasOptions.duration.visibility" class="am-fs__extras-card__content" :style="cssVars">
-              <div v-if="extra.description && extrasOptions.description.visibility" class="am-fs__extras-card__content-main">
+            <div
+              v-if="
+                extrasOptions.description.visibility ||
+                extrasOptions.duration.visibility
+              "
+              class="am-fs__extras-card__content"
+              :style="cssVars"
+            >
+              <div
+                v-if="extra.description && extrasOptions.description.visibility"
+                class="am-fs__extras-card__content-main"
+              >
                 {{ extra.description }}
               </div>
-              <div v-if="extrasOptions.duration.visibility" class="am-fs__extras-card__content-sub">
-                {{`${labelsDisplay('duration_colon')} 60 min`}}
+              <div
+                v-if="extrasOptions.duration.visibility"
+                class="am-fs__extras-card__content-sub"
+              >
+                {{ `${labelsDisplay('duration_colon')} 60 min` }}
               </div>
             </div>
           </template>
@@ -49,29 +68,31 @@
 
 <script setup>
 // * Components
-import AmCollapse from '../../../../_components/collapse/AmCollapse.vue';
-import AmCollapseItem from '../../../../_components/collapse/AmCollapseItem.vue';
-import AmInputNumber from '../../../../_components/input-number/AmInputNumber.vue';
+import AmCollapse from '../../../../_components/collapse/AmCollapse.vue'
+import AmCollapseItem from '../../../../_components/collapse/AmCollapseItem.vue'
+import AmInputNumber from '../../../../_components/input-number/AmInputNumber.vue'
 // * Import from Vue
-import {
-  ref,
-  inject,
-  computed
-} from "vue";
+import { ref, inject, computed } from 'vue'
 // * Composables
-import { useColorTransparency } from '../../../../../assets/js/common/colorManipulation.js';
+import { useColorTransparency } from '../../../../../assets/js/common/colorManipulation.js'
 import { useFormattedPrice } from '../../../../../assets/js/common/formatting'
+import { useReactiveCustomize } from '../../../../../assets/js/admin/useReactiveCustomize.js'
 
 let langKey = inject('langKey')
 let amLabels = inject('labels')
 
 let pageRenderKey = inject('pageRenderKey')
-let amCustomize = inject('customize')
+const { amCustomize } = useReactiveCustomize()
 
-function labelsDisplay (label) {
+function labelsDisplay(label) {
   let computedLabel = computed(() => {
-    let translations = amCustomize.value[pageRenderKey.value].extrasStep.translations
-    return translations && translations[label] && translations[label][langKey.value] ? translations[label][langKey.value] : amLabels[label]
+    let translations =
+      amCustomize.value[pageRenderKey.value].extrasStep.translations
+    return translations &&
+      translations[label] &&
+      translations[label][langKey.value]
+      ? translations[label][langKey.value]
+      : amLabels[label]
   })
 
   return computedLabel.value
@@ -87,22 +108,25 @@ let extrasArray = ref([
     price: '5',
     quantity: 0,
     maxQuantity: 5,
-    description: 'Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged.',
+    description:
+      "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged.",
   },
   {
     name: 'Extra 2',
     price: '3',
     quantity: 0,
     maxQuantity: 5,
-    description: 'Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged.',
+    description:
+      "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged.",
   },
   {
     name: 'Extra 3',
     price: '7',
     quantity: 0,
     maxQuantity: 5,
-    description: 'Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged.',
-  }
+    description:
+      "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged.",
+  },
 ])
 
 // * Colors
@@ -110,7 +134,10 @@ let amColors = inject('amColors')
 let cssVars = computed(() => {
   return {
     '--am-c-extras-text': amColors.value.colorMainText,
-    '--am-c-extras-text-op80': useColorTransparency(amColors.value.colorMainText, 0.8)
+    '--am-c-extras-text-op80': useColorTransparency(
+      amColors.value.colorMainText,
+      0.8
+    ),
   }
 })
 </script>
@@ -125,7 +152,7 @@ export default {
     stepSelectedData: [],
     finished: false,
     selected: false,
-  }
+  },
 }
 </script>
 
@@ -149,7 +176,11 @@ export default {
           $count: 3;
           @for $i from 0 through $count {
             &:nth-child(#{$i + 1}) {
-              animation: 600ms cubic-bezier(.45,1,.4,1.2) #{$i*100}ms am-animation-slide-up;
+              animation: 600ms
+                cubic-bezier(0.45, 1, 0.4, 1.2)
+                #{$i *
+                100}ms
+                am-animation-slide-up;
               animation-fill-mode: both;
             }
           }
@@ -192,7 +223,11 @@ export default {
           $count: 3;
           @for $i from 0 through $count {
             &:nth-child(#{$i + 1}) {
-              animation: 600ms cubic-bezier(.45,1,.4,1.2) #{$i*100}ms am-animation-slide-up;
+              animation: 600ms
+                cubic-bezier(0.45, 1, 0.4, 1.2)
+                #{$i *
+                100}ms
+                am-animation-slide-up;
               animation-fill-mode: both;
             }
           }

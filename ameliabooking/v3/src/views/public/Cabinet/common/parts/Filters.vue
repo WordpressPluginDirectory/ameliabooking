@@ -354,6 +354,9 @@ function searchCustomers(val = '', customers = []) {
   )
 }
 
+// * Cabinet type
+const cabinetType = inject('cabinetType')
+
 function searchEvents(val = '', events = []) {
   loadingInput.value.events = true
   if (events.length) {
@@ -371,8 +374,9 @@ function searchEvents(val = '', events = []) {
           timeZone: store.getters['cabinet/getTimeZone'],
           group: true,
           page: 1,
-          limit: amSettings.general.itemsPerPageBackEnd,
+          limit: amSettings.general.itemsPerPage,
           search: val,
+          source: 'cabinet-' + cabinetType.value
         },
         (result) => {
           store.dispatch(

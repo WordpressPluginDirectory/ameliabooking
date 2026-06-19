@@ -5,7 +5,7 @@
     :class="props.globalClass"
   >
     <div v-show="!loading">
-      <div v-if="paymentError && instantBooking" class="am-fs__info-error">
+      <div v-if="paymentError && (instantBooking || isWaitingListBooking)" class="am-fs__info-error">
         <AmAlert
           type="error"
           :title="paymentError"
@@ -17,10 +17,10 @@
 
       <div v-if="authError" class="am-fs__info-error">
         <AmAlert
-            type="error"
-            :title="authErrorMessage"
-            :show-icon="true"
-            :closable="true"
+          type="error"
+          :title="authErrorMessage"
+          :show-icon="true"
+          :closable="true"
         >
         </AmAlert>
       </div>
@@ -32,8 +32,8 @@
             {{amLabels.auto_fill_your_details}}
           </div>
           <am-social-button
-              :provider="socialProvider"
-              @social-action="onSignupSocial"
+            :provider="socialProvider"
+            @social-action="onSignupSocial"
           />
         </div>
 
@@ -44,188 +44,194 @@
         <!-- /Social Divider -->
       </div>
       <!-- /Social Buttons -->
-    <el-form
-      ref="infoFormRef"
-      :model="infoFormData"
-      :rules="rules"
-      label-position="top"
-      class="am-fs__info-form"
-      :class="[
-        {'am-fs__info-form-mobile': pageWidth < 330},
-        {'am-fs__info-form-mobile-s': pageWidth < 300}
-      ]"
-    >
-      <template v-for="item in amCustomize.infoStep.order" :key="item.id">
-        <component
-          :is="formFields[item.id].template"
-          ref="primeCollectorRef"
-          v-bind="formFields[item.id].props"
-          v-on="'handlers' in formFields[item.id] ? formFields[item.id].handlers : {}"
-        ></component>
-      </template>
-
-      <el-form-item
-          v-if="settings.mailchimp.subscribeFieldVisible && amCustomize.infoStep.options.email.visibility"
-          class="am-subscribe"
+      <el-form
+        ref="infoFormRef"
+        :model="infoFormData"
+        :rules="rules"
+        label-position="top"
+        class="am-fs__info-form"
+        :class="[
+          {'am-fs__info-form-mobile': pageWidth < 330},
+          {'am-fs__info-form-mobile-s': pageWidth < 300}
+        ]"
       >
-        <AmCheckBox
-          v-model="subscribeToMailchimp"
-          :label="amLabels.subscribe_to_mailing_list"
-        >
-        </AmCheckBox>
-      </el-form-item>
-
-
-      <!-- Custom Fields TODO - validation for custom fields isn't set-->
-      <template v-if="availableCustomFields && allCustomFields">
-        <el-form-item
-          v-for="(cf, index) in allCustomFields"
-          v-show="cf.id in availableCustomFields && checkCustomerCustomFieldVisibility(cf)"
-          :id="'am-cf-' + cf.id"
-          :ref="el => customFieldsRefs[index] = el"
-          :key="index"
-          class="am-fs__info-form__item"
-          :class="[
-            { 'is-required': cf.type === 'file' && cf.required },
-            `am-cf-width-${cf.width}`,
-            {'am-rtl': isRtl}
-          ]"
-          label-position="top"
-          :prop="cf.required && cf.type !== 'content' ? 'cf' + cf.id : 'inputFile'"
-        >
-          <!-- ####### LABEL ####### -->
-          <template v-if="cf.type !== 'content'" #label>
-            <span
-              v-if="
-                (cf.type === 'checkbox' || cf.type === 'radio') && cf.label
-              "
-              :class="
-                (cf.type === 'checkbox' || cf.type === 'radio') && cf.required
-                  ? 'am-custom-required-as-html'
-                  : ''
-              "
-              v-html="cf.label ? cf.label : ''"
-            >
-            </span>
-            <span v-else class="am-fs__info-form__label">
-              {{cf.label}}
-            </span>
-          </template>
-          <!-- ####### /LABEL ####### -->
-
-          <!-- ####### INPUT ####### -->
-          <!-- types - [input, text-area] -->
+        <template v-for="item in amCustomize.infoStep.order" :key="item.id">
           <component
-            :is="customFieldsComponents[cf.type]"
-            v-model="infoFormData['cf' + cf.id]"
-            :type="cf.type === 'text-area' ? 'textarea' : (cf.type === 'text' ? 'text' : '')"
-            :placeholder="refCFPlaceholders[cf.id] && refCFPlaceholders[cf.id].placeholder"
+            :is="formFields[item.id].template"
+            ref="primeCollectorRef"
+            v-model="infoFormData[item.id]"
+            v-model:country-code="formFields[item.id].countryCode"
+            v-bind="formFields[item.id].props"
+            v-on="'handlers' in formFields[item.id] ? formFields[item.id].handlers : {}"
           ></component>
-          <!-- /types - [input, text-area] -->
+        </template>
 
-          <!-- Address Field -->
-          <template v-if="cf.type === 'address'">
-            <AmAddressInput
-              :id="`amelia-address-autocomplete-${cf.id}`"
-              v-model="infoFormData['cf' + cf.id]"
-              @address-selected="(address) => addressSelected(address, cf.id)"
-            />
-          </template>
-          <!-- /Address Field -->
-
-          <!-- type - date-picker-full -->
-          <AmDatePickerFull
-            v-if="cf.type === 'datepicker'"
-            :persistent="false"
-            :existing-date="infoFormData['cf' + cf.id]"
-            :disabled="false"
-            @selected-date="(dateString) => {selectedDatePickerValue('cf' + cf.id, dateString)}"
-          />
-          <!-- /type - date-picker-full -->
-
-          <!-- type - select -->
-          <AmSelect
-            v-if="cf.type === 'select'"
-            v-model="infoFormData['cf' + cf.id]"
-            :fit-input-width="true"
+        <el-form-item
+          v-if="
+            settings.featuresIntegrations.mailchimp.enabled &&
+            settings.mailchimp.subscribeFieldVisible &&
+            amCustomize.infoStep.options.email.visibility
+          "
+          class="am-subscribe"
+        >
+          <AmCheckBox
+            v-model="subscribeToMailchimp"
+            :label="amLabels.subscribe_to_mailing_list"
           >
-            <AmOption
-              v-for="(option, i) in cf.options"
-              :key="i"
-              :label="option.label"
-              :value="option.label"
-            />
-          </AmSelect>
-          <!-- /type - select -->
-
-          <!-- type - radio -->
-          <AmRadioGroup
-            v-if="cf.type === 'radio'"
-            v-model="infoFormData['cf' + cf.id]"
-          >
-            <AmRadio
-              v-for="(option, i) in cf.options"
-              :key="i"
-              :label="option.label"
-              :value="option.label"
-            />
-          </AmRadioGroup>
-          <!-- /type - radio -->
-
-          <!-- type - checkbox -->
-          <AmCheckBoxGroup
-            v-if="cf.type === 'checkbox'"
-            v-model="infoFormData['cf' + cf.id]"
-          >
-            <AmCheckBox
-              v-for="(option, i) in cf.options"
-              :key="i"
-              :label="option.label"
-              :value="option.label"
-            />
-          </AmCheckBoxGroup>
-          <!-- /type - checkbox -->
-
-          <!-- type - attachment -->
-          <AmAttachment
-            v-if="cf.type === 'file'"
-            :id="cf.id"
-            v-model="infoFormData['cf' + cf.id]"
-            :auto-upload="false"
-            :accept="customFieldsAllowedExtensions"
-            @change="onAddFile"
-            @remove="onRemoveFile"
-          >
-            {{amLabels.upload_file_here}}
-          </AmAttachment>
-          <!-- /type - attachment -->
-
-          <!-- type - content -->
-          <div v-if="cf.type === 'content'" v-html="cf.label"></div>
-          <!-- /type - content -->
-          <!-- ####### INPUT ####### -->
+          </AmCheckBox>
         </el-form-item>
-      </template>
-      <div v-if="instantBooking && settings.payments.wc.enabled && !settings.payments.wc.onSiteIfFree && wcEntityEnabled" class="am-fs__payments-sentence">
-        <p>
-          {{amLabels.payment_wc_mollie_sentence}}
-        </p>
-      </div>
-    </el-form>
 
-    <PaymentOnSite
-      v-if="instantBooking && (settings.payments.wc.enabled ? settings.payments.wc.onSiteIfFree || !wcEntityEnabled : true)"
-      ref="refOnSiteBooking"
-      :instant-booking="instantBooking"
-      @payment-error="callPaymentError"
-    />
 
-    <PaymentWc
-      v-if="instantBooking && settings.payments.wc.enabled && !settings.payments.wc.onSiteIfFree && wcEntityEnabled"
-      ref="refWcBooking"
-      :instant-booking="instantBooking"
-      @payment-error="callPaymentError"
-    />
+        <!-- Custom Fields TODO - validation for custom fields isn't set-->
+        <template v-if="availableCustomFields && allCustomFields">
+          <el-form-item
+            v-for="(cf, index) in allCustomFields"
+            v-show="cf.id in availableCustomFields && checkCustomerCustomFieldVisibility(cf)"
+            :id="'am-cf-' + cf.id"
+            :ref="el => customFieldsRefs[index] = el"
+            :key="index"
+            class="am-fs__info-form__item"
+            :class="[
+              { 'is-required': cf.type === 'file' && cf.required },
+              `am-cf-width-${cf.width}`,
+              {'am-rtl': isRtl}
+            ]"
+            label-position="top"
+            :prop="cf.required && cf.type !== 'content' ? 'cf' + cf.id : 'inputFile'"
+          >
+            <!-- ####### LABEL ####### -->
+            <template v-if="cf.type !== 'content'" #label>
+              <span
+                v-if="
+                  (cf.type === 'checkbox' || cf.type === 'radio') && cf.label
+                "
+                :class="
+                  (cf.type === 'checkbox' || cf.type === 'radio') && cf.required
+                    ? 'am-custom-required-as-html'
+                    : ''
+                "
+                v-html="cf.label ? cf.label : ''"
+              >
+              </span>
+              <span v-else class="am-fs__info-form__label">
+                {{cf.label}}
+              </span>
+            </template>
+            <!-- ####### /LABEL ####### -->
+
+            <!-- ####### INPUT ####### -->
+            <!-- types - [input, text-area] -->
+            <component
+              :is="customFieldsComponents[cf.type]"
+              v-model="infoFormData['cf' + cf.id]"
+              :type="cf.type === 'text-area' ? 'textarea' : (cf.type === 'text' ? 'text' : '')"
+              :placeholder="refCFPlaceholders[cf.id] && refCFPlaceholders[cf.id].placeholder"
+            ></component>
+            <!-- /types - [input, text-area] -->
+
+            <!-- Address Field -->
+            <template v-if="cf.type === 'address'">
+              <AmAddressInput
+                :id="`amelia-address-autocomplete-${cf.id}`"
+                v-model="infoFormData['cf' + cf.id]"
+                @address-selected="(address) => addressSelected(address, cf.id)"
+              />
+            </template>
+            <!-- /Address Field -->
+
+            <!-- type - date-picker-full -->
+            <AmDatePickerFull
+              v-if="cf.type === 'datepicker'"
+              :persistent="false"
+              :existing-date="infoFormData['cf' + cf.id]"
+              :disabled="false"
+              @selected-date="(dateString) => {selectedDatePickerValue('cf' + cf.id, dateString)}"
+            />
+            <!-- /type - date-picker-full -->
+
+            <!-- type - select -->
+            <AmSelect
+              v-if="cf.type === 'select'"
+              v-model="infoFormData['cf' + cf.id]"
+              :fit-input-width="true"
+            >
+              <AmOption
+                v-for="(option, i) in cf.options"
+                :key="i"
+                :label="option.label"
+                :value="option.label"
+              />
+            </AmSelect>
+            <!-- /type - select -->
+
+            <!-- type - radio -->
+            <AmRadioGroup
+              v-if="cf.type === 'radio'"
+              v-model="infoFormData['cf' + cf.id]"
+            >
+              <AmRadio
+                v-for="(option, i) in cf.options"
+                :key="i"
+                :label="option.label"
+                :value="option.label"
+              />
+            </AmRadioGroup>
+            <!-- /type - radio -->
+
+            <!-- type - checkbox -->
+            <AmCheckBoxGroup
+              v-if="cf.type === 'checkbox'"
+              v-model="infoFormData['cf' + cf.id]"
+            >
+              <AmCheckBox
+                v-for="(option, i) in cf.options"
+                :key="i"
+                :label="option.label"
+                :value="option.label"
+              />
+            </AmCheckBoxGroup>
+            <!-- /type - checkbox -->
+
+            <!-- type - attachment -->
+            <AmAttachment
+              v-if="cf.type === 'file'"
+              :id="cf.id"
+              v-model="infoFormData['cf' + cf.id]"
+              :auto-upload="false"
+              :accept="customFieldsAllowedExtensions"
+              @change="onAddFile"
+              @remove="onRemoveFile"
+            >
+              {{amLabels.upload_file_here}}
+            </AmAttachment>
+            <!-- /type - attachment -->
+
+            <!-- type - content -->
+            <div v-if="cf.type === 'content'" v-html="cf.label"></div>
+            <!-- /type - content -->
+            <!-- ####### INPUT ####### -->
+          </el-form-item>
+        </template>
+        <div v-if="instantBooking && settings.payments.wc.enabled && !settings.payments.wc.onSiteIfFree && wcEntityEnabled" class="am-fs__payments-sentence">
+          <p>
+            {{amLabels.payment_wc_mollie_sentence}}
+          </p>
+        </div>
+      </el-form>
+
+      <PaymentOnSite
+        v-if="isWaitingListBooking || (instantBooking && (settings.payments.wc.enabled ? settings.payments.wc.onSiteIfFree || !wcEntityEnabled : true))"
+        ref="refOnSiteBooking"
+        :instant-booking="instantBooking"
+        @payment-error="callPaymentError"
+      />
+
+      <PaymentWc
+        v-if="instantBooking && !isWaitingListBooking && settings.payments.wc.enabled && !settings.payments.wc.onSiteIfFree && wcEntityEnabled"
+        ref="refWcBooking"
+        :instant-booking="instantBooking"
+        @payment-error="callPaymentError"
+      />
     </div>
 
     <BookingSkeleton/>
@@ -271,7 +277,6 @@ import VueAuthenticate from "vue-authenticate";
 import { settings } from "../../../../plugins/settings";
 import { usePrepaidPrice, usePaymentError } from "../../../../assets/js/common/appointments";
 import { useScrollTo } from "../../../../assets/js/common/scrollElements";
-import { saveStats, useAppointmentBookingData } from "../../../../assets/js/public/booking";
 import { useCustomFields } from "../../../../assets/js/public/customFields";
 import useAction from "../../../../assets/js/public/actions";
 import { useElementSize } from "@vueuse/core";
@@ -280,6 +285,7 @@ import httpClient from "../../../../plugins/axios";
 import AmSocialButton from "../../../common/FormFields/AmSocialButton.vue";
 import {SocialAuthOptions} from "../../../../assets/js/admin/socialAuthOptions";
 import {mapAddressComponentsForXML} from "../../../../assets/js/common/helper";
+import { useIvyMapping } from "../../../../assets/js/public/ivy";
 
 let props = defineProps({
   globalClass: {
@@ -296,6 +302,9 @@ const amLabels = inject('amLabels')
 
 // * Customize
 let amCustomize = inject('amCustomize')
+
+// * Shortcode data
+const shortcodeData = inject('shortcodeData')
 
 let infoFormWrapperRef = ref(null)
 let {width: pageWidth} = useElementSize(infoFormWrapperRef)
@@ -334,7 +343,7 @@ const {
 })
 
 watch(headerButtonPreviousClicked, () => {
-  if (instantBooking.value) {
+  if (instantBooking.value && !isWaitingListBooking.value) {
     addPaymentsStep()
   }
 })
@@ -362,6 +371,9 @@ let infoFormRef = ref(null)
 let isRtl = computed(() => store.getters['getIsRtl'])
 
 let phoneError = ref(false)
+let isPhoneValid = ref(false)
+let refreshPhoneComponent = ref(0)
+
 let loggedInUser = computed(() => (store.getters['booking/getCustomerId'] && store.getters['booking/getCustomerEmail'])
   || (!!window.ameliaUser && window.ameliaUser.type == 'admin'))
 
@@ -400,33 +412,48 @@ let formFields = ref({
     template: markRaw(FirstNameFormField),
     props: {
       class: computed(() => isRtl.value ? 'am-rtl' : ''),
-      loggedInUser: computed(() => !!loggedInUser.value)
     }
   },
   lastName: {
     template: markRaw(LastNameFormField),
     props: {
       class: computed(() => isRtl.value ? 'am-rtl' : ''),
-      loggedInUser: computed(() => !!loggedInUser.value)
     }
   },
   email: {
     template: markRaw(EmailFormField),
     props: {
       class: computed(() => isRtl.value ? 'am-rtl' : ''),
-      loggedInUser: computed(() => !!loggedInUser.value)
     }
   },
   phone: {
+    countryCode: computed({
+      get: () => {
+        const iso = store.getters['booking/getCustomerCountryPhoneIso']
+        return iso ? iso.toUpperCase() : ''
+      },
+      set: (val) => {
+        store.commit('booking/setCustomerCountryPhoneIso', val ? val.toLowerCase() : "")
+      }
+    }),
     template: markRaw(PhoneFormField),
     props: {
       class: computed(() => isRtl.value ? 'am-rtl' : ''),
-      phoneError: computed(() => phoneError.value),
-      loggedInUser: computed(() => !!loggedInUser.value)
+      phoneError: computed(() => phoneError.value && !isPhoneValid.value),
+      errorMessage: computed(() => !isPhoneValid.value && infoFormData.value.phone ? amLabels.value.enter_valid_phone_warning : ''),
+      refreshTrigger: computed(() => refreshPhoneComponent.value),
     },
     handlers: {
-      countryPhoneIsoUpdated: (val) => {
-        store.commit('booking/setCustomerCountryPhoneIso', val ? val.toLowerCase() : "")
+      handlePhoneData: (phoneData) => {
+        // If phone data is received without country code, set the default country code
+        if (phoneData && !phoneData.countryCode && !store.getters['booking/getCustomerCountryPhoneIso'] && settings.general.phoneDefaultCountryCode !== 'auto') {
+          store.commit('booking/setCustomerCountryPhoneIso', settings.general.phoneDefaultCountryCode.toLowerCase())
+        }
+
+        // Set national format of phone number because chanvge of coutry code doesn't change the national format
+        store.commit('booking/setCustomerPhone', phoneData && typeof phoneData.formatNational === 'string' ? phoneData.formatNational.replace(/\s+/g, "") : "")
+
+        isPhoneValid.value = !!phoneData.isValid
       }
     }
   }
@@ -471,7 +498,7 @@ let rules = ref({
     {
       required: amCustomize.infoStep.options.phone.required,
       message: amLabels.value.enter_phone_warning,
-      trigger: 'submit',
+      trigger: ['blur', 'submit'],
     }
   ],
 })
@@ -489,6 +516,8 @@ let couponCode = ref('')
 let loading = computed(() => store.getters['booking/getLoading'])
 
 let instantBooking = ref(usePrepaidPrice(store) === 0)
+
+let isWaitingListBooking = computed(() => store.getters['appointmentWaitingListOptions/getIsWaitingListSlot'])
 
 allCustomFields.value.forEach((customField) => {
   if (customField.id in availableCustomFields.value) {
@@ -550,36 +579,60 @@ function submitForm() {
       null
   )
   infoFormRef.value.validate((valid) => {
-    if (valid) {
+    if (valid && (amCustomize.infoStep.options.phone.required ? isPhoneValid.value : true)) {
       phoneError.value = false
-      if (!instantBooking.value) {
+      if (!instantBooking.value && !isWaitingListBooking.value) {
         nextStep()
       } else {
-        if (settings.payments.wc.enabled && !settings.payments.wc.onSiteIfFree && wcEntityEnabled.value) {
-          store.commit('booking/setPaymentGateway', 'wc')
-
-          refWcBooking.value.continueWithBooking()
-        } else {
+        // For waiting list bookings always use onSite gateway.
+        if (isWaitingListBooking.value) {
           store.commit('booking/setPaymentGateway', 'onSite')
-
-          refOnSiteBooking.value.continueWithBooking()
+          if (refOnSiteBooking.value && typeof refOnSiteBooking.value.continueWithBooking === 'function') {
+            refOnSiteBooking.value.continueWithBooking()
+          } else {
+            // Fallback: remove payment step already, just proceed to next step if exposed
+            nextStep()
+          }
+        } else {
+          if (settings.payments.wc.enabled && !settings.payments.wc.onSiteIfFree && wcEntityEnabled.value) {
+            store.commit('booking/setPaymentGateway', 'wc')
+            refWcBooking.value.continueWithBooking()
+          } else {
+            store.commit('booking/setPaymentGateway', 'onSite')
+            if (refOnSiteBooking.value && typeof refOnSiteBooking.value.continueWithBooking === 'function') {
+              refOnSiteBooking.value.continueWithBooking()
+            } else {
+              nextStep()
+            }
+          }
         }
       }
     } else {
       // * Scroll to the first error field
       let fieldElement
 
-      infoFormRef.value.fields.some((el) => {
-        if (el.validateState === 'error') {
-          fieldElement = el.$el
-          return el.validateState === 'error'
-        }
-      })
-
       let phoneField = infoFormRef.value.fields.find(el => el.prop === 'phone')
+      let shouldFlagPhone = phoneField
+        && amCustomize.infoStep.options.phone.visibility
+        && (amCustomize.infoStep.options.phone.required || !!infoFormData.value.phone)
+        && !isPhoneValid.value
+
+      if (shouldFlagPhone) {
+        phoneField.validateState = 'error'
+      }
       phoneError.value = !!(phoneField && phoneField.validateState === 'error')
 
-      useScrollTo(infoFormWrapperRef.value, fieldElement, 20, 300)
+      nextTick(() => {
+        infoFormRef.value.fields.some((el) => {
+          if (el.validateState === 'error') {
+            fieldElement = el.$el
+            return el.validateState === 'error'
+          }
+        })
+
+        useScrollTo(infoFormWrapperRef.value, fieldElement, 20, 300)
+      })
+
       return false
     }
   })
@@ -621,6 +674,12 @@ function setDataFromSocialLogin(data) {
   infoFormData.value.firstName = data.firstName
   infoFormData.value.lastName = data.lastName
   infoFormData.value.email = data.email
+  if (data.phone) {
+    infoFormData.value.phone = data.phone
+    const normalizedIso = data.countryPhoneIso ? data.countryPhoneIso.trim().toLowerCase() : ''
+    store.commit('booking/setCustomerCountryPhoneIso', normalizedIso)
+    refreshPhoneComponent.value++
+  }
 }
 
 // * Watching when footer button was clicked
@@ -682,6 +741,10 @@ let addressCustomFields = ref([])
 let wcEntityEnabled = ref(false)
 
 onMounted(() => {
+  if (infoFormWrapperRef.value) {
+    infoFormWrapperRef.value.focus()
+  }
+
   let entity = null
 
   switch (store.getters['booking/getBookableType']) {
@@ -731,7 +794,7 @@ onMounted(() => {
     }
   })
 
-  if (instantBooking.value) {
+  if (instantBooking.value || isWaitingListBooking.value) {
     removePaymentsStep()
   }
 
@@ -744,17 +807,6 @@ onMounted(() => {
     allFieldsRefs.value.push.apply(allFieldsRefs.value, customFieldsRefs.value)
   })
 
-  // add stats
-  if (store.getters['booking/getBookableType'] === 'appointment') {
-    let statsData = useAppointmentBookingData(store)[0]
-
-    saveStats({
-      locationId: statsData.locationId !== null ? statsData.locationId : null,
-      providerId: statsData.providerId,
-      serviceId: statsData.serviceId,
-    })
-  }
-
   useAction(
       store,
       { customFieldsPlaceholders: refCFPlaceholders, couponCode },
@@ -766,6 +818,10 @@ onMounted(() => {
 
   if (couponCode.value) {
     store.commit('booking/setCouponCode', couponCode.value)
+  }
+
+  if (useIvyMapping(store, shortcodeData, infoFormData)) {
+    refreshPhoneComponent.value++
   }
 })
 </script>

@@ -5,19 +5,16 @@ namespace AmeliaBooking\Application\Commands;
 use AmeliaBooking\Application\Commands\Booking\Appointment\AddBookingCommand;
 use AmeliaBooking\Application\Commands\Booking\Appointment\DeleteBookingRemotelyCommand;
 use AmeliaBooking\Application\Commands\Booking\Appointment\SuccessfulBookingCommand;
-use AmeliaBooking\Application\Commands\Notification\GetSMSNotificationsHistoryCommand;
 use AmeliaBooking\Application\Commands\Notification\UpdateSMSNotificationHistoryCommand;
+use AmeliaBooking\Application\Commands\Outlook\FetchAccessTokenWithAuthCodeOutlookCommand;
 use AmeliaBooking\Application\Commands\Payment\CalculatePaymentAmountCommand;
 use AmeliaBooking\Application\Commands\Square\DisconnectFromSquareAccountCommand;
-use AmeliaBooking\Application\Commands\Square\FetchAccessTokenSquareCommand;
 use AmeliaBooking\Application\Commands\Square\SquareRefundWebhookCommand;
-use AmeliaBooking\Application\Commands\Square\SquarePaymentCommand;
-use AmeliaBooking\Application\Commands\Stats\AddStatsCommand;
 use AmeliaBooking\Application\Services\User\UserApplicationService;
 use AmeliaBooking\Domain\Services\Permissions\PermissionsService;
 use AmeliaBooking\Domain\Services\Settings\SettingsService;
 use AmeliaBooking\Infrastructure\WP\SettingsService\SettingsStorage;
-use Slim\Http\Request;
+use AmeliaVendor\Psr\Http\Message\ServerRequestInterface as Request;
 
 /**
  * Class Command
@@ -119,25 +116,24 @@ abstract class Command
      */
     public function setToken($request)
     {
-        $headers = $request->getHeaders();
-
         $token = null;
 
         /** @var SettingsService $settingsService */
         $settingsService = new SettingsService(new SettingsStorage());
 
+        $authorization = $request->getHeaderLine('Authorization');
+
         if (
-            isset($headers['HTTP_AUTHORIZATION'][0]) &&
-            ($values = explode(' ', $request->getHeaders()['HTTP_AUTHORIZATION'][0])) &&
+            $authorization !== '' &&
+            ($values = explode(' ', $authorization)) &&
             sizeof($values) === 2 &&
             $settingsService->getSetting('roles', 'enabledHttpAuthorization')
         ) {
             $token = $values[1];
-        } elseif (isset($headers['HTTP_COOKIE'][0])) {
-            foreach (explode('; ', $headers['HTTP_COOKIE'][0]) as $cookie) {
-                if (($ameliaTokenCookie = explode('=', $cookie)) && $ameliaTokenCookie[0] === 'ameliaToken') {
-                    $token = $ameliaTokenCookie[1];
-                }
+        } else {
+            $cookies = $request->getCookieParams();
+            if (!empty($cookies['ameliaToken'])) {
+                $token = $cookies['ameliaToken'];
             }
         }
 
@@ -178,7 +174,7 @@ abstract class Command
 
     /**
      * @param $request
-     * @return string|null
+     * @return int|boolean
      */
     public function validateNonce($request)
     {
@@ -187,14 +183,11 @@ abstract class Command
             !self::getToken() &&
             !($this instanceof CalculatePaymentAmountCommand) &&
             !($this instanceof AddBookingCommand) &&
-            !($this instanceof AddStatsCommand) &&
             !($this instanceof DeleteBookingRemotelyCommand) &&
-            !($this instanceof SquarePaymentCommand) &&
             !($this instanceof SquareRefundWebhookCommand) &&
             !($this instanceof DisconnectFromSquareAccountCommand) &&
             !($this instanceof SuccessfulBookingCommand) &&
-            !($this instanceof FetchAccessTokenSquareCommand) &&
-            !($this instanceof GetSMSNotificationsHistoryCommand) &&
+            !($this instanceof FetchAccessTokenWithAuthCodeOutlookCommand) &&
             !($this instanceof UpdateSMSNotificationHistoryCommand)
         ) {
             $queryParams = $request->getQueryParams();

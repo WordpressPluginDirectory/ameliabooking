@@ -46,6 +46,10 @@ function fixCacheData (data) {
         keys.forEach((key) => {
           fixType(i, key)
         })
+
+        if (!('extras' in i) || i.extras === undefined || i.extras === null) {
+          i.extras = []
+        }
       })
 
       keys = ['locationId', 'providerId']
@@ -69,7 +73,7 @@ function useRestore (store, shortcodeData) {
 
   let userClickedBack = false
 
-  if (!data || (parseInt(data.request.form.shortcode.counter) !== parseInt(shortcodeData.counter))) {
+  if (!data || (!data.status && parseInt(data.request.form.shortcode.counter) !== parseInt(shortcodeData.counter))) {
     let savedData = sessionStorage.getItem('ameliaCacheData')
     const navEntries = performance.getEntriesByType("navigation");
     const navType = navEntries && navEntries.length > 0 ? navEntries[0].type : performance.navigation.type;
@@ -193,6 +197,8 @@ function useRestore (store, shortcodeData) {
   } else {
     switch ((data.status !== null) ? data.status : 'paid') {
       case ('canceled'):
+        store.commit('booking/setError', window.wpAmeliaLabels['payment_canceled'])
+
         return {
           result: 'canceled',
           steps: data.request.form.steps,

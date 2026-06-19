@@ -1,7 +1,7 @@
 <?php
 
 /**
- * @copyright © TMS-Plugins. All rights reserved.
+ * @copyright © Melograno Ventures. All rights reserved.
  * @licence   See LICENCE.md for license details.
  */
 
@@ -17,25 +17,64 @@ use AmeliaBooking\Infrastructure\Licence;
  */
 class AmeliaEventsGutenbergBlock extends GutenbergBlock
 {
+    public static function getBlockAttributes(): array
+    {
+        return [
+            'short_code'   => ['type' => 'string', 'default' => '[ameliaevents]'],
+            'trigger'      => ['type' => 'string', 'default' => ''],
+            'event'        => ['type' => 'string', 'default' => ''],
+            'type'         => ['type' => 'string', 'default' => 'list'],
+            'recurring'    => ['type' => 'boolean', 'default' => false],
+            'tag'          => ['type' => 'string', 'default' => ''],
+            'eventOptions' => ['type' => 'string', 'default' => ''],
+            'parametars'   => ['type' => 'boolean', 'default' => false],
+        ];
+    }
+
+    public static function renderBlock(array $attributes): string
+    {
+        $shortCode = $attributes['short_code'] ?? '[ameliaevents]';
+
+        if (strpos($shortCode, '[ameliaevents') !== 0) {
+            return '';
+        }
+
+        return do_shortcode($shortCode);
+    }
+
+    public static function registerBlockForRendering()
+    {
+        register_block_type(
+            'amelia/events-gutenberg-block',
+            array(
+                'attributes'      => self::getBlockAttributes(),
+                'render_callback' => array(__CLASS__, 'renderBlock'),
+            )
+        );
+    }
+
     /**
      * Register Amelia Events block for Gutenberg
      */
     public static function registerBlockType()
     {
+        // Enqueue shared icon and styles
+        parent::enqueueSharedIcon();
+        parent::enqueueSharedStyles();
+
         wp_enqueue_script(
             'amelia_events_gutenberg_block',
             AMELIA_URL . 'public/js/gutenberg/amelia-events/amelia-events-gutenberg.js',
-            array('wp-blocks', 'wp-components', 'wp-element', 'wp-editor')
+            array('wp-blocks', 'wp-components', 'wp-element', 'wp-block-editor', 'amelia_block_icon')
         );
 
         wp_localize_script(
             'amelia_events_gutenberg_block',
             'wpAmeliaLabels',
             array_merge(
-                BackendStrings::getCommonStrings(),
-                BackendStrings::getWordPressStrings(),
+                BackendStrings::getAllStrings(),
                 self::getEntitiesData(),
-                array('isLite' => !Licence\Licence::$premium)
+                array('isLite' => !Licence\Licence::isPremium())
             )
         );
 
@@ -44,11 +83,6 @@ class AmeliaEventsGutenbergBlock extends GutenbergBlock
             AMELIA_URL . 'public/js/gutenberg/amelia-events/amelia-events-gutenberg.css',
             [],
             AMELIA_VERSION
-        );
-
-        register_block_type(
-            'amelia/events-gutenberg-block',
-            array('editor_script' => 'amelia_events_gutenberg_block')
         );
     }
 }

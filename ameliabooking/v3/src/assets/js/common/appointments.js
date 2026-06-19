@@ -579,10 +579,16 @@ function useDuration (serviceDuration, extras) {
   return duration
 }
 
-function useCalendarEvents (slots) {
+function useCalendarEvents (slots, waitingSlots) {
   let calendarSlotsValues = []
 
-  useSortedDateStrings(Object.keys(slots)).forEach((date) => {
+  let dates = Object.keys(slots)
+
+  if (waitingSlots) {
+    dates = [...new Set([...dates, ...Object.keys(waitingSlots)])]
+  }
+
+  useSortedDateStrings(dates).forEach((date) => {
     calendarSlotsValues.push({
       title  : 'e',
       start  : date,
@@ -590,7 +596,7 @@ function useCalendarEvents (slots) {
       extendedProps: {
         slotsTotal: 100,
         slotsAvailable: 1,
-        slots: slots[date]
+        slots: date in slots ? slots[date] : {}
       }
     })
   })
@@ -640,6 +646,10 @@ function useBusySlots (store) {
   return busySlots[activeAppointment.date] ? Object.keys(busySlots[activeAppointment.date]) : []
 }
 
+function isSlotOccupiedBySelection (inspectedStart, inspectedEnd, occupiedStart, occupiedEnd) {
+  return !(inspectedEnd <= occupiedStart || inspectedStart >= occupiedEnd)
+}
+
 function useAvailableSlots (store) {
   let cart = store.getters['booking/getAllMultipleAppointments']
 
@@ -663,8 +673,9 @@ function useAvailableSlots (store) {
 
           if (i.date && i.date === activeAppointment.date && i.time && !isCurrentAppointment) {
             selectedSlots.push({
+              providerId: i.providerId,
               time: i.time,
-              duration: service.duration + i.extras.filter(e => e.quantity && e.duration).map(e => e.duration).reduce((fullDuration, duration) => fullDuration + duration, 0),
+              duration: i.duration + i.extras.filter(e => e.quantity && e.duration).map(e => e.duration).reduce((fullDuration, duration) => fullDuration + duration, 0),
               timeAfter: service.timeAfter,
               timeBefore: service.timeBefore
             })
@@ -673,31 +684,58 @@ function useAvailableSlots (store) {
       }
     })
 
-    let service = services.find(i => i.id === cart[cartIndex].serviceId)
+    let targetService = services.find(i => i.id === cart[cartIndex].serviceId)
+
+    let targetDuration = activeAppointment.duration + activeAppointment.extras
+      .filter(e => e.quantity && e.duration)
+      .map(e => e.duration)
+      .reduce((fullDuration, duration) => fullDuration + duration, 0)
+
+    // Date may only exist in waiting list slots (not in regular slots) — guard against undefined
+    if (!(activeAppointment.date in cart[cartIndex].services[cart[cartIndex].serviceId].slots)) {
+      return []
+    }
 
     let defaultSlots = Object.keys(cart[cartIndex].services[cart[cartIndex].serviceId].slots[activeAppointment.date])
 
     let availableSlots = {}
 
     for (let i = 0; i < defaultSlots.length; i++) {
-      let defaultSlotSeconds = useTimeInSeconds(defaultSlots[i])
+      let slotEmployeesIds = cart[cartIndex].services[
+          cart[cartIndex].serviceId
+        ].slots[activeAppointment.date][defaultSlots[i]].map((j) => parseInt(j.e))
 
-      let isFreeSlot = true
+      let targetSlotSeconds = useTimeInSeconds(defaultSlots[i])
+
+      let occupiedSlotsCounter = 0
+
+      let occupiedSlotsEmployeesIds = []
 
       for (let j = 0; j < selectedSlots.length; j++) {
-        let slotInSeconds = useTimeInSeconds(selectedSlots[j].time)
+        let selectedSlotSeconds = useTimeInSeconds(selectedSlots[j].time)
 
-        if (defaultSlotSeconds > (slotInSeconds - service.duration - service.timeAfter) &&
-          defaultSlotSeconds < (slotInSeconds + selectedSlots[j].duration + selectedSlots[j].timeBefore + service.timeAfter)
-        ) {
-          isFreeSlot = false
+        if (isSlotOccupiedBySelection(
+          targetSlotSeconds - targetService.timeBefore,
+          targetSlotSeconds + targetDuration + targetService.timeAfter,
+          selectedSlotSeconds - selectedSlots[j].timeBefore,
+          selectedSlotSeconds + selectedSlots[j].duration + selectedSlots[j].timeAfter
+        )) {
+          occupiedSlotsCounter++
 
-          break
+          if (selectedSlots[j].providerId) {
+            occupiedSlotsEmployeesIds.push(selectedSlots[j].providerId)
+          }
         }
       }
 
-      if (isFreeSlot) {
-        availableSlots[defaultSlots[i]] = useTimeInSeconds(defaultSlots[i])
+      if (
+        occupiedSlotsEmployeesIds.length
+          ? slotEmployeesIds.some(
+            (value) => !occupiedSlotsEmployeesIds.includes(value)
+            )
+          : occupiedSlotsCounter < cart[cartIndex].services[cart[cartIndex].serviceId].slots[activeAppointment.date][defaultSlots[i]].length
+      ) {
+        availableSlots[defaultSlots[i]] = targetSlotSeconds
       }
     }
 
@@ -717,37 +755,104 @@ function useFillAppointments (store) {
     let booking = cartItem.services[cartItem.serviceId].list[0]
 
     if (!booking.providerId && booking.date && booking.time) {
-      let employeesIds = cartItem.services[cartItem.serviceId].slots[booking.date][booking.time].map(
-        i => i.e
-      ).filter(
-        (v, i, a) => a.indexOf(v) === i
-      )
+      // Check if waiting list slot with pre-selected provider
+      let isWaitingListSlot = store.getters['appointmentWaitingListOptions/getIsWaitingListSlot']
+      let waitingListOptions = store.getters['appointmentWaitingListOptions/getWaitingListOptions']
 
-      if (settings.roles.limitPerEmployee.enabled) {
-        let chosenEmployees = store.getters['booking/getAllMultipleAppointments'].map(a => Object.values(a.services)[0].list[0])
-        let appCount = store.getters['booking/getMultipleAppointmentsAppCount'](cartItem.serviceId);
-        let result = checkLimitPerEmployee(employeesIds, 0, [], booking, appCount, chosenEmployees, cartItem.serviceId)
-        if (result.bookingFailed !== null) {
-          return {booking: result.bookingFailed, serviceId: parseInt(cartItem.serviceId)}
-        }
-        employeesIds = result.employeeIds
-      }
-
-      if (settings.appointments.employeeSelection === 'random') {
-        booking.providerId = employeesIds[Math.floor(Math.random() * (employeesIds.length) + 1) - 1]
+      if (isWaitingListSlot && waitingListOptions.selectedProviderId) {
+        // Use the provider ID that was stored when the waiting list slot was selected
+        booking.providerId = waitingListOptions.selectedProviderId
       } else {
-        employeesIds = sortForEmployeeSelection(store, employeesIds, cartItem.serviceId)
-        booking.providerId = employeesIds[0]
+        // Derive employeesIds. If a waiting list slot is selected (not present in regular slots),
+        // pull provider data from occupied structure instead of slots.
+        let slotDataArray = null
+
+        if (
+          isWaitingListSlot &&
+          booking.date && booking.time &&
+          (
+            !(booking.date in cartItem.services[cartItem.serviceId].slots) ||
+            !(booking.time in cartItem.services[cartItem.serviceId].slots[booking.date])
+          ) &&
+          booking.date in cartItem.services[cartItem.serviceId].occupied &&
+          booking.time in cartItem.services[cartItem.serviceId].occupied[booking.date]
+        ) {
+          // Waiting list slot: use occupied data (fully booked original appointment rows)
+          const serviceId = parseInt(cartItem.serviceId)
+          slotDataArray = cartItem.services[cartItem.serviceId].occupied[booking.date][booking.time]
+            .filter(p => p.s === serviceId)
+        } else if (
+          booking.date && booking.time &&
+          booking.date in cartItem.services[cartItem.serviceId].slots &&
+          booking.time in cartItem.services[cartItem.serviceId].slots[booking.date]
+        ) {
+          // Regular slot
+          slotDataArray = cartItem.services[cartItem.serviceId].slots[booking.date][booking.time]
+        } else {
+          slotDataArray = []
+        }
+
+        let occupiedSlotEmployeesIds = !isWaitingListSlot
+          ? getOccupiedSlotEmployeesIds(store, cartItem.serviceId, booking)
+          : []
+
+        let employeesIds = slotDataArray.map(i => i.e).filter(
+            (v, i, a) => a.indexOf(v) === i && !occupiedSlotEmployeesIds.includes(v)
+        )
+
+        if (!employeesIds.length) {
+          employeesIds = slotDataArray.map(i => i.e).filter((v, i, a) => a.indexOf(v) === i)
+        }
+
+        if (settings.roles.limitPerEmployee.enabled) {
+          let chosenEmployees = store.getters['booking/getAllMultipleAppointments'].map(a => Object.values(a.services)[0].list[0])
+          let appCount = store.getters['booking/getMultipleAppointmentsAppCount'](cartItem.serviceId);
+          let result = checkLimitPerEmployee(employeesIds, 0, [], booking, appCount, chosenEmployees, cartItem.serviceId)
+          if (result.bookingFailed !== null) {
+            return {booking: result.bookingFailed, serviceId: parseInt(cartItem.serviceId)}
+          }
+          employeesIds = result.employeeIds
+        }
+
+        if (settings.appointments.employeeSelection === 'random') {
+          booking.providerId = employeesIds[Math.floor(Math.random() * (employeesIds.length) + 1) - 1]
+        } else {
+          employeesIds = sortForEmployeeSelection(store, employeesIds, cartItem.serviceId)
+          booking.providerId = employeesIds[0]
+        }
       }
     }
 
     if (!booking.locationId && booking.date && booking.time) {
-      let locationsIds = cartItem.services[cartItem.serviceId].slots[booking.date][booking.time].filter(
-        i => i.e === booking.providerId
-      ).map(i => i.l)
+      let isWaitingListSlot = store.getters['appointmentWaitingListOptions/getIsWaitingListSlot']
+
+      let slotRows = null
+      if (
+        isWaitingListSlot &&
+        (
+          !(booking.date in cartItem.services[cartItem.serviceId].slots) ||
+          !(booking.time in cartItem.services[cartItem.serviceId].slots[booking.date])
+        ) &&
+        booking.date in cartItem.services[cartItem.serviceId].occupied &&
+        booking.time in cartItem.services[cartItem.serviceId].occupied[booking.date]
+      ) {
+        // Waiting list slot: derive possible locations from occupied data
+        const serviceId = parseInt(cartItem.serviceId)
+        slotRows = cartItem.services[cartItem.serviceId].occupied[booking.date][booking.time]
+          .filter(p => p.s === serviceId)
+      } else if (
+        booking.date in cartItem.services[cartItem.serviceId].slots &&
+        booking.time in cartItem.services[cartItem.serviceId].slots[booking.date]
+      ) {
+        slotRows = cartItem.services[cartItem.serviceId].slots[booking.date][booking.time]
+      } else {
+        slotRows = []
+      }
+
+      let locationsIds = slotRows.filter(r => r.e === booking.providerId).map(r => r.l)
 
       booking.locationId = locationsIds.length ? getPreferredEntityId(
-        cartItem.services[cartItem.serviceId].slots[booking.date],
+        cartItem.services[cartItem.serviceId].slots[booking.date] || {},
         booking.date in cartItem.services[cartItem.serviceId].occupied
           ? cartItem.services[cartItem.serviceId].occupied[booking.date] : {},
         booking.time,
@@ -795,6 +900,43 @@ function useFillAppointments (store) {
   })
 
   return null
+}
+
+function getOccupiedSlotEmployeesIds (store, serviceId, booking) {
+  let cart = useCart(store)
+
+  let services = useServices(store)
+
+  let targetService = services.find(i => i.id === parseInt(serviceId))
+
+  let targetSlotSeconds = useTimeInSeconds(booking.time)
+
+  let targetDuration = booking.duration + booking.extras.filter(e => e.quantity && e.duration).map(e => e.duration).reduce((fullDuration, duration) => fullDuration + duration, 0)
+
+  let occupiedSlotEmployeesIds = []
+
+  cart.forEach((item) => {
+    item.services[item.serviceId].list.forEach((slot) => {
+      if (slot.providerId && slot.date && slot.time && booking.date === slot.date) {
+        let selectedService = services.find(i => i.id === item.serviceId)
+
+        let selectedSlotSeconds = useTimeInSeconds(slot.time)
+
+        let selectedDuration = slot.duration + slot.extras.filter(e => e.quantity && e.duration).map(e => e.duration).reduce((fullDuration, duration) => fullDuration + duration, 0)
+
+        if (isSlotOccupiedBySelection(
+          targetSlotSeconds - targetService.timeBefore,
+          targetSlotSeconds + targetDuration + targetService.timeAfter,
+          selectedSlotSeconds - selectedService.timeBefore,
+          selectedSlotSeconds + selectedDuration + selectedService.timeAfter
+        )) {
+          occupiedSlotEmployeesIds.push(slot.providerId)
+        }
+      }
+    })
+  })
+
+  return [...new Set(occupiedSlotEmployeesIds)].map(i => parseInt(i))
 }
 
 function setProviderServicePrice (store, employeeId, serviceId, persons) {
@@ -881,11 +1023,11 @@ function useAppointmentsPayments (store, serviceId, appointments) {
 }
 
 function setPreferredEntitiesData (bookings, store, serviceId, chosenEmployees) {
-  let employeesIds = getAllEntitiesIds(bookings, 'e')
+  let allEmployeesIds = getAllEntitiesIds(bookings, 'e')
 
   let locationsIds = getAllEntitiesIds(bookings, 'l')
 
-  let isSingleEmployee = employeesIds.length === 1
+  let isSingleEmployee = allEmployeesIds.length === 1
 
   let isSingleLocation = locationsIds.length === 1
 
@@ -893,8 +1035,21 @@ function setPreferredEntitiesData (bookings, store, serviceId, chosenEmployees) 
 
   for (let bookingIndex = 0; bookingIndex < bookings.list.length; bookingIndex++) {
     let booking = bookings.list[bookingIndex]
+
     if (booking.date && booking.time) {
-      employeesIds = sortForEmployeeSelection(store, employeesIds, serviceId)
+      let occupiedSlotEmployeesIds = !booking.providerId
+        ? getOccupiedSlotEmployeesIds(store, serviceId, booking)
+        : []
+
+      let employeesIds = sortForEmployeeSelection(
+          store,
+          allEmployeesIds.filter(x => !occupiedSlotEmployeesIds.includes(x)),
+          serviceId
+      )
+
+      if (!employeesIds.length) {
+        employeesIds = sortForEmployeeSelection(store, allEmployeesIds, serviceId)
+      }
 
       if (settings.roles.limitPerEmployee.enabled) {
         let result = checkLimitPerEmployee(employeesIds, bookingIndex, bookings.list, booking, appCount, chosenEmployees, serviceId)
@@ -938,7 +1093,7 @@ function setPreferredEntitiesData (bookings, store, serviceId, chosenEmployees) 
       } else if (isSingleLocation && !isSingleEmployee) {
         booking.locationId = locationsIds[0]
 
-        booking.providerId = getPreferredEntityId(
+        const preferredProviderId = getPreferredEntityId(
           bookings.slots[booking.date],
           booking.date in bookings.occupied ? bookings.occupied[booking.date] : {},
           booking.time,
@@ -946,6 +1101,8 @@ function setPreferredEntitiesData (bookings, store, serviceId, chosenEmployees) 
           employeesIds,
           'e'
         )
+
+        booking.providerId = employeesIds.includes(preferredProviderId) ? preferredProviderId : employeesIds[0]
       } else {
         let setEntities = false
         outsideLoop: for (let j = 0; j < employeesIds.length; j++) {
@@ -1058,7 +1215,15 @@ function getPreferredEntityId (availableSlots, occupiedSlots, timeString, select
 
   let availableIds = []
 
-  availableSlots[timeString].forEach((slotData) => {
+  // Collect ids from available slots for the specific time; if time not in availableSlots (e.g., waiting list slot),
+  // fall back to occupied slots data to derive potential ids.
+  let timeRows = (timeString in availableSlots && Array.isArray(availableSlots[timeString])) ? availableSlots[timeString] : []
+
+  if (!timeRows.length && (timeString in occupiedSlots) && Array.isArray(occupiedSlots[timeString])) {
+    timeRows = occupiedSlots[timeString]
+  }
+
+  timeRows.forEach((slotData) => {
     if (slotData[searchIndex] === selectedId) {
       availableIds.push(slotData[targetIndex])
     }
@@ -1077,11 +1242,11 @@ function getPreferredEntityId (availableSlots, occupiedSlots, timeString, select
   }
 
   for (let i = 0; i < allIds.length; i++) {
-    for (let j = 0; j < availableSlots[timeString].length; j++) {
-      if (availableSlots[timeString][j][searchIndex] === selectedId &&
-        allIds[i] === availableSlots[timeString][j][targetIndex]
+    for (let j = 0; j < timeRows.length; j++) {
+      if (timeRows[j][searchIndex] === selectedId &&
+        allIds[i] === timeRows[j][targetIndex]
       ) {
-        return availableSlots[timeString][j][targetIndex]
+        return timeRows[j][targetIndex]
       }
     }
   }

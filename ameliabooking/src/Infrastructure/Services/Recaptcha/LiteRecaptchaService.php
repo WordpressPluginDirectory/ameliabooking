@@ -1,7 +1,7 @@
 <?php
 
 /**
- * @copyright © TMS-Plugins. All rights reserved.
+ * @copyright © Melograno Ventures. All rights reserved.
  * @licence   See LICENCE.md for license details.
  */
 
@@ -20,6 +20,22 @@ class LiteRecaptchaService extends AbstractRecaptchaService
     public function verify($value)
     {
         return true;
+    }
+
+    /**
+     * Verify recaptcha with provided secret and token
+     *
+     * @param string $secret
+     * @param string $token
+     *
+     * @return array Array with 'success' (bool) and 'message' (string)
+     */
+    public function verifyWithSecret($secret, $token)
+    {
+        return [
+            'success' => true,
+            'message' => 'Validation successful (Lite version)'
+        ];
     }
 
     /**

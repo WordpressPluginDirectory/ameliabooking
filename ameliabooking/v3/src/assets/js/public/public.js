@@ -27,6 +27,7 @@ import cabinet from "../../../store/modules/cabinet.js";
 import cabinetFilters from "../../../store/modules/cabinetFilters.js"
 import eventWaitingListOptions from "../../../store/modules/eventWaitingListOptions"
 import stepByStepFilters from "../../../store/modules/stepByStepFilters.js"
+import appointmentWaitingListOptions from "../../../store/modules/appointmentWaitingListOptions"
 
 import {
   provide,
@@ -35,6 +36,9 @@ import {
   readonly
 } from "vue";
 import VueGtag from "vue-gtag";
+import { MazUi } from 'maz-ui/plugins'
+import { mazUi as mazUiThemePreset } from '@maz-ui/themes/presets/mazUi'
+import 'maz-ui/styles'
 import {
   install,
   init
@@ -92,7 +96,66 @@ window.__dynamic_preload__ = function(preloads) {
   return preloads.map(preload => dynamicCdn + preload);
 }
 
+function ameliaBeforeFormSubmit(submit, onError, data) {
+  let formFound = false
+
+  if (window.ameliaShortcodeDataTriggered !== undefined) {
+    window.ameliaShortcodeDataTriggered.forEach((shortcodeData) => {
+      if (parseInt(shortcodeData.ivy) === parseInt(data.formId)) {
+        shortcodeData.ivy = data
+        shortcodeData.trigger = 'ivy'
+
+        setTimeout(() => {
+          const ivyForm = document.getElementsByClassName('ivyforms-form-' + data.formId)[0]
+          if (ivyForm) {
+            ivyForm.style.display = 'none'
+          }
+        }, 200)
+
+        window.amelia.load(shortcodeData)
+
+        formFound = true
+      }
+    })
+  }
+
+  if (!formFound) {
+    submit()
+  }
+}
+
+function registerAmeliaIvyFormsHook() {
+  let wpAmeliaSettings = JSON.parse(JSON.stringify(window.wpAmeliaSettings))
+
+  if (wpAmeliaSettings.featuresIntegrations?.ivy?.enabled === false) {
+    return false
+  }
+
+  const register = window.IvyForms?.hooks?.registerBeforeFormSubmit
+
+  if (typeof register !== 'function') {
+    return false
+  }
+
+  window.IvyForms?.hooks?.registerBeforeFormSubmit(ameliaBeforeFormSubmit)
+}
+
+if (!registerAmeliaIvyFormsHook()) {
+  window.addEventListener('ivyforms:ready', () => registerAmeliaIvyFormsHook(), { once: true })
+}
+
 let isMounted = ref(false)
+
+function getMazLocale() {
+  const locale = Array.isArray(window.localeLanguage) ? window.localeLanguage[0] : ''
+
+  if (typeof locale !== 'string' || !locale) {
+    return 'en'
+  }
+
+  // Normalize WP locale formats like en_US -> en for maz-ui locale keys.
+  return locale.toLowerCase().replace('_', '-').split('-')[0] || 'en'
+}
 
 if (window.ameliaShortcodeDataTriggered !== undefined) {
   window.ameliaShortcodeDataTriggered.forEach((shortCodeData) => {
@@ -154,7 +217,7 @@ if (window.ameliaShortcodeDataTriggered !== undefined) {
           }, 12000)
         }
       }, 250)
-    } else {
+    } else if (!shortCodeData.ivy) {
       let ameliaPopUpLoaded = false
 
       let ameliaBookingButtonLoadInterval = setInterval(
@@ -258,13 +321,13 @@ function createAmelia(shortcodeData) {
     }
   })
 
-  if (settings.googleTag.id) {
+  if (settings.featuresIntegrations.googleAnalytics.enabled && settings.googleTag.id) {
     app.use(VueGtag, {
       config: {id: wpAmeliaSettings.googleTag.id}
     })
   }
 
-  if (settings.googleAnalytics.id) {
+  if (settings.featuresIntegrations.googleAnalytics.enabled && settings.googleAnalytics.id) {
     app.use(VueGtag, {
       config: {id: wpAmeliaSettings.googleAnalytics.id}
     })
@@ -279,6 +342,18 @@ function createAmelia(shortcodeData) {
   let data = 'ameliaCache' in window && window.ameliaCache.length && window.ameliaCache[0]
     ? JSON.parse(window.ameliaCache[0])
     : null
+
+  app.use(MazUi, {
+    theme: {
+      preset: mazUiThemePreset,
+      strategy: 'runtime',
+      darkModeStrategy: 'class',
+    },
+    translations: {
+      locale: getMazLocale(),
+      fallbackLocale: 'en',
+    },
+  })
 
   app
     .component('StepFormWrapper', StepFormWrapper)
@@ -306,6 +381,7 @@ function createAmelia(shortcodeData) {
             data?.request?.form?.shortcode?.counter &&
             parseInt(data.request.form.shortcode.counter) === parseInt(shortcodeData.counter),
           restored: false,
+          ivy: shortcodeData.ivy,
         }),
 
         getters: {
@@ -347,6 +423,10 @@ function createAmelia(shortcodeData) {
 
           getIsRtl (state) {
             return state.isRtl
+          },
+
+          getIvy (state) {
+            return state.ivy
           }
         },
 
@@ -369,6 +449,10 @@ function createAmelia(shortcodeData) {
 
           setFormKey (state, payload) {
             state.formKey = payload
+          },
+
+          setIvy (state, payload) {
+            state.ivy = payload
           }
         },
 
@@ -397,6 +481,7 @@ function createAmelia(shortcodeData) {
           cabinetFilters,
           eventWaitingListOptions,
           stepByStepFilters,
+          appointmentWaitingListOptions
         },
       })
     )

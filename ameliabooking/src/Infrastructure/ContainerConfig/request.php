@@ -1,58 +1,77 @@
 <?php
 
-use Slim\Http\Request;
-use Slim\Http\Uri;
+use AmeliaBooking\Infrastructure\Common\Container;
+use Slim\Factory\ServerRequestCreatorFactory;
 
-$entries['request'] = function (AmeliaBooking\Infrastructure\Common\Container $c) {
+$entries['request'] = function (Container $c) {
+    $creator = ServerRequestCreatorFactory::create();
 
-    $curUri = Uri::createFromEnvironment($c->get('environment'));
+    $serverRequest = $creator->createServerRequestFromGlobals();
+
+    $curUri = $serverRequest->getUri();
 
     // fix callback url for Razorpay payment through link since Razorpay encodes callback urls
-    $newRoute = str_replace(
+    $queryWithPlaceholderFixes = str_replace(
         '__payments__callback',
         '/payments/callback',
         $curUri->getQuery()
     );
 
     // fix callback url for whatsapp webhooks
-    $newRoute = str_replace(
+    $queryWithPlaceholderFixes = str_replace(
         '__notifications__whatsapp__webhook',
         '/notifications/whatsapp/webhook',
-        $newRoute
+        $queryWithPlaceholderFixes
     );
 
-    // fix callback url for square payment
-    $newRoute = str_replace(
-        '__payment__square__notify',
-        '/payment/square/notify',
-        $newRoute
-    );
+    [$newPath, $newQuery] = (function ($queryWithPlaceholderFixes, array $get) {
+        if (isset($get['call']) && is_string($get['call']) && $get['call'] !== '') {
+            $callPath = str_replace(
+                '__payments__callback',
+                '/payments/callback',
+                $get['call']
+            );
+            $callPath = str_replace(
+                '__notifications__whatsapp__webhook',
+                '/notifications/whatsapp/webhook',
+                $callPath
+            );
 
-    $newRoute = str_replace(
-        ['XDEBUG_SESSION_START=PHPSTORM&' . AMELIA_ACTION_SLUG, AMELIA_ACTION_SLUG],
-        '',
-        $newRoute
-    );
+            $queryParams = $get;
+            unset($queryParams['action'], $queryParams['call']);
 
-    $newPath = strpos($newRoute, '&') ? substr(
-        $newRoute,
-        0,
-        strpos($newRoute, '&')
-    ) : $newRoute;
+            return [$callPath, http_build_query($queryParams)];
+        }
 
-    $newQuery = strpos($newRoute, '&') ? substr(
-        $newRoute,
-        strpos($newRoute, '&') + 1
-    ) : '';
+        $newRoute = str_replace(
+            ['XDEBUG_SESSION_START=PHPSTORM&' . AMELIA_ACTION_SLUG, AMELIA_ACTION_SLUG],
+            '',
+            $queryWithPlaceholderFixes
+        );
 
-    $request = Request::createFromEnvironment($c->get('environment'))
-    ->withUri(
+        $newPath = strpos($newRoute, '&') ? substr(
+            $newRoute,
+            0,
+            strpos($newRoute, '&')
+        ) : $newRoute;
+
+        $newQuery = strpos($newRoute, '&') ? substr(
+            $newRoute,
+            strpos($newRoute, '&') + 1
+        ) : '';
+
+        return [$newPath, $newQuery];
+    })($queryWithPlaceholderFixes, $_GET);
+
+    $request = $serverRequest->withUri(
         $curUri
-               ->withPath($newPath)
-               ->withQuery($newQuery)
+            ->withPath($newPath)
+            ->withQuery($newQuery)
     );
 
-    if (method_exists($request, 'getParam') && $request->getParam('showAmeliaErrors')) {
+    $queryParams = $request->getQueryParams();
+
+    if (!empty($queryParams['showAmeliaErrors'])) {
         ini_set('display_errors', 1);
         ini_set('display_startup_errors', 1);
         error_reporting(E_ALL);

@@ -147,17 +147,6 @@ function continueWithBooking () {
 
       break
 
-    case ('square'):
-      payment(
-          '/payment/square',
-          bookingData,
-          function (response) {
-            window.location = response.data.data.redirectUrl
-          }
-      )
-
-      break
-
     case ('razorpay'):
       payment(
         '/payment/razorpay',

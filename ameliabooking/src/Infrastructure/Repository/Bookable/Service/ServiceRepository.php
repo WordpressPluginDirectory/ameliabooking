@@ -1,7 +1,7 @@
 <?php
 
 /**
- * @copyright © TMS-Plugins. All rights reserved.
+ * @copyright © Melograno Ventures. All rights reserved.
  * @licence   See LICENCE.md for license details.
  */
 
@@ -67,11 +67,26 @@ class ServiceRepository extends AbstractRepository implements ServiceRepositoryI
      * @return Collection
      * @throws QueryExecutionException
      */
-    public function getAllArrayIndexedById()
+    public function getAllArrayIndexedById($ids = [])
     {
+        $where  = '';
+        $params = [];
+        if (!empty($ids)) {
+            $query = [];
+
+            foreach ((array)$ids as $index => $value) {
+                $param = ':id' . $index;
+
+                $query[] = $param;
+
+                $params[$param] = $value;
+            }
+
+            $where = 'WHERE s.id IN (' . implode(', ', $query) . ')';
+        }
+
         try {
-            $statement = $this->connection->query(
-                "SELECT
+            $statement = $this->connection->prepare("SELECT
                 s.id AS service_id,
                 s.name AS service_name,
                 s.description AS service_description,
@@ -122,11 +137,14 @@ class ServiceRepository extends AbstractRepository implements ServiceRepositoryI
               FROM {$this->table} s
               LEFT JOIN {$this->extrasTable} e ON e.serviceId = s.id
               LEFT JOIN {$this->galleriesTable} g ON g.entityId = s.id AND g.entityType = 'service'
-              ORDER BY s.position, s.name ASC, e.position ASC, g.position ASC"
-            );
-            $rows      = $statement->fetchAll();
+              {$where}
+              ORDER BY s.position, s.name ASC, e.position ASC, g.position ASC");
+
+            $statement->execute($params);
+
+            $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to get data from ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to get data from ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         /** @var Collection $services */
@@ -145,7 +163,7 @@ class ServiceRepository extends AbstractRepository implements ServiceRepositoryI
     /**
      * @param Service $entity
      *
-     * @return bool
+     * @return int
      * @throws QueryExecutionException
      */
     public function add($entity)
@@ -221,15 +239,11 @@ class ServiceRepository extends AbstractRepository implements ServiceRepositoryI
                 )"
             );
 
-            $result = $statement->execute($params);
-
-            if (!$result) {
-                throw new QueryExecutionException('Unable to add data in ' . __CLASS__);
-            }
+            $statement->execute($params);
 
             return $this->connection->lastInsertId();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to add data in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to add data in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
     }
 
@@ -291,15 +305,11 @@ class ServiceRepository extends AbstractRepository implements ServiceRepositoryI
                 id = :id"
             );
 
-            $result = $statement->execute($params);
+            $statement->execute($params);
 
-            if (!$result) {
-                throw new QueryExecutionException('Unable to save data in ' . __CLASS__);
-            }
-
-            return $result;
+            return true;
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to save data in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to save data in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
     }
 
@@ -325,38 +335,66 @@ class ServiceRepository extends AbstractRepository implements ServiceRepositoryI
             switch ($criteria['sort']) {
                 case ('nameAsc'):
                     $orderColumn = 's.name';
-
                     $orderDirection = 'ASC';
-
                     break;
 
                 case ('nameDesc'):
                     $orderColumn = 's.name';
-
                     $orderDirection = 'DESC';
-
                     break;
 
                 case ('priceAsc'):
                     $orderColumn = 's.price';
-
                     $orderDirection = 'ASC';
-
                     break;
 
                 case ('priceDesc'):
                     $orderColumn = 's.price';
-
                     $orderDirection = 'DESC';
+                    break;
 
+                case ('durationAsc'):
+                    $orderColumn = 's.duration';
+                    $orderDirection = 'ASC';
+                    break;
+
+                case ('durationDesc'):
+                    $orderColumn = 's.duration';
+                    $orderDirection = 'DESC';
+                    break;
+
+                case ('idAsc'):
+                    $orderColumn = 's.id';
+                    $orderDirection = 'ASC';
+                    break;
+
+                case ('idDesc'):
+                    $orderColumn = 's.id';
+                    $orderDirection = 'DESC';
                     break;
 
                 case ('custom'):
                     $orderColumn = 's.position, s.id';
-
                     $orderDirection = 'ASC';
-
                     break;
+            }
+        }
+
+        if (!empty($criteria['search'])) {
+            $terms = preg_split('/\s+/', trim($criteria['search']));
+            $termIndex = 0;
+
+            foreach ($terms as $term) {
+                $param = ":search{$termIndex}";
+                $params[$param] = "%{$term}%";
+
+                $where[] = "(
+                        s.name LIKE {$param}
+                        OR s.description LIKE {$param}
+                        OR s.id LIKE {$param}
+                    )";
+
+                $termIndex++;
             }
         }
 
@@ -365,6 +403,8 @@ class ServiceRepository extends AbstractRepository implements ServiceRepositoryI
 
             $where[] = 's.categoryId = :categoryId';
         }
+
+        $providersJoin = $this->getProvidersJoin($criteria, $params, $where);
 
         $where = $where ? 'WHERE ' . implode(' AND ', $where) : '';
 
@@ -377,8 +417,9 @@ class ServiceRepository extends AbstractRepository implements ServiceRepositoryI
 
         try {
             $statement = $this->connection->prepare(
-                "SELECT s.*
+                "SELECT DISTINCT s.*
                 FROM {$this->table} s
+                {$providersJoin}
                 {$where}
                 {$order}
                 {$limit}"
@@ -388,7 +429,7 @@ class ServiceRepository extends AbstractRepository implements ServiceRepositoryI
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find by ids in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find by ids in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         $items = new Collection();
@@ -412,27 +453,47 @@ class ServiceRepository extends AbstractRepository implements ServiceRepositoryI
 
         $where = [];
 
+        if (!empty($criteria['search'])) {
+            $terms = preg_split('/\s+/', trim($criteria['search']));
+            $termIndex = 0;
+
+            foreach ($terms as $term) {
+                $param = ":search{$termIndex}";
+                $params[$param] = "%{$term}%";
+
+                $where[] = "(
+                        s.name LIKE {$param}
+                        OR s.description LIKE {$param}
+                        OR s.id LIKE {$param}
+                    )";
+
+                $termIndex++;
+            }
+        }
+
         if (!empty($criteria['categoryId'])) {
             $params[':categoryId'] = $criteria['categoryId'];
 
             $where[] = 's.categoryId = :categoryId';
         }
 
+        $providersJoin = $this->getProvidersJoin($criteria, $params, $where);
+
         $where = $where ? 'WHERE ' . implode(' AND ', $where) : '';
 
         try {
             $statement = $this->connection->prepare(
-                "SELECT COUNT(*) as count
+                "SELECT COUNT(DISTINCT s.id) as count
                 FROM {$this->table} s
-                {$where}
-                ORDER BY s.position, s.id"
+                {$providersJoin}
+                {$where}"
             );
 
             $statement->execute($params);
 
             $row = $statement->fetch()['count'];
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to get data from ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to get data from ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return $row;
@@ -498,7 +559,7 @@ class ServiceRepository extends AbstractRepository implements ServiceRepositoryI
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find by ids in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find by ids in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return call_user_func([static::FACTORY, 'createCollection'], $rows);
@@ -527,9 +588,19 @@ class ServiceRepository extends AbstractRepository implements ServiceRepositoryI
         }
 
         if (!empty($criteria['search'])) {
-            $params[':search'] = "%{$criteria['search']}%";
+            $terms = preg_split('/\s+/', trim($criteria['search']));
+            $termIndex = 0;
 
-            $where[] = 's.name LIKE :search';
+            foreach ($terms as $term) {
+                $param = ":search{$termIndex}";
+                $params[$param] = "%{$term}%";
+
+                $where[] = "(
+                        s.name LIKE {$param}
+                    )";
+
+                $termIndex++;
+            }
         }
 
         if (!empty($criteria['services'])) {
@@ -639,7 +710,7 @@ class ServiceRepository extends AbstractRepository implements ServiceRepositoryI
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return call_user_func([static::FACTORY, 'createCollection'], $rows);
@@ -705,7 +776,7 @@ class ServiceRepository extends AbstractRepository implements ServiceRepositoryI
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return call_user_func([static::FACTORY, 'createCollection'], $rows)->getItem($serviceId);
@@ -789,7 +860,7 @@ class ServiceRepository extends AbstractRepository implements ServiceRepositoryI
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to get data from ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to get data from ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         /** @var Collection $services */
@@ -803,40 +874,6 @@ class ServiceRepository extends AbstractRepository implements ServiceRepositoryI
         }
 
         return $services;
-    }
-
-    /**
-     * @param $serviceId
-     * @param $status
-     *
-     * @return bool
-     * @throws QueryExecutionException
-     */
-    public function updateStatusById($serviceId, $status)
-    {
-        $params = [
-            ':id'     => $serviceId,
-            ':status' => $status
-        ];
-
-        try {
-            $statement = $this->connection->prepare(
-                "UPDATE {$this->table}
-                SET
-                `status` = :status
-                WHERE id = :id"
-            );
-
-            $res = $statement->execute($params);
-
-            if (!$res) {
-                throw new QueryExecutionException('Unable to save data in ' . __CLASS__);
-            }
-
-            return $res;
-        } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to save data in ' . __CLASS__, $e->getCode(), $e);
-        }
     }
 
     /**
@@ -885,7 +922,7 @@ class ServiceRepository extends AbstractRepository implements ServiceRepositoryI
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to get data from ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to get data from ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         $result = [];
@@ -944,7 +981,7 @@ class ServiceRepository extends AbstractRepository implements ServiceRepositoryI
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to get data from ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to get data from ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         $result = [];
@@ -959,7 +996,7 @@ class ServiceRepository extends AbstractRepository implements ServiceRepositoryI
     /**
      * @param $serviceId
      *
-     * @return string
+     * @return bool
      * @throws QueryExecutionException
      */
     public function addViewStats($serviceId)
@@ -1001,13 +1038,9 @@ class ServiceRepository extends AbstractRepository implements ServiceRepositoryI
                 );
             }
 
-            $response = $statement->execute($params);
+            $statement->execute($params);
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to add data in ' . __CLASS__, $e->getCode(), $e);
-        }
-
-        if (!$response) {
-            throw new QueryExecutionException('Unable to add data in ' . __CLASS__);
+            throw new QueryExecutionException('Unable to add data in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return true;
@@ -1030,9 +1063,36 @@ class ServiceRepository extends AbstractRepository implements ServiceRepositoryI
                 "DELETE FROM {$this->serviceViewsTable} WHERE serviceId = :serviceId"
             );
 
-            return $statement->execute($params);
+            $statement->execute($params);
+            return true;
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to delete data from ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to delete data from ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
+    }
+
+    /**
+     * @param array  $criteria
+     * @param array  $params
+     * @param array  $where
+     *
+     * @return string
+     */
+    private function getProvidersJoin($criteria, &$params, &$where)
+    {
+        if (empty($criteria['providers'])) {
+            return '';
+        }
+
+        $queryProviders = [];
+
+        foreach ((array)$criteria['providers'] as $index => $value) {
+            $param            = ':provider' . $index;
+            $queryProviders[] = $param;
+            $params[$param]   = $value;
+        }
+
+        $where[] = 'ps.userId IN (' . implode(', ', $queryProviders) . ')';
+
+        return "INNER JOIN {$this->providerServicesTable} ps ON ps.serviceId = s.id";
     }
 }

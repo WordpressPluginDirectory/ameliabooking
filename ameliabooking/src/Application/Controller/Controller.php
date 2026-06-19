@@ -13,8 +13,8 @@ use AmeliaBooking\Application\Commands\CommandResult;
 use AmeliaBooking\Infrastructure\WP\SettingsService\SettingsStorage;
 use AmeliaBooking\Domain\Common\Exceptions\CustomException;
 use League\Tactician\CommandBus;
-use Slim\Http\Request;
-use Slim\Http\Response;
+use AmeliaVendor\Psr\Http\Message\ServerRequestInterface as Request;
+use AmeliaVendor\Psr\Http\Message\ResponseInterface as Response;
 
 /**
  * Class Controller
@@ -58,8 +58,7 @@ abstract class Controller
      * Base Controller constructor.
      *
      * @param Container $container
-     *
-     * @throws \Interop\Container\Exception\ContainerException
+     * @param bool $fromApi
      */
     public function __construct(Container $container, $fromApi = false)
     {
@@ -84,11 +83,10 @@ abstract class Controller
      *
      * @param CommandResult  $result
      *
-     * @return null
+     * @return void
      */
     protected function emitSuccessEvent(DomainEventBus $eventBus, CommandResult $result)
     {
-        return null;
     }
 
     /**
@@ -136,12 +134,12 @@ abstract class Controller
             $response = $response->withHeader('Content-Type', 'application/json;charset=utf-8');
             $response = $response->withStatus(self::STATUS_INTERNAL_SERVER_ERROR);
 
-            $response =  $response->write(
+            $response->getBody()->write(
                 json_encode(
                     [
-                    'data' => [
-                    'message' => $e->getMessage()
-                    ]
+                        'data' => [
+                            'message' => $e->getMessage()
+                        ]
                     ]
                 )
             );
@@ -165,7 +163,7 @@ abstract class Controller
             return $response;
         }
 
-        if ($commandResult->hasAttachment() === false) {
+        if ($commandResult->hasAttachment() === false && $commandResult->getHtml() === null) {
             $responseBody = [
                 'message' => $commandResult->getMessage(),
                 'data'    => $commandResult->getData()
@@ -190,13 +188,39 @@ abstract class Controller
 
             /** @var Response $response */
             $response = $response->withHeader('Content-Type', 'application/json;charset=utf-8');
-            $response = $response->write(
+
+            $response->getBody()->write(
                 $this->sendJustData ? $commandResult->getData() :
-                json_encode(
-                    $commandResult->hasDataInResponse() ?
-                        $responseBody : array_merge($responseBody, ['data' => []])
-                )
+                    json_encode(
+                        $commandResult->hasDataInResponse() ?
+                            $responseBody : array_merge($responseBody, ['data' => []])
+                    )
             );
+        }
+
+        if (($html = $commandResult->getHtml()) !== null) {
+            /** @var Response $response */
+            $this->emitSuccessEvent($this->eventBus, $commandResult);
+
+            switch ($commandResult->getResult()) {
+                case (CommandResult::RESULT_SUCCESS):
+                    $response = $response->withStatus(self::STATUS_OK);
+
+                    break;
+                case (CommandResult::RESULT_CONFLICT):
+                    $response = $response->withStatus(self::STATUS_CONFLICT);
+
+                    break;
+                default:
+                    $response = $response->withStatus(self::STATUS_INTERNAL_SERVER_ERROR);
+
+                    break;
+            }
+
+            $response = $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+            $response = $response->withHeader('Cache-Control', 'max-age=0');
+
+            $response->getBody()->write($html);
         }
 
         if (($file = $commandResult->getFile()) !== null) {
@@ -209,7 +233,7 @@ abstract class Controller
                 $response = $response->withHeader('Content-Length', $file['size']);
             }
 
-            $response = $response->write($file['content']);
+            $response->getBody()->write($file['content']);
         }
 
         return $response;
@@ -231,10 +255,11 @@ abstract class Controller
 
     /**
      * @param mixed $params
+     * @param array $keys
      */
-    protected function setArrayParams(&$params)
+    protected function setArrayParams(&$params, $keys = [])
     {
-        $names = [
+        $names = array_merge([
             'customers',
             'categories',
             'services',
@@ -244,12 +269,16 @@ abstract class Controller
             'providerIds',
             'locations',
             'locationIds',
+            'ids',
             'events',
+            'tag',
             'dates',
             'types',
             'fields',
             'statuses',
-        ];
+            'stats',
+            'bookingTypes',
+        ], $keys);
 
         foreach ($names as $name) {
             if (!empty($params[$name])) {
@@ -262,7 +291,7 @@ abstract class Controller
                 $params['dates'][0] : DateTimeService::getNowDate();
         }
 
-        if (isset($params['dates'][1])) {
+        if (isset($params['dates'][1]) && $params['dates'][1]) {
             $params['dates'][1] = preg_match("/^\d{4}-\d{2}-\d{2}$/", $params['dates'][1]) ?
                 $params['dates'][1] : DateTimeService::getNowDate();
         }
@@ -317,5 +346,37 @@ abstract class Controller
                 $this->filterField($requestBody['extras'][$index], 'description', 'description');
             }
         }
+    }
+
+    /**
+     * Helper to set HTML content on CommandResult as an inline file
+     * so the controller can respond with a text/html body.
+     *
+     * @param CommandResult $result
+     * @param string        $html
+     * @param string        $filename
+     *
+     * @return void
+     */
+    protected function setResultHtml(CommandResult $result, $html, $filename = 'content.html')
+    {
+        $result->setFile([
+            'type'    => 'text/html; charset=utf-8',
+            'name'    => $filename,
+            'size'    => strlen($html),
+            'content' => $html,
+        ]);
+    }
+
+    /**
+     * @param mixed $default
+     *
+     * @return mixed
+     */
+    public static function getParam(Request $request, string $key, $default = null)
+    {
+        $params = $request->getQueryParams();
+
+        return array_key_exists($key, $params) ? $params[$key] : $default;
     }
 }

@@ -1,8 +1,5 @@
 <template>
-  <div
-    ref="pageContainer"
-    class="am-cap"
-  >
+  <div ref="pageContainer" class="am-cap">
     <CabinetFilters
       :param-list="paramList"
       :responsive-class="responsiveClass"
@@ -33,16 +30,16 @@
             </div>
           </div>
           <el-popover
-              v-if="!licence.isStarter"
-              ref="editRef"
-              :visible="editPopVisible[index]"
-              :persistent="false"
-              :show-arrow="false"
-              :width="'auto'"
-              :popper-class="'am-sc__popper'"
-              :popper-style="cssVars"
-              trigger="click"
-              placement="bottom-end"
+            v-if="features.invoices"
+            ref="editRef"
+            :visible="editPopVisible[index]"
+            :persistent="false"
+            :show-arrow="false"
+            :width="'auto'"
+            :popper-class="'am-sc__popper'"
+            :popper-style="cssVars"
+            trigger="click"
+            placement="bottom-end"
           >
             <template #reference>
               <span
@@ -55,20 +52,14 @@
                 class="am-sc__edit"
             >
               <!-- Invoice -->
-              <div
-                  v-if="!licence.isStarter"
-                  class="am-sc__edit-item"
-              >
+              <div class="am-sc__edit-item">
                 <span class="am-icon-eye"></span>
                 <span class="am-sc__edit-text">
                   {{ labelsDisplay('preview_invoice') }}
                 </span>
               </div>
 
-              <div
-                  v-if="!licence.isStarter"
-                  class="am-sc__edit-item"
-              >
+              <div class="am-sc__edit-item">
                 <span class="am-icon-download"></span>
                 <span class="am-sc__edit-text">
                   {{ labelsDisplay('download_invoice') }}
@@ -78,13 +69,21 @@
             </div>
           </el-popover>
         </div>
-
-        <div
-          class="am-sc__top-right"
-          :class="responsiveClass"
-        >
+        <div class="am-sc__top-right" :class="responsiveClass">
           <div class="am-sc__capacity">
-            {{ `${purchasedCount(packages[customerId].services, null, 'count')}/${purchasedCount(packages[customerId].services, null, 'total')} ${bookedNumberText(purchasedCount(packages[customerId].services, null, 'count'))}` }}
+            {{
+              `${purchasedCount(
+                packages[customerId].services,
+                null,
+                'count'
+              )}/${purchasedCount(
+                packages[customerId].services,
+                null,
+                'total'
+              )} ${bookedNumberText(
+                purchasedCount(packages[customerId].services, null, 'count')
+              )}`
+            }}
           </div>
           <div class="am-sc__btn">
             <span class="am-icon-arrow-right"></span>
@@ -92,9 +91,22 @@
         </div>
       </div>
       <template v-if="packages[customerId].packageData.end">
-        <div v-if="expirationDate(packages[customerId].packageData.end.split(' ')[0]) > 0" class="am-sc__bottom">
+        <div
+          v-if="
+            expirationDate(packages[customerId].packageData.end.split(' ')[0]) >
+            0
+          "
+          class="am-sc__bottom"
+        >
           <span class="am-sc__expiration">
-            <span class="am-icon-triangle-info"></span> {{ `${labelsDisplay('package_deal_expire_in')} ${expirationDate(packages[customerId].packageData.end.split(' ')[0])} ${labelsDisplay('expires_days')}, ${labelsDisplay('appointments_deal_expire')}` }}
+            <span class="am-icon-triangle-info"></span>
+            {{
+              `${labelsDisplay('package_deal_expire_in')} ${expirationDate(
+                packages[customerId].packageData.end.split(' ')[0]
+              )} ${labelsDisplay('expires_days')}, ${labelsDisplay(
+                'appointments_deal_expire'
+              )}`
+            }}
           </span>
         </div>
       </template>
@@ -111,7 +123,8 @@ import { ClickOutside as vClickOutside } from "element-plus";
 // * Import from Vue
 import {
   computed,
-  inject, onMounted,
+  inject,
+  onMounted,
   ref
 } from "vue";
 
@@ -119,51 +132,63 @@ import {
 import CabinetFilters from '../parts/Filters.vue'
 
 // * Composables
-import {getFrontedFormattedDate} from "../../../../../../../assets/js/common/date";
-import {useColorTransparency} from "../../../../../../../assets/js/common/colorManipulation";
+import { getFrontedFormattedDate } from '../../../../../../../assets/js/common/date'
+import { useColorTransparency } from '../../../../../../../assets/js/common/colorManipulation'
+import { useReactiveCustomize } from '../../../../../../../assets/js/admin/useReactiveCustomize.js'
 
 // * Plugin Licence
 let licence = inject('licence')
+
+// * Features
+let features = inject('features')
 
 // * Component properties
 let props = defineProps({
   responsiveClass: {
     type: String,
-    default: ''
-  }
+    default: '',
+  },
 })
 
 let paramList = ref({
   packages: {
-    name: 'packages', icon: 'shipment', ids: []
+    name: 'packages',
+    icon: 'shipment',
+    ids: [],
   },
   services: {
-    name: 'services', icon: 'service', ids: []
+    name: 'services',
+    icon: 'service',
+    ids: [],
   },
   providers: {
-    name: 'providers', icon: 'employee', ids: []
+    name: 'providers',
+    icon: 'employee',
+    ids: [],
   },
   locations: {
-    name: 'locations', icon: 'locations', ids: []
-  }
+    name: 'locations',
+    icon: 'locations',
+    ids: [],
+  },
 })
 
 let arrApp = [
   {
     end: 7,
     name: 'Package 1',
-    status: 'approved'
+    status: 'approved',
   },
   {
     end: null,
     name: 'Package 2',
-    status: 'approved'
+    status: 'approved',
   },
   {
     end: 10,
     name: 'Package 3',
-    status: 'approved'
-  }
+    status: 'approved',
+  },
 ]
 
 let packages = ref({})
@@ -188,27 +213,29 @@ arrApp.forEach((item, index) => {
       price: 130,
       status: item.status,
       start: null,
-      end: item.end ? `${moment().add(item.end, 'days').format('YYYY-MM-DD')} 10:00` : item.end,
-      type: "package"
+      end: item.end
+        ? `${moment().add(item.end, 'days').format('YYYY-MM-DD')} 10:00`
+        : item.end,
+      type: 'package',
     },
     services: [
       {
         count: 3,
-        total: 4
+        total: 4,
       },
       {
         count: 1,
-        total: 5
+        total: 5,
       },
       {
         count: 0,
-        total: 3
+        total: 3,
       },
       {
         count: 1,
-        total: 3
-      }
-    ]
+        total: 3,
+      },
+    ],
   }
   editPopVisible.value.push(false);
 })
@@ -217,7 +244,7 @@ function expirationDate(end) {
   return moment(end, 'YYYY-MM-DD').diff(moment(), 'days')
 }
 
-function purchasedCount (data, id, type) {
+function purchasedCount(data, id, type) {
   let count = 0
 
   data.forEach((item) => {
@@ -231,7 +258,7 @@ function purchasedCount (data, id, type) {
  * * Customize
  * */
 // * Customize
-let amCustomize = inject('customize')
+const { amCustomize } = useReactiveCustomize()
 
 // * Labels
 let langKey = inject('langKey')
@@ -241,20 +268,29 @@ let pageRenderKey = inject('pageRenderKey')
 let stepName = inject('stepName')
 
 // * Label computed function
-function labelsDisplay (label) {
+function labelsDisplay(label) {
   let computedLabel = computed(() => {
-    return amCustomize.value[pageRenderKey.value][stepName.value].translations
-    && amCustomize.value[pageRenderKey.value][stepName.value].translations[label]
-    && amCustomize.value[pageRenderKey.value][stepName.value].translations[label][langKey.value]
-      ? amCustomize.value[pageRenderKey.value][stepName.value].translations[label][langKey.value]
+    return amCustomize.value[pageRenderKey.value][stepName.value]
+      .translations &&
+      amCustomize.value[pageRenderKey.value][stepName.value].translations[
+        label
+      ] &&
+      amCustomize.value[pageRenderKey.value][stepName.value].translations[
+        label
+      ][langKey.value]
+      ? amCustomize.value[pageRenderKey.value][stepName.value].translations[
+          label
+        ][langKey.value]
       : amLabels[label]
   })
 
   return computedLabel.value
 }
 
-function bookedNumberText (numb) {
-  return numb === 1 ? labelsDisplay('appointment_booked') : labelsDisplay('appointments_booked')
+function bookedNumberText(numb) {
+  return numb === 1
+    ? labelsDisplay('appointment_booked')
+    : labelsDisplay('appointments_booked')
 }
 
 // * Colors
@@ -276,7 +312,7 @@ let cssVars = computed(() => {
 <script>
 export default {
   name: 'CabinetPackagesList',
-  key: 'packagesList'
+  key: 'packagesList',
 }
 </script>
 

@@ -1,19 +1,21 @@
 <?php
 
 /**
- * @copyright © TMS-Plugins. All rights reserved.
+ * @copyright © Melograno Ventures. All rights reserved.
  * @licence   See LICENCE.md for license details.
  */
 
 namespace AmeliaBooking\Application\Services\Notification;
 
 use AmeliaBooking\Application\Services\Placeholder\PlaceholderService;
+use AmeliaBooking\Domain\Services\DateTime\DateTimeService;
 use AmeliaBooking\Domain\Services\Settings\SettingsService;
 use AmeliaBooking\Domain\ValueObjects\String\NotificationSendTo;
 use AmeliaBooking\Infrastructure\Common\Container;
 use AmeliaBooking\Infrastructure\Common\Exceptions\NotFoundException;
 use AmeliaBooking\Infrastructure\Common\Exceptions\QueryExecutionException;
-use AmeliaPHPMailer\PHPMailer\Exception;
+use AmeliaBooking\Infrastructure\Repository\Notification\NotificationSMSHistoryRepository;
+use AmeliaVendor\PHPMailer\PHPMailer\Exception;
 use Interop\Container\Exception\ContainerException;
 
 /**
@@ -86,8 +88,6 @@ class SMSAPIService
             return ['status' => null, 'error' => [$errorNo, $errorStr, $error]];
         }
 
-        curl_close($ch);
-
         return json_decode($response);
     }
 
@@ -146,7 +146,8 @@ class SMSAPIService
     {
         $route = 'auth/password/forgot';
 
-        $data['redirectUrl'] = AMELIA_PAGE_URL . 'wpamelia-notifications&notificationTab=sms';
+        // TODO: Redesign - Remove "redesign" from the URL
+        $data['redirectUrl'] = AMELIA_PAGE_URL . 'wpamelia-notifications&activeTab=sms';
 
         return $this->sendRequest($route, false, $data);
     }
@@ -195,6 +196,7 @@ class SMSAPIService
      * @throws QueryExecutionException
      * @throws ContainerException
      * @throws NotFoundException
+     * @throws \Exception
      */
     public function testNotification($data)
     {
@@ -208,6 +210,9 @@ class SMSAPIService
 
         /** @var PlaceholderService $placeholderService */
         $placeholderService = $this->container->get("application.placeholder.{$data['type']}.service");
+
+        /** @var NotificationSMSHistoryRepository $notificationsSMSHistoryRepo */
+        $notificationsSMSHistoryRepo = $this->container->get('domain.notificationSMSHistory.repository');
 
         $appointmentsSettings = $settingsService->getCategorySettings('appointments');
 
@@ -229,13 +234,44 @@ class SMSAPIService
             $dummyData
         );
 
+        $alphaSenderId = $settingsService->getSetting('notifications', 'smsAlphaSenderId');
+
+        $historyId = $notificationsSMSHistoryRepo->add(
+            [
+                'notificationId'    => $notification->getId()->getValue(),
+                'userId'            => null,
+                'appointmentId'     => null,
+                'eventId'           => null,
+                'packageCustomerId' => null,
+                'text'              => $body,
+                'phone'             => $data['recipientPhone'],
+                'alphaSenderId'     => $alphaSenderId
+            ]
+        );
+
         $data = [
             'to'   => $data['recipientPhone'],
-            'from' => $settingsService->getSetting('notifications', 'smsAlphaSenderId'),
-            'body' => $body
+            'from' => $alphaSenderId,
+            'body' => $body,
+            'callbackUrl' => AMELIA_ACTION_URL . '/notifications/sms/history/' . $historyId
         ];
 
-        return $this->sendRequest($route, true, $data);
+        $apiResponse = $this->sendRequest($route, true, $data);
+
+        if ($apiResponse->status === 'OK') {
+            $notificationsSMSHistoryRepo->update(
+                $historyId,
+                [
+                    'logId'    => $apiResponse->message->logId ?? null,
+                    'status'   => $apiResponse->message->status,
+                    'price'    => $apiResponse->message->price ?? null,
+                    'dateTime' => DateTimeService::getNowDateTimeInUtc(),
+                    'segments' => $apiResponse->message->segments ?? null,
+                ]
+            );
+        }
+
+        return $apiResponse;
     }
 
     /**
@@ -283,7 +319,8 @@ class SMSAPIService
     {
         $route = '/payment/checkout';
 
-        $data['redirectUrl'] = AMELIA_PAGE_URL . 'wpamelia-notifications&notificationTab=sms';
+        // TODO: Redesign - Remove "redesign" from the URL
+        $data['redirectUrl'] = AMELIA_PAGE_URL . 'wpamelia-notifications&activeTab=sms';
 
         return $this->sendRequest($route, true, $data);
     }

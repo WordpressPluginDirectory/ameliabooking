@@ -39,6 +39,7 @@ use AmeliaBooking\Domain\Entity\User\AbstractUser;
 use AmeliaBooking\Domain\Entity\User\Customer;
 use AmeliaBooking\Domain\Factory\Payment\PaymentFactory;
 use AmeliaBooking\Domain\Factory\Tax\TaxFactory;
+use AmeliaBooking\Domain\Services\Api\BasicApiService;
 use AmeliaBooking\Domain\Services\DateTime\DateTimeService;
 use AmeliaBooking\Domain\Services\Reservation\ReservationServiceInterface;
 use AmeliaBooking\Domain\Services\Settings\SettingsService;
@@ -59,6 +60,7 @@ use AmeliaBooking\Infrastructure\Common\Container;
 use AmeliaBooking\Infrastructure\Common\Exceptions\NotFoundException;
 use AmeliaBooking\Infrastructure\Common\Exceptions\QueryExecutionException;
 use AmeliaBooking\Infrastructure\Repository\Booking\Appointment\CustomerBookingRepository;
+use AmeliaBooking\Infrastructure\Repository\Bookable\Service\PackageCustomerRepository;
 use AmeliaBooking\Infrastructure\Repository\Payment\PaymentRepository;
 use AmeliaBooking\Infrastructure\Repository\User\CustomerRepository;
 use AmeliaBooking\Infrastructure\Repository\User\UserRepository;
@@ -66,9 +68,11 @@ use AmeliaBooking\Infrastructure\Services\Mailchimp\AbstractMailchimpService;
 use AmeliaBooking\Infrastructure\Services\Recaptcha\AbstractRecaptchaService;
 use AmeliaBooking\Infrastructure\WP\EventListeners\Booking\Appointment\BookingAddedEventHandler;
 use AmeliaBooking\Infrastructure\WP\Translations\FrontendStrings;
+use AmeliaBooking\Infrastructure\WP\Translations\LiteFrontendStrings;
+use AmeliaBooking\Infrastructure\WP\Integrations\IvyForms\IvyFormsService;
+use AmeliaBooking\Infrastructure\WP\Integrations\PluginInstaller;
 use DateTime;
 use Exception;
-use Interop\Container\Exception\ContainerException;
 use Slim\Exception\ContainerValueNotFoundException;
 
 /**
@@ -185,29 +189,39 @@ abstract class AbstractReservationService implements ReservationServiceInterface
      * @throws ContainerValueNotFoundException
      * @throws InvalidArgumentException
      * @throws QueryExecutionException
-     * @throws ContainerException
      * @throws Exception
      */
     public function processRequest($data, $reservation, $save)
     {
         $result = new CommandResult();
 
-        $type = $data['type'] ?: Entities::APPOINTMENT;
+        $type = !empty($data['type']) ? $data['type'] : Entities::APPOINTMENT;
+
+        /** @var SettingsService $settingsService */
+        $settingsService = $this->container->get('domain.settings.service');
 
         if (
             !empty($data['payment']['gateway']) &&
             ($data['payment']['gateway'] === 'onSite' || ($data['payment']['gateway'] === 'stripe' && empty($data['payment']['data']['paymentIntentId']))) &&
             empty($data['isBackendOrCabinet'])
         ) {
-            /** @var SettingsService $settingsService */
-            $settingsService = $this->container->get('domain.settings.service');
+            $apiKeysGenerated = $settingsService->getSetting('apiKeys', 'apiKeys');
+            /** @var BasicApiService $apiService */
+            $apiService = $this->container->get('domain.api.service');
+            $isValidAPIRequest = !empty($_SERVER['HTTP_AMELIA']) &&
+                $apiService->checkApiKeys($_SERVER['HTTP_AMELIA'], $apiKeysGenerated);
 
             $googleRecaptchaSettings = $settingsService->getSetting(
                 'general',
                 'googleRecaptcha'
             );
 
-            if ($googleRecaptchaSettings['enabled']) {
+            if (
+                $settingsService->isFeatureEnabled('recaptcha') &&
+                $googleRecaptchaSettings['siteKey'] &&
+                $googleRecaptchaSettings['secret'] &&
+                !$isValidAPIRequest
+            ) {
                 /** @var AbstractRecaptchaService $recaptchaService */
                 $recaptchaService = $this->container->get('infrastructure.recaptcha.service');
 
@@ -257,6 +271,66 @@ abstract class AbstractReservationService implements ReservationServiceInterface
             return $result;
         }
 
+        if (
+            !empty($data['ivy'])
+            && $settingsService->isFeatureEnabled('ivy')
+            && PluginInstaller::isPluginActive('ivyforms')
+        ) {
+            $entryId = null;
+
+            try {
+                $ivyFormsData = IvyFormsService::addFormEntry($data['ivy']);
+
+                $entryId = $ivyFormsData['data']['data']['entry']['id'] ?? null;
+            } catch (Exception $e) {
+            }
+
+            if (!empty($entryId)) {
+                switch ($type) {
+                    case (Entities::APPOINTMENT):
+                    case (Entities::EVENT):
+                        /** @var CustomerBookingRepository $customerBookingRepository */
+                        $customerBookingRepository = $this->container->get('domain.booking.customerBooking.repository');
+
+                        $customerBookingRepository->updateFieldById(
+                            $reservation->getBooking()->getId()->getValue(),
+                            $entryId,
+                            'ivyEntryId'
+                        );
+
+                        /** @var Reservation $recurringReservation */
+                        foreach ($reservation->getRecurring()->getItems() as $recurringReservation) {
+                            $customerBookingRepository->updateFieldById(
+                                $recurringReservation->getBooking()->getId()->getValue(),
+                                $entryId,
+                                'ivyEntryId'
+                            );
+                        }
+
+                        break;
+
+                    case (Entities::PACKAGE):
+                        /** @var PackageCustomerRepository $packageCustomerRepository */
+                        $packageCustomerRepository = $this->container->get('domain.bookable.packageCustomer.repository');
+
+                        /** @var PackageCustomerService $packageCustomerService */
+                        foreach ($reservation->getPackageCustomerServices()->getItems() as $packageCustomerService) {
+                            $packageCustomerId = $packageCustomerService->getPackageCustomer()->getId()->getValue();
+
+                            $packageCustomerRepository->updateFieldById(
+                                $packageCustomerId,
+                                $entryId,
+                                'ivyEntryId'
+                            );
+
+                            break;
+                        }
+
+                        break;
+                }
+            }
+        }
+
         $this->finalize(
             $result,
             $reservation,
@@ -293,15 +367,35 @@ abstract class AbstractReservationService implements ReservationServiceInterface
      * @throws InvalidArgumentException
      * @throws QueryExecutionException
      * @throws Exception
-     * @throws ContainerException
      */
     public function processBooking($result, $appointmentData, $reservation, $save)
     {
+        /** @var SettingsService $settingsService */
+        $settingsService = $this->container->get('domain.settings.service');
+
+        if (
+            !$save &&
+            !empty($appointmentData['ivy']) &&
+            $settingsService->isFeatureEnabled('ivy') &&
+            PluginInstaller::isPluginActive('ivyforms')
+        ) {
+            try {
+                IvyFormsService::validateBeforeSubmit($appointmentData['ivy']);
+            } catch (Exception $e) {
+                $result->setResult(CommandResult::RESULT_ERROR);
+                $result->setData(['message' => LiteFrontendStrings::getBookingStrings()['ivyforms_validation_failed']]);
+
+                return;
+            }
+        }
+
         $appointmentData['bookings'][0]['info'] = !empty($appointmentData['bookings'][0]['customer']) ? json_encode(
             [
                 'firstName' => $appointmentData['bookings'][0]['customer']['firstName'],
                 'lastName'  => $appointmentData['bookings'][0]['customer']['lastName'],
-                'phone'     => $appointmentData['bookings'][0]['customer']['phone'],
+                'phone'     => !empty($appointmentData['bookings'][0]['customer']['phone'])
+                    ? $appointmentData['bookings'][0]['customer']['phone']
+                    : null,
                 'locale'    => isset($appointmentData['locale']) ? $appointmentData['locale'] : null,
                 'timeZone'  => isset($appointmentData['timeZone']) ? $appointmentData['timeZone'] : null,
                 'urlParams' => !empty($appointmentData['urlParams']) ? $appointmentData['urlParams'] : null,
@@ -341,7 +435,7 @@ abstract class AbstractReservationService implements ReservationServiceInterface
                 $result->setResult(CommandResult::RESULT_ERROR);
                 $result->setData(['message' => 'Unknown User']);
 
-                return null;
+                return;
             }
         }
 
@@ -360,7 +454,7 @@ abstract class AbstractReservationService implements ReservationServiceInterface
             }
 
             if ($result->getResult() === CommandResult::RESULT_ERROR) {
-                return null;
+                return;
             }
 
             if ($save && !$user->getId()) {
@@ -368,7 +462,7 @@ abstract class AbstractReservationService implements ReservationServiceInterface
                     $result->setResult(CommandResult::RESULT_ERROR);
                     $result->setData(['emailError' => true]);
 
-                    return null;
+                    return;
                 }
 
                 $user->setId(new Id($newUserId));
@@ -397,12 +491,19 @@ abstract class AbstractReservationService implements ReservationServiceInterface
             );
         }
 
+        if ($user && $user->getType() === AbstractUser::USER_ROLE_PROVIDER) {
+            $result->setResult(CommandResult::RESULT_ERROR);
+            $result->setData(['message' => LiteFrontendStrings::getCommonStrings()['error_use_diff_email_or_phone']]);
+
+            return;
+        }
+
         if (!isset($appointmentData['isBackendOrCabinet']) && $user && $user->getStatus() && $user->getStatus()->getValue() === Status::BLOCKED) {
             $result->setResult(CommandResult::RESULT_ERROR);
             $result->setMessage(FrontendStrings::getCommonStrings()['customer_blocked']);
             $result->setData(['customerBlocked' => true]);
 
-            return null;
+            return;
         }
 
         /** @var AbstractCustomFieldApplicationService $customFieldService */
@@ -446,7 +547,10 @@ abstract class AbstractReservationService implements ReservationServiceInterface
             );
         }
 
-        if (!empty($appointmentData['bookings'][0]['customer']['email']) && !empty($appointmentData['bookings'][0]['customer']['subscribeToMailchimp'])) {
+        if (
+            $settingsService->isFeatureEnabled('mailchimp') &&
+            !empty($appointmentData['bookings'][0]['customer']['email']) && !empty($appointmentData['bookings'][0]['customer']['subscribeToMailchimp'])
+        ) {
             /** @var AbstractMailchimpService $mailchimpService */
             $mailchimpService = $this->container->get('infrastructure.mailchimp.service');
             $userData = $user ? $user->toArray() : $appointmentData['bookings'][0]['customer'];
@@ -456,21 +560,29 @@ abstract class AbstractReservationService implements ReservationServiceInterface
         try {
             $this->book($appointmentData, $reservation, $save);
         } catch (CustomerBookedException $e) {
-            return $this->manageException($result, $newUserId, $e->getMessage(), ['customerAlreadyBooked' => true]);
+            $this->manageException($result, $newUserId, $e->getMessage(), ['customerAlreadyBooked' => true]);
+            return;
         } catch (BookingUnavailableException $e) {
-            return $this->manageException($result, $newUserId, $e->getMessage(), ['timeSlotUnavailable' => true]);
+            $this->manageException($result, $newUserId, $e->getMessage(), ['timeSlotUnavailable' => true]);
+            return;
         } catch (PackageBookingUnavailableException $e) {
-            return $this->manageException($result, $newUserId, $e->getMessage(), ['packageBookingUnavailable' => true]);
+            $this->manageException($result, $newUserId, $e->getMessage(), ['packageBookingUnavailable' => true]);
+            return;
         } catch (BookingsLimitReachedException $e) {
-            return $this->manageException($result, $newUserId, $e->getMessage(), ['bookingsLimitReached' => true]);
+            $this->manageException($result, $newUserId, $e->getMessage(), ['bookingsLimitReached' => true]);
+            return;
         } catch (EventBookingUnavailableException $e) {
-            return $this->manageException($result, $newUserId, $e->getMessage(), ['eventBookingUnavailable' => true]);
+            $this->manageException($result, $newUserId, $e->getMessage(), ['eventBookingUnavailable' => true]);
+            return;
         } catch (CouponUnknownException $e) {
-            return $this->manageException($result, $newUserId, $e->getMessage(), ['couponUnknown' => true]);
+            $this->manageException($result, $newUserId, $e->getMessage(), ['couponUnknown' => true]);
+            return;
         } catch (CouponInvalidException $e) {
-            return $this->manageException($result, $newUserId, $e->getMessage(), ['couponInvalid' => true]);
+            $this->manageException($result, $newUserId, $e->getMessage(), ['couponInvalid' => true]);
+            return;
         } catch (CouponExpiredException $e) {
-            return $this->manageException($result, $newUserId, $e->getMessage(), ['couponExpired' => true]);
+            $this->manageException($result, $newUserId, $e->getMessage(), ['couponExpired' => true]);
+            return;
         }
 
         $reservation->setIsNewUser(new BooleanValueObject($newUserId !== null));
@@ -494,7 +606,7 @@ abstract class AbstractReservationService implements ReservationServiceInterface
      * @param string        $message
      * @param array         $data
      *
-     * @return null
+     * @return void
      *
      * @throws QueryExecutionException
      */
@@ -505,8 +617,6 @@ abstract class AbstractReservationService implements ReservationServiceInterface
         $result->setResult(CommandResult::RESULT_ERROR);
         $result->setMessage($message);
         $result->setData($data);
-
-        return null;
     }
 
     /**
@@ -516,7 +626,6 @@ abstract class AbstractReservationService implements ReservationServiceInterface
      * @param bool          $isCart
      *
      * @throws ContainerValueNotFoundException
-     * @throws ContainerException
      * @throws ForbiddenFileUploadException
      * @throws InvalidArgumentException
      */
@@ -553,7 +662,7 @@ abstract class AbstractReservationService implements ReservationServiceInterface
                 foreach ($reservation->getPackageCustomerServices()->getItems() as $packageCustomerService) {
                     $payment =
                         $packageCustomerService->getPackageCustomer()->getPayments()
-                            ->getItem($packageCustomerService->getPackageCustomer()->getPayments()->keys()[0]);
+                                               ->getItem($packageCustomerService->getPackageCustomer()->getPayments()->keys()[0]);
 
                     break;
                 }
@@ -660,9 +769,8 @@ abstract class AbstractReservationService implements ReservationServiceInterface
                     'recurring' => $recurringReservations,
                     'package'   => $packageReservations,
                     'packageId' => $packageReservations ? $reservation->getBookable()->getId()->getValue() : null,
-                    'isPackageAppointment' =>
-                        ($reservation->getBooking() && $reservation->getBooking()->getPackageCustomerService() !== null) ||
-                        $reservation->getReservation()->getType()->getValue() === BookableType::PACKAGE,
+                    'isPackageAppointment' => ($reservation->getBooking() && $reservation->getBooking()->getPackageCustomerService() !== null) ||
+                                              $reservation->getReservation()->getType()->getValue() === BookableType::PACKAGE,
                     'customer'  => $reservation->getCustomer() ? array_merge(
                         $reservation->getCustomer()->toArray(),
                         [
@@ -721,17 +829,17 @@ abstract class AbstractReservationService implements ReservationServiceInterface
     public function getTax($taxJson)
     {
         return $taxJson &&
-            ($taxData = json_decode($taxJson->getValue(), true)) &&
-            !empty($taxData[0])
-                ? TaxFactory::create($taxData[0])
-                : null;
+               ($taxData = json_decode($taxJson->getValue(), true)) &&
+               !empty($taxData[0])
+            ? TaxFactory::create($taxData[0])
+            : null;
     }
 
     /**
      * @param Tax   $tax
      * @param float $amount
      *
-     * @return float
+     * @return float|string
      */
     protected function getTaxAmount($tax, $amount)
     {
@@ -749,7 +857,7 @@ abstract class AbstractReservationService implements ReservationServiceInterface
     /**
      * @param Tax   $tax
      *
-     * @return string
+     * @return string|int
      */
     protected function getTaxRate($tax)
     {
@@ -939,7 +1047,6 @@ abstract class AbstractReservationService implements ReservationServiceInterface
      * @return CommandResult
      *
      * @throws InvalidArgumentException
-     * @throws ContainerException
      * @throws QueryExecutionException
      */
     public function getSuccessBookingResponse(
@@ -1050,7 +1157,6 @@ abstract class AbstractReservationService implements ReservationServiceInterface
      * @param CommandResult $result
      *
      * @return void
-     * @throws ContainerException
      * @throws InvalidArgumentException
      * @throws QueryExecutionException
      * @throws NotFoundException
@@ -1235,7 +1341,7 @@ abstract class AbstractReservationService implements ReservationServiceInterface
     public function applyDeposit($bookable, $applyDeposit)
     {
         $depositPaymentEnabled = $bookable->getDeposit() &&
-            $bookable->getDeposit()->getValue() !== DepositType::DISABLED;
+                                 $bookable->getDeposit()->getValue() !== DepositType::DISABLED;
 
         $fullPaymentEnabled =
             $depositPaymentEnabled &&
@@ -1243,6 +1349,68 @@ abstract class AbstractReservationService implements ReservationServiceInterface
             $bookable->getFullPayment()->getValue();
 
         return $applyDeposit ? $depositPaymentEnabled : $depositPaymentEnabled && !$fullPaymentEnabled;
+    }
+
+    /**
+     * @param CustomerBooking|PackageCustomer $booking
+     * @param AbstractBookable                $bookable
+     * @param array                           $data
+     * @param bool                            $invoices
+     *
+     * @return array
+     * @throws InvalidArgumentException
+     */
+    protected function getCommonPaymentSummary($booking, $bookable, $data, $invoices)
+    {
+        $paymentAmountData = $this->getPaymentAmount($booking, $bookable, true);
+
+        $summary[$data['bookingId']] = [
+            'bookable'   => $paymentAmountData['bookable'],
+            'subtotal'   => $paymentAmountData['subtotal'],
+            'discount'   => $paymentAmountData['discount'] + $paymentAmountData['deduction'],
+            'wcDiscount' => !empty($data['wcItemCouponValue']) ? $data['wcItemCouponValue'] : 0,
+            'tax'        => $paymentAmountData['total_tax'],
+            'wcTax'      => !empty($data['wcItemTaxValue']) ? $data['wcItemTaxValue'] : 0,
+        ];
+
+        if ($invoices) {
+            foreach ($data['secondaryPayments'] as $secondaryPayment) {
+                $secondaryPaymentSummary = $this->getPaymentSummary($secondaryPayment, false);
+
+                if (empty($summary[$secondaryPayment['bookingId']])) {
+                    $summary[$secondaryPayment['bookingId']] = [
+                        'bookable'   => $secondaryPaymentSummary['bookable'],
+                        'subtotal'   => $secondaryPaymentSummary['subtotal'],
+                        'discount'   => $secondaryPaymentSummary['discount'],
+                        'wcDiscount' => $secondaryPaymentSummary['wcDiscount'],
+                        'tax'        => $secondaryPaymentSummary['tax'],
+                        'wcTax'      => 0,
+                    ];
+                }
+
+                $summary[$secondaryPayment['bookingId']]['wcTax'] += $secondaryPaymentSummary['wcTax'];
+            }
+        }
+
+        $result = [
+            'bookable'   => 0,
+            'subtotal'   => 0,
+            'tax'        => 0,
+            'wcTax'      => 0,
+            'discount'   => 0,
+            'wcDiscount' => 0,
+        ];
+
+        foreach ($summary as $item) {
+            $result['bookable'] += $item['bookable'];
+            $result['subtotal'] += $item['subtotal'];
+            $result['tax'] += $item['tax'];
+            $result['wcTax'] += $item['wcTax'];
+            $result['discount'] += $item['discount'];
+            $result['wcDiscount'] += $item['wcDiscount'];
+        }
+
+        return $result;
     }
 
     /**
@@ -1255,11 +1423,23 @@ abstract class AbstractReservationService implements ReservationServiceInterface
 
     /**
      * @param int $bookingId
-     * @param string $token
      *
      * @return array
      *
-     * @throws AccessDeniedException
      */
-    abstract public function deleteBooking($bookingId, $token = null);
+    abstract public function deleteBooking($bookingId);
+
+    /**
+     * @param int $bookingId
+     *
+     * @return CustomerBooking|PackageCustomer
+     *
+     */
+    public function getBooking($bookingId)
+    {
+        /** @var CustomerBookingRepository $bookingRepository */
+        $bookingRepository = $this->container->get('domain.booking.customerBooking.repository');
+
+        return $bookingRepository->getById((int)$bookingId);
+    }
 }

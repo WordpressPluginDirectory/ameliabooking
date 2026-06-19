@@ -1,7 +1,7 @@
 <?php
 
 /**
- * @copyright © TMS-Plugins. All rights reserved.
+ * @copyright © Melograno Ventures. All rights reserved.
  * @licence   See LICENCE.md for license details.
  */
 
@@ -35,6 +35,16 @@ abstract class AbstractRecaptchaService
      * @return boolean
      */
     abstract public function verify($value);
+
+    /**
+     * Verify recaptcha with provided secret and token
+     *
+     * @param string $secret
+     * @param string $token
+     *
+     * @return array
+     */
+    abstract public function verifyWithSecret($secret, $token);
 
     /**
      * @param string $value

@@ -15,8 +15,14 @@ use AmeliaBooking\Domain\ValueObjects\Json;
 use AmeliaBooking\Domain\ValueObjects\String\Password;
 use AmeliaBooking\Infrastructure\Licence;
 use AmeliaBooking\Infrastructure\Common\Exceptions\QueryExecutionException;
+use AmeliaBooking\Infrastructure\DB\WPDB\Statement;
 use AmeliaBooking\Infrastructure\Repository\AbstractRepository;
+use AmeliaBooking\Infrastructure\WP\InstallActions\DB\Booking\AppointmentsTable;
 use AmeliaBooking\Infrastructure\WP\InstallActions\DB\Booking\CustomerBookingsTable;
+use AmeliaBooking\Infrastructure\WP\InstallActions\DB\Booking\CustomerBookingsToEventsPeriodsTable;
+use AmeliaBooking\Infrastructure\WP\InstallActions\DB\Booking\EventsPeriodsTable;
+use AmeliaBooking\Infrastructure\WP\InstallActions\DB\Booking\EventsProvidersTable;
+use AmeliaBooking\Infrastructure\WP\InstallActions\DB\Booking\EventsTable;
 
 /**
  * Class UserRepository
@@ -113,16 +119,12 @@ class UserRepository extends AbstractRepository implements UserRepositoryInterfa
                 )"
             );
 
-            $res = $statement->execute($params);
-
-            if (!$res) {
-                throw new QueryExecutionException('Unable to add data in ' . __CLASS__);
-            }
+            $statement->execute($params);
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to add data in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to add data in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
-        return $this->connection->lastInsertId();
+        return (int) $this->connection->lastInsertId();
     }
 
     /**
@@ -189,15 +191,11 @@ class UserRepository extends AbstractRepository implements UserRepositoryInterfa
                 id = :id"
             );
 
-            $res = $statement->execute($params);
+            $statement->execute($params);
 
-            if (!$res) {
-                throw new QueryExecutionException('Unable to save data in ' . __CLASS__);
-            }
-
-            return $res;
+            return true;
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to save data in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to save data in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
     }
 
@@ -216,7 +214,7 @@ class UserRepository extends AbstractRepository implements UserRepositoryInterfa
             $statement->execute();
             $row = $statement->fetch();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find by external id in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find by external id in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         if (!$row) {
@@ -246,7 +244,7 @@ class UserRepository extends AbstractRepository implements UserRepositoryInterfa
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to get data from ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to get data from ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         $items = [];
@@ -279,6 +277,7 @@ class UserRepository extends AbstractRepository implements UserRepositoryInterfa
             u.note AS note,
             u.description AS description,
             u.phone AS phone,
+            u.countryPhoneIso AS countryPhoneIso,
             u.gender AS gender,
             u.status AS status,
             u.translations AS translations
@@ -292,7 +291,7 @@ class UserRepository extends AbstractRepository implements UserRepositoryInterfa
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to get data from ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to get data from ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         $items = [];
@@ -304,18 +303,95 @@ class UserRepository extends AbstractRepository implements UserRepositoryInterfa
     }
 
     /**
-     * Returns Collection of all customers and other users that have at least one booking
+     * Returns Collection of all users that have no bookings (neither appointment nor event),
+     * or whose bookings belong to appointments/events of the given provider.
+     *
+     * @param int $providerId
      *
      * @return Collection
      * @throws QueryExecutionException
      * @throws InvalidArgumentException
      */
-    public function getAllWithoutBookings()
+    public function getProviderAllowedCustomers($providerId)
     {
         $bookingsTable = CustomerBookingsTable::getTableName();
 
+        $appointmentsTable = AppointmentsTable::getTableName();
+
+        $bookingsToEventsTable = CustomerBookingsToEventsPeriodsTable::getTableName();
+
+        $eventsPeriodsTable = EventsPeriodsTable::getTableName();
+
+        $eventsTable = EventsTable::getTableName();
+
+        $eventsProvidersTable = EventsProvidersTable::getTableName();
+
         try {
-            $statement = $this->connection->query(
+            // 1) User IDs that have no bookings at all
+            $statement = $this->connection->prepare(
+                "
+                SELECT u.id
+                FROM {$this->table} u
+                WHERE u.type = 'customer' AND
+                      u.id NOT IN (SELECT DISTINCT cb.customerId FROM {$bookingsTable} cb)
+                "
+            );
+
+            $statement->execute();
+
+            $userIds = array_map('intval', array_column($statement->fetchAll(), 'id'));
+
+            // 2) User IDs from the provider's appointments
+            $statement = $this->connection->prepare(
+                "
+                    SELECT DISTINCT cb.customerId AS id
+                    FROM {$bookingsTable} cb
+                    INNER JOIN {$appointmentsTable} a ON a.id = cb.appointmentId
+                    WHERE a.providerId = :providerId
+                    "
+            );
+
+            $statement->execute([':providerId' => $providerId]);
+
+            $userIds = array_unique(
+                array_merge(
+                    $userIds,
+                    array_map('intval', array_column($statement->fetchAll(), 'id'))
+                )
+            );
+
+            // 3) User IDs from the provider's events (organizer or assigned provider)
+            $statement = $this->connection->prepare(
+                "
+                    SELECT DISTINCT cb.customerId AS id
+                    FROM {$bookingsTable} cb
+                    INNER JOIN {$bookingsToEventsTable} cbep ON cbep.customerBookingId = cb.id
+                    INNER JOIN {$eventsPeriodsTable} ep ON ep.id = cbep.eventPeriodId
+                    INNER JOIN {$eventsTable} ev ON ev.id = ep.eventId
+                    LEFT JOIN {$eventsProvidersTable} evpr ON evpr.eventId = ev.id
+                    WHERE evpr.userId = :providerId OR evpr.userId IS NULL
+                    "
+            );
+
+            $statement->execute([
+                ':providerId' => $providerId,
+            ]);
+
+            $userIds = array_unique(
+                array_merge(
+                    $userIds,
+                    array_map('intval', array_column($statement->fetchAll(), 'id'))
+                )
+            );
+
+            if (empty($userIds)) {
+                return new Collection();
+            }
+
+            // Fetch full user data for the collected IDs
+            $userIdsImploded = implode(', ', array_map('intval', $userIds));
+
+            $statement = $this->connection->prepare(
                 "
                 SELECT
                     u.id AS id,
@@ -324,31 +400,25 @@ class UserRepository extends AbstractRepository implements UserRepositoryInterfa
                     u.email AS email,
                     u.note AS note,
                     u.phone AS phone,
+                    u.countryPhoneIso AS countryPhoneIso,
                     u.gender AS gender,
                     u.status AS status,
                     u.translations AS translations
                 FROM {$this->table} u
-                LEFT JOIN {$bookingsTable} cb ON cb.customerId = u.id
-                WHERE
-                (u.type = 'customer' OR (cb.id IS NOT NULL AND u.type IN ('admin', 'provider', 'manager')))
-                AND cb.appointmentId IS NULL
-                AND u.id NOT IN (
-                    SELECT u2.id
-                    FROM {$this->table} u2
-                    INNER JOIN {$bookingsTable} cb2 ON cb2.customerId = u2.id
-                    WHERE cb2.appointmentId IS NOT NULL
-                )
-                GROUP BY u.id
-                ORDER BY CONCAT(firstName, ' ', lastName)
-            "
+                WHERE u.id IN ({$userIdsImploded})
+                ORDER BY CONCAT(u.firstName, ' ', u.lastName)
+                "
             );
+
+            $statement->execute();
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to get data from ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to get data from ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         $items = [];
+
         foreach ($rows as $row) {
             $items[$row['id']] = call_user_func([static::FACTORY, 'create'], $row);
         }
@@ -361,7 +431,7 @@ class UserRepository extends AbstractRepository implements UserRepositoryInterfa
      * @param boolean $setPassword
      * @param boolean $setUsedTokens
      *
-     * @return Admin|Customer|Manager|Provider
+     * @return Admin|Customer|Manager|Provider|null
      * @throws InvalidArgumentException
      * @throws QueryExecutionException
      */
@@ -378,7 +448,7 @@ class UserRepository extends AbstractRepository implements UserRepositoryInterfa
 
             $row = $statement->fetch();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to get data from ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to get data from ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         if (!$row) {
@@ -401,7 +471,7 @@ class UserRepository extends AbstractRepository implements UserRepositoryInterfa
     /**
      * @param string $phone
      *
-     * @return Admin|Customer|Manager|Provider
+     * @return Admin|Customer|Manager|Provider|null
      * @throws InvalidArgumentException
      * @throws QueryExecutionException
      */
@@ -418,7 +488,7 @@ class UserRepository extends AbstractRepository implements UserRepositoryInterfa
 
             $row = $statement->fetch();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to get data from ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to get data from ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         if (!$row) {
@@ -448,9 +518,9 @@ class UserRepository extends AbstractRepository implements UserRepositoryInterfa
                 "
             );
             $statement->execute($params);
-            $rows = $statement->fetchAll(\PDO::FETCH_COLUMN);
+            $rows = $statement->fetchAll(Statement::FETCH_COLUMN);
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to get data from ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to get data from ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return $rows;
@@ -481,15 +551,11 @@ class UserRepository extends AbstractRepository implements UserRepositoryInterfa
                 "UPDATE {$this->table} SET {$fields} WHERE email = :email"
             );
 
-            $res = $statement->execute($params);
-
-            if (!$res) {
-                throw new QueryExecutionException('Unable to save data in ' . __CLASS__);
-            }
+            $statement->execute($params);
 
             return true;
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to save data in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to save data in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
     }
 }

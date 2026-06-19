@@ -17,6 +17,7 @@ use AmeliaBooking\Domain\Entity\Booking\Event\Event;
 use AmeliaBooking\Domain\Entity\Entities;
 use AmeliaBooking\Domain\Entity\Location\Location;
 use AmeliaBooking\Domain\Entity\Payment\Payment;
+use AmeliaBooking\Domain\Entity\User\AbstractUser;
 use AmeliaBooking\Domain\Entity\User\Customer;
 use AmeliaBooking\Domain\Entity\User\Provider;
 use AmeliaBooking\Domain\Factory\Bookable\Service\PackageFactory;
@@ -298,6 +299,14 @@ class BookingApplicationService
             $data['utc'] = null;
         }
 
+        if (isset($data['bookings'][0]['customer']) && array_key_exists('type', $data['bookings'][0]['customer'])) {
+            $data['bookings'][0]['customer']['type'] = AbstractUser::USER_ROLE_CUSTOMER;
+        }
+
+        if (isset($data['bookings'][0]['customer']) && array_key_exists('externalId', $data['bookings'][0]['customer'])) {
+            $data['bookings'][0]['customer']['externalId'] = null;
+        }
+
         if (!empty($data['bookings'][0]['customer']['firstName'])) {
             $data['bookings'][0]['customer']['firstName'] =
                 sanitize_text_field($data['bookings'][0]['customer']['firstName']);
@@ -435,7 +444,7 @@ class BookingApplicationService
         // Convert UTC slot to slot in TimeZone based on Settings
         if (
             (isset($data['bookingStart']) &&
-            $data['bookings'][0]['utcOffset'] !== null &&
+            isset($data['bookings'][0]['utcOffset']) &&
             $settingsService->getSetting('general', 'showClientTimeZone')) ||
             (isset($data['utc']) ? (isset($data['bookingStart']) && $data['utc'] === true) : false)
         ) {
@@ -555,6 +564,19 @@ class BookingApplicationService
                     $reservation->setService($service);
                 }
 
+                if (
+                    $reservation->getService() !== null &&
+                    $reservation->getService()->getCategory() === null &&
+                    $reservation->getService()->getCategoryId() !== null
+                ) {
+                    /** @var CategoryRepository $categoryRepository */
+                    $categoryRepository = $this->container->get('domain.bookable.category.repository');
+
+                    $category = $categoryRepository->getById($reservation->getService()->getCategoryId()->getValue());
+
+                    $reservation->getService()->setCategory($category);
+                }
+
                 if ($reservation->getProvider() === null && $reservation->getProviderId() !== null) {
                     /** @var Provider $provider */
                     $provider = $providerRepository->getWithSchedule(
@@ -659,52 +681,49 @@ class BookingApplicationService
         $locationId = $reservation->getLocation() === null && $reservation->getLocationId() !== null ?
             $reservation->getLocationId()->getValue() : null;
 
-        switch ($reservation->getType()->getValue()) {
-            case Entities::APPOINTMENT:
-                if ($reservation->getService() === null && $reservation->getServiceId() !== null) {
-                    /** @var BookableApplicationService $bookableAS */
-                    $bookableAS = $this->container->get('application.bookable.service');
+        if ($reservation->getType()->getValue() == Entities::APPOINTMENT) {
+            if ($reservation->getService() === null && $reservation->getServiceId() !== null) {
+                /** @var BookableApplicationService $bookableAS */
+                $bookableAS = $this->container->get('application.bookable.service');
 
-                    /** @var Service $service */
-                    $service = $bookableAS->getAppointmentService(
-                        $reservation->getServiceId()->getValue(),
-                        $reservation->getProviderId()->getValue()
-                    );
+                /** @var Service $service */
+                $service = $bookableAS->getAppointmentService(
+                    $reservation->getServiceId()->getValue(),
+                    $reservation->getProviderId()->getValue()
+                );
 
-                    if ($service->getCategory() === null && $service->getCategoryId() !== null) {
-                        /** @var Category $category */
-                        $category = $categoryRepository->getById($service->getCategoryId()->getValue());
+                if ($service->getCategory() === null && $service->getCategoryId() !== null) {
+                    /** @var Category $category */
+                    $category = $categoryRepository->getById($service->getCategoryId()->getValue());
 
-                        $service->setCategory($category);
-                    }
-
-                    $reservation->setService($service);
+                    $service->setCategory($category);
                 }
 
-                if ($reservation->getProvider() === null && $reservation->getProviderId() !== null) {
-                    /** @var Collection $providers */
-                    $providers = $providerRepository->getWithSchedule(
-                        ['providers' => [$reservation->getProviderId()->getValue()]]
-                    );
+                $reservation->setService($service);
+            }
 
-                    /** @var Provider $provider */
-                    $provider = count($providers->getItems()) ? $providers->getItem($reservation->getProviderId()->getValue()) : null;
+            if ($reservation->getProvider() === null && $reservation->getProviderId() !== null) {
+                /** @var Collection $providers */
+                $providers = $providerRepository->getWithSchedule(
+                    ['providers' => [$reservation->getProviderId()->getValue()]]
+                );
 
-                    if ($provider) {
-                        $reservation->setProvider($provider);
-                    }
+                /** @var Provider $provider */
+                $provider = count($providers->getItems()) ? $providers->getItem($reservation->getProviderId()->getValue()) : null;
+
+                if ($provider) {
+                    $reservation->setProvider($provider);
                 }
+            }
 
-                if (
-                    $reservation->getLocation() === null &&
-                    $reservation->getLocationId() === null &&
-                    $reservation->getProvider() !== null &&
-                    $reservation->getProvider()->getLocationId() !== null
-                ) {
-                    $locationId = $reservation->getProvider()->getLocationId()->getValue();
-                }
-
-                break;
+            if (
+                $reservation->getLocation() === null &&
+                $reservation->getLocationId() === null &&
+                $reservation->getProvider() !== null &&
+                $reservation->getProvider()->getLocationId() !== null
+            ) {
+                $locationId = $reservation->getProvider()->getLocationId()->getValue();
+            }
         }
 
         if ($locationId !== null) {
@@ -789,8 +808,8 @@ class BookingApplicationService
     /**
      * Set entities (service, provider, location, customers) to targetAppointment
      *
-     * @param Appointment $appointment
-     * @param Collection  $filledAppointments
+     * @param Appointment     $appointment
+     * @param Collection|null $filledAppointments
      *
      * @return void
      *
@@ -798,9 +817,9 @@ class BookingApplicationService
      * @throws NotFoundException
      * @throws QueryExecutionException
      */
-    public function setAppointmentEntities($appointment, $filledAppointments)
+    public function setAppointmentEntities($appointment, $filledAppointments = null)
     {
-        if ($filledAppointments->length()) {
+        if ($filledAppointments && $filledAppointments->length()) {
             $this->setFilledAppointmentEntities($appointment, $filledAppointments);
         }
 

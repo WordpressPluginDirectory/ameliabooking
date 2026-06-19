@@ -91,10 +91,32 @@
       <span>{{ timeZoneString }}</span>
     </div>
 
-    <div v-if="props.periodPricing && props.periodPricing.price && props.showEstimatedPricing" class="am-advsc__period-pricing">
-      <span v-if="props.periodPricing.price.low !== null" class="period-pricing-low">{{ useFormattedPrice(props.periodPricing.price.low) }}{{ !props.periodPricing.price.uniqueMin ? '+' : '' }}</span>
-      <span v-if="props.periodPricing.price.mid !== null" class="period-pricing-mid">{{ useFormattedPrice(props.periodPricing.price.mid) }}{{ !props.periodPricing.price.uniqueMid ? '+' : '' }}</span>
-      <span v-if="props.periodPricing.price.high !== null" class="period-pricing-high">{{ useFormattedPrice(props.periodPricing.price.high) }}{{ !props.periodPricing.price.uniqueMax ? '+' : '' }}</span>
+    <div
+      v-if="
+        props.periodPricing &&
+        props.periodPricing.price &&
+        props.showEstimatedPricing
+      "
+      class="am-advsc__period-pricing"
+    >
+      <span
+        v-if="props.periodPricing.price.low !== null"
+        class="period-pricing-low"
+        >{{ useFormattedPrice(props.periodPricing.price.low)
+        }}{{ !props.periodPricing.price.uniqueMin ? '+' : '' }}</span
+      >
+      <span
+        v-if="props.periodPricing.price.mid !== null"
+        class="period-pricing-mid"
+        >{{ useFormattedPrice(props.periodPricing.price.mid)
+        }}{{ !props.periodPricing.price.uniqueMid ? '+' : '' }}</span
+      >
+      <span
+        v-if="props.periodPricing.price.high !== null"
+        class="period-pricing-high"
+        >{{ useFormattedPrice(props.periodPricing.price.high)
+        }}{{ !props.periodPricing.price.uniqueMax ? '+' : '' }}</span
+      >
     </div>
 
     <FullCalendar
@@ -106,7 +128,7 @@
     ></FullCalendar>
 
     <div
-      v-if="calendarEventSlots.length"
+      v-if="shouldShowSlots"
       ref="slotsWrapper"
       class="am-advsc__slots-wrapper"
     >
@@ -114,68 +136,94 @@
         {{ slotsHeading }}
       </div>
       <div class="am-advsc__slots">
+        <!-- Unified chronological list (regular + waiting) -->
         <div
-          v-for="slot in useSortedTimeStrings([
-            ...new Set(
-              calendarEventSlots.concat(
-                props.showBusySlots ? calendarEventBusySlots : []
-              )
-            ),
-          ])"
-          :key="slot"
+          v-for="slotObj in mergedSlots"
+          :key="(slotObj.waiting ? 'wl-' : 'std-') + slotObj.time"
           class="am-advsc__slots-item"
           :class="[
             {
-              'am-advsc__slots-item__selected': calendarEventSlot === slot,
-              'am-advsc__slots-item__low': calendarEventDate && props.periodPricing && props.periodPricing.dates && calendarEventDate in props.periodPricing.dates && slot in props.periodPricing.dates[calendarEventDate].slots && props.periodPricing.dates[calendarEventDate].slots[slot].type === 'low',
-              'am-advsc__slots-item__high': calendarEventDate && props.periodPricing && props.periodPricing.dates && calendarEventDate in props.periodPricing.dates && slot in props.periodPricing.dates[calendarEventDate].slots && props.periodPricing.dates[calendarEventDate].slots[slot].type === 'high',
+              'am-advsc__slots-item__selected': calendarEventSlot === slotObj.time,
+              'am-advsc__slots-item__low': calendarEventDate && props.periodPricing && props.periodPricing.dates && calendarEventDate in props.periodPricing.dates && slotObj.time in props.periodPricing.dates[calendarEventDate].slots && props.periodPricing.dates[calendarEventDate].slots[slotObj.time].type === 'low',
+              'am-advsc__slots-item__high': calendarEventDate && props.periodPricing && props.periodPricing.dates && calendarEventDate in props.periodPricing.dates && slotObj.time in props.periodPricing.dates[calendarEventDate].slots && props.periodPricing.dates[calendarEventDate].slots[slotObj.time].type === 'high',
             },
             { 'am-advsc__slots-item-mobile': checkScreen },
             {
               'am-advsc__slots-item-disabled':
-                calendarEventBusySlots.includes(slot) &&
+                calendarEventBusySlots.includes(slotObj.time) &&
                 props.showBusySlots &&
-                !calendarEventSlots.includes(slot),
+                !calendarEventSlots.includes(slotObj.time) &&
+                !slotObj.waiting
             },
-            {'am-width-full': props.showSlotPricing}
+            {'am-width-full': props.showSlotPricing},
+            {'am-advsc__slots-item-waiting': slotObj.waiting}
           ]"
           tabindex="0"
           @click="
+            !slotObj.waiting &&
             props.showBusySlots &&
-            calendarEventBusySlots.includes(slot) &&
-            !calendarEventSlots.includes(slot)
+            calendarEventBusySlots.includes(slotObj.time) &&
+            !calendarEventSlots.includes(slotObj.time)
               ? null
-              : slotSelected(slot)
+              : slotSelected(slotObj)
           "
           @keydown.enter="
+            !slotObj.waiting &&
             props.showBusySlots &&
-            calendarEventBusySlots.includes(slot) &&
-            !calendarEventSlots.includes(slot)
+            calendarEventBusySlots.includes(slotObj.time) &&
+            !calendarEventSlots.includes(slotObj.time)
               ? null
-              : slotSelected(slot)
+              : slotSelected(slotObj)
           "
         >
-          <div class="am-advsc__slots-item__inner">
+          <div
+            class="am-advsc__slots-item__inner"
+            :class="{'am-contains-waiting-tag': slotObj.waiting && props.showPeopleWaiting}"
+          >
             {{
-              `${getFrontedFormattedTime(slot)} ${
+              `${getFrontedFormattedTime(slotObj.time)} ${
                 props.endTime
                   ? ' - ' +
                     getFrontedFormattedTime(
-                      addSeconds(slot, calendarSlotDuration)
+                      addSeconds(slotObj.time, calendarSlotDuration)
                     )
                   : ''
               }`
             }}
 
-            <span v-if="props.showSlotPricing && calendarEventDate && props.periodPricing && props.periodPricing.dates && calendarEventDate in props.periodPricing.dates && slot in props.periodPricing.dates[calendarEventDate].slots && props.periodPricing.dates[calendarEventDate].slots[slot].price !== null">
-              {{ useFormattedPrice(props.periodPricing.dates[calendarEventDate].slots[slot].price) }}
+            <span
+              v-if="
+                props.showSlotPricing &&
+                calendarEventDate &&
+                props.periodPricing &&
+                props.periodPricing.dates &&
+                calendarEventDate in props.periodPricing.dates &&
+                slotObj.time in
+                  props.periodPricing.dates[calendarEventDate].slots &&
+                props.periodPricing.dates[calendarEventDate].slots[slotObj.time]
+                  .price !== null
+              "
+            >
+              {{
+                useFormattedPrice(
+                  props.periodPricing.dates[calendarEventDate].slots[
+                    slotObj.time
+                  ].price
+                )
+              }}
+            </span>
+            <span
+              v-if="slotObj.waiting && props.showPeopleWaiting"
+              class="am-advsc__waiting-tag am-icon-clock"
+            >
+              {{ props.labelWaitingList + ' (' + slotObj.peopleWaiting + ')' }}
             </span>
           </div>
         </div>
       </div>
     </div>
     <div
-      v-if="isDateSelected && !calendarEventSlots.length"
+      v-if="isDateSelected && !calendarEventSlots.length && !waitingListDisplayTimes.length"
       style="text-align: center"
     >
       {{ props.labelSlotsSelected }}
@@ -209,6 +257,7 @@ import {
   computed,
   watch,
   onMounted,
+  nextTick,
 } from 'vue'
 
 // * Composables
@@ -283,6 +332,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  showCalendarDateBusyness: {
+    type: Boolean,
+    default: true,
+  },
   showEstimatedPricing: {
     type: Boolean,
     default: false,
@@ -295,7 +348,15 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  showPeopleWaiting: {
+    type: Boolean,
+    default: true,
+  },
   labelSlotsSelected: {
+    type: String,
+    default: '',
+  },
+  labelWaitingList: {
     type: String,
     default: '',
   },
@@ -457,10 +518,13 @@ const options = ref({
   initialDate: calendarStartDate.value,
   plugins: [dayGridPlugin, interactionPlugin],
   initialView: props.initialView,
-  dayCellDidMount: function(info) {
+  dayCellDidMount: function (info) {
     if (!info.el.classList.contains('am-advsc__dayGridMonth-disabled')) {
       info.el.setAttribute('tabindex', '0')
-      info.el.setAttribute('aria-label', `Select date ${info.date.toDateString()}`)
+      info.el.setAttribute(
+        'aria-label',
+        `Select date ${info.date.toDateString()}`
+      )
       info.el.setAttribute('role', 'button')
       info.el.setAttribute('aria-describedby', 'calendar-instructions')
     }
@@ -498,12 +562,12 @@ const options = ref({
         const events = calendarApi.getEvents()
 
         // Find events that occur on this specific date
-        const matchingEvents = events.filter(event => {
+        const matchingEvents = events.filter((event) => {
           if (!event.start) return false
           // Use moment to format the event start date in the same way
           const eventStartDate = moment(event.start).format('YYYY-MM-DD')
           return eventStartDate === localDateStr
-        });
+        })
 
         // If there are events on this date, trigger eventClick for the first one
         if (matchingEvents.length > 0) {
@@ -583,6 +647,7 @@ const emits = defineEmits([
   'changedMonth',
   'selectedDuration',
   'unselectDate',
+  'waitingListSlot',
 ])
 
 let calendarEventSlots = inject('calendarEventSlots')
@@ -590,6 +655,9 @@ let calendarEventSlots = inject('calendarEventSlots')
 let calendarEventDate = inject('calendarEventDate')
 
 let calendarEventBusySlots = inject('calendarEventBusySlots', [])
+
+// Waiting list times for selected date
+let calendarWaitingListTimes = inject('calendarWaitingListTimes', ref([]))
 
 let calendarEventSlot = inject('calendarEventSlot')
 
@@ -599,8 +667,72 @@ let calendarSlotDuration = inject('calendarSlotDuration')
 
 let calendarServiceDuration = inject('calendarServiceDuration')
 
+let calendarWaitingListSlots = inject('calendarWaitingListSlots')
+
 // * Slots heading
 let slotsHeading = ref(props.date ? getFrontedFormattedDate(props.date) : '')
+
+// Computed arrays for display
+const combinedStandardSlots = computed(() =>
+  useSortedTimeStrings([
+    ...new Set(
+      calendarEventSlots.value.concat(
+        props.showBusySlots ? calendarEventBusySlots.value : []
+      )
+    ),
+  ]).filter((s) => !calendarWaitingListTimes.value.includes(s))
+)
+
+const waitingListDisplayTimes = computed(() =>
+  useSortedTimeStrings(calendarWaitingListTimes.value)
+)
+
+// Merge standard and waiting list slots chronologically while preserving status
+const mergedSlots = computed(() => {
+  // Helper: extract people waiting for a given time on selected date
+  const getPeopleWaiting = (time) => {
+    try {
+      const dateKey = calendarEventDate?.value
+        ? moment(calendarEventDate.value).format('YYYY-MM-DD')
+        : null
+      if (!dateKey) return 0
+
+      const dayObj = calendarWaitingListSlots?.value?.[dateKey]
+      if (!dayObj) return 0
+
+      const slotArr = dayObj[time]
+      if (!Array.isArray(slotArr) || !slotArr.length) return 0
+
+      const rec = slotArr[0]
+      const w = rec && (typeof rec.w === 'number' ? rec.w : Number(rec.w))
+      return Number.isFinite(w) ? w : 0
+    } catch (e) {
+      return 0
+    }
+  }
+
+  const std = combinedStandardSlots.value.map((t) => ({
+    time: t,
+    waiting: false,
+  }))
+
+  const wl = waitingListDisplayTimes.value.map((t) => ({
+    time: t,
+    waiting: true,
+    peopleWaiting: getPeopleWaiting(t),
+  }))
+
+  return [...std, ...wl].sort((a, b) => a.time.localeCompare(b.time))
+})
+
+// Only show slots on iOS when a date is currently selected; other platforms unchanged
+const shouldShowSlots = computed(() => {
+  if (iOS()) {
+    return isDateSelected.value && (calendarEventSlots.value.length || waitingListDisplayTimes.value.length)
+  }
+
+  return calendarEventSlots.value.length || waitingListDisplayTimes.value.length
+})
 
 /**
  * Html class builder for calendar header day cell
@@ -623,6 +755,46 @@ watch(calendarStartDate, () => {
 
   advCalendar.gotoDate(calendarStartDate.value)
 })
+
+// iOS: ensure first available slot auto-selects once slots load, and keep heading in sync
+watch(calendarEventSlots, (val) => {
+  if (!iOS() || !isDateSelected.value) return
+
+  const hasSlots = Array.isArray(val) && val.length > 0
+
+  if (!hasSlots) {
+    slotsHeading.value = ''
+    return
+  }
+
+  const currentDate = calendarEventDate?.value || null
+  const needsSelection = !calendarEventSlot.value || !val.includes(calendarEventSlot.value)
+
+  if (needsSelection) {
+    calendarEventSlot.value = val[0]
+    emits('selectedTime', calendarEventSlot.value)
+  }
+
+  const headingDate = currentDate ? getFrontedFormattedDate(currentDate) : currentDate
+  slotsHeading.value =
+    headingDate +
+    (calendarEventSlot.value && val.includes(calendarEventSlot.value)
+      ? ' - ' + getFrontedFormattedTime(calendarEventSlot.value)
+      : '')
+})
+
+watch(
+  () => ({
+    showCalendarDateBusyness: props.showCalendarDateBusyness,
+    busyness: props.busyness,
+  }),
+  () => {
+    nextTick(() => {
+      advCalendarRef.value?.getApi()?.render()
+    })
+  },
+  { deep: true },
+)
 
 /**
  * Html class builder for calendar day cell
@@ -656,12 +828,17 @@ function calendarDayClassBuilder(data) {
     !eventIdentifier.length
   ) {
     classCollector.push(`am-advsc__${data.view.type}-disabled`)
-  } else if (props.periodPricing &&
+  } else if (
+    props.periodPricing &&
     props.periodPricing.dates &&
     dateString in props.periodPricing.dates &&
-    (props.periodPricing.dates[dateString].type === 'low' || props.periodPricing.dates[dateString].type === 'high')
+    (props.periodPricing.dates[dateString].type === 'low' ||
+      props.periodPricing.dates[dateString].type === 'high')
   ) {
-    classCollector.push(`am-advsc__${data.view.type}-` + props.periodPricing.dates[dateString].type)
+    classCollector.push(
+      `am-advsc__${data.view.type}-` +
+        props.periodPricing.dates[dateString].type
+    )
   }
 
   if (props.date && props.date === moment(data.date).format('YYYY-MM-DD')) {
@@ -676,9 +853,8 @@ function calendarDayClassBuilder(data) {
  * @param data
  */
 
-// * bug - single tap on date cause double click on ios devices
-// * bug fix for iOS devices that had to be removed after publishing the event calendar
-let calEvtClicked = ref(false)
+// * Guard repeated iOS date-clicks fired twice for a single tap
+let lastIOSDateClick = ref({ date: '', ts: 0 })
 
 // * this function must be removed and its content should be placed inside the calendarDateClick function after releasing the event calendar
 function calendarDateClickFunctionality(data) {
@@ -702,9 +878,19 @@ function calendarDateClickFunctionality(data) {
 
     slotsHeading.value = ''
 
+    // Only force-clear slots immediately on iOS; other platforms keep existing flow
+    if (iOS()) {
+      calendarEventSlots.value = []
+      calendarEventSlot.value = ''
+      calendarEventBusySlots.value = []
+    }
+
     emits('unselectDate')
+
   } else {
     isDateSelected.value = true
+
+    emits('selectedDate', data.dateStr)
 
     if (
       calendarEventSlot.value &&
@@ -786,21 +972,32 @@ function calendarDateClickFunctionality(data) {
     selectedSlot.reference = 'package-slot ' + props.id + ' ' + props.serviceId
   }
 
+  let isWaiting = waitingListDisplayTimes.value.includes(selectedSlot.value)
+  emits('waitingListSlot', isWaiting)
+
   sidebarDataCollector(selectedSlot)
 }
 
 // * this function had to return to its previous state after event calendar release
 function calendarDateClick(data) {
-  setTimeout(() => {
-    if (iOS()) {
-      if (calEvtClicked.value) {
-        calendarDateClickFunctionality(data)
-        calEvtClicked.value = false
-      }
-    } else {
-      calendarDateClickFunctionality(data)
+  if (iOS()) {
+    const now = Date.now()
+    const last = lastIOSDateClick.value
+
+    // Ignore the second click if iOS fires two events for a single tap
+    if (last.date === data.dateStr && now - last.ts < 250) {
+      return
     }
-  }, 300)
+
+    lastIOSDateClick.value = { date: data.dateStr, ts: now }
+
+    // Give eventClick/emit time to propagate state before painting selection
+    return setTimeout(() => {
+      calendarDateClickFunctionality(data)
+    }, 50)
+  }
+
+  setTimeout(() => calendarDateClickFunctionality(data), 50)
 }
 
 function iOS() {
@@ -823,7 +1020,6 @@ function iOS() {
  * @param eventData
  */
 function calendarEventClick(eventData) {
-  calEvtClicked.value = true
   emits('selectedDate', moment(eventData.event.start).format('YYYY-MM-DD'))
 }
 
@@ -833,12 +1029,21 @@ function calendarEventClick(eventData) {
  * @returns {{html: string}}
  */
 function calendarEventContent(eventCalendarData) {
-  let eventContent
+  if (!props.showCalendarDateBusyness) {
+    return { html: '' }
+  }
 
   const slotsAvailablePercentage =
     props.busyness[moment(eventCalendarData.event.start).format('YYYY-MM-DD')]
 
-  eventContent = `<div class="am-advsc__slot-wrapper" style="height: ${slotsAvailablePercentage}%"></div>`
+  if (
+    slotsAvailablePercentage === undefined ||
+    slotsAvailablePercentage === null
+  ) {
+    return { html: '' }
+  }
+
+  const eventContent = `<div class="am-advsc__slot-wrapper" style="height: ${slotsAvailablePercentage}%"></div>`
 
   return { html: eventContent }
 }
@@ -858,10 +1063,10 @@ function slotSelected(slot) {
     }
 
     selectedSlot.value = !slotsHeading.value.includes(' - ')
-      ? slotsHeading.value + ' - ' + getFrontedFormattedTime(slot)
+      ? slotsHeading.value + ' - ' + getFrontedFormattedTime(slot.time)
       : slotsHeading.value.split(' - ')[0] +
         ' - ' +
-        getFrontedFormattedTime(slot)
+        getFrontedFormattedTime(slot.time)
 
     slotsHeading.value = selectedSlot.value
 
@@ -873,9 +1078,35 @@ function slotSelected(slot) {
     sidebarDataCollector(selectedSlot)
   }
 
-  calendarEventSlot.value = slot
+  calendarEventSlot.value = slot.time
 
-  emits('selectedTime', slot)
+  let isWaiting = waitingListDisplayTimes.value.includes(slot.time)
+  
+  // Get the first qualifying provider ID for waiting list slot
+  let selectedProviderId = null
+  if (isWaiting && slot.waiting) {
+    const dateKey = calendarEventDate?.value
+      ? moment(calendarEventDate.value).format('YYYY-MM-DD')
+      : null
+    if (dateKey && calendarWaitingListSlots?.value?.[dateKey]?.[slot.time]) {
+      const slotProviders = calendarWaitingListSlots.value[dateKey][slot.time]
+      if (slotProviders && slotProviders.length > 0) {
+        // Get first qualifying provider
+        const qualifyingProvider = slotProviders.find(p => {
+          const isFullyBooked = p.c <= 0
+          const hasWaitingSpace = !p.maxWaitingCapacity || (p.w || 0) < p.maxWaitingCapacity
+          return isFullyBooked && hasWaitingSpace
+        })
+        if (qualifyingProvider) {
+          selectedProviderId = qualifyingProvider.e
+        }
+      }
+    }
+  }
+
+  emits('waitingListSlot', isWaiting, (slot.waiting ? slot.peopleWaiting : 0), selectedProviderId)
+
+  emits('selectedTime', slot.time)
 }
 
 window.addEventListener('resize', resize)
@@ -947,49 +1178,96 @@ let amColors = inject('amColors', {
 
 const cssVars = computed(() => {
   return {
-    '--am-c-cal-indicator': 'showIndicatorPricing' in props && props.showIndicatorPricing ? 'visible' : 'hidden',
-    '--am-c-cal-low': 'colorCalCellLow' in amColors.value ? amColors.value.colorCalCellLow : amColors.value.colorCalCell,
-    '--am-c-cal-high': 'colorCalCellHigh' in amColors.value ? amColors.value.colorCalCellHigh : amColors.value.colorCalCell,
-    '--am-c-cal-low-text': 'colorCalCellLowText' in amColors.value ? amColors.value.colorCalCellLowText : amColors.value.colorCalCellText,
-    '--am-c-cal-high-text': 'colorCalCellHighText' in amColors.value ? amColors.value.colorCalCellHighText : amColors.value.colorCalCellText,
+    '--am-c-cal-indicator':
+      'showIndicatorPricing' in props && props.showIndicatorPricing
+        ? 'visible'
+        : 'hidden',
+    '--am-c-cal-low':
+      'colorCalCellLow' in amColors.value
+        ? amColors.value.colorCalCellLow
+        : amColors.value.colorCalCell,
+    '--am-c-cal-high':
+      'colorCalCellHigh' in amColors.value
+        ? amColors.value.colorCalCellHigh
+        : amColors.value.colorCalCell,
+    '--am-c-cal-low-text':
+      'colorCalCellLowText' in amColors.value
+        ? amColors.value.colorCalCellLowText
+        : amColors.value.colorCalCellText,
+    '--am-c-cal-high-text':
+      'colorCalCellHighText' in amColors.value
+        ? amColors.value.colorCalCellHighText
+        : amColors.value.colorCalCellText,
     '--am-c-cal-low-op10': useColorTransparency(
-      'colorCalCellLow' in amColors.value ? amColors.value.colorCalCellLow : amColors.value.colorCalCell,
+      'colorCalCellLow' in amColors.value
+        ? amColors.value.colorCalCellLow
+        : amColors.value.colorCalCell,
       0.1
     ),
     '--am-c-cal-low-op20': useColorTransparency(
-      'colorCalCellLow' in amColors.value ? amColors.value.colorCalCellLow : amColors.value.colorCalCell,
+      'colorCalCellLow' in amColors.value
+        ? amColors.value.colorCalCellLow
+        : amColors.value.colorCalCell,
       0.2
     ),
+    '--am-c-cal-waiting':
+      'colorCalCellWaiting' in amColors.value
+        ? amColors.value.colorCalCellWaiting
+        : amColors.value.colorMainBgr,
+    '--am-c-cal-waiting-text':
+      'colorCalCellWaitingText' in amColors.value
+        ? amColors.value.colorCalCellWaitingText
+        : amColors.value.colorMainText,
+    '--am-c-cal-waiting-op40':
+      'colorCalCellWaitingText' in amColors.value
+        ? useColorTransparency(amColors.value.colorCalCellWaitingText,0.4)
+        : useColorTransparency(amColors.value.colorMainText,0.4),
     '--am-c-cal-low-op30': useColorTransparency(
-      'colorCalCellLow' in amColors.value ? amColors.value.colorCalCellLow : amColors.value.colorCalCell,
+      'colorCalCellLow' in amColors.value
+        ? amColors.value.colorCalCellLow
+        : amColors.value.colorCalCell,
       0.3
     ),
     '--am-c-cal-low-op60': useColorTransparency(
-      'colorCalCellLow' in amColors.value ? amColors.value.colorCalCellLow : amColors.value.colorCalCell,
+      'colorCalCellLow' in amColors.value
+        ? amColors.value.colorCalCellLow
+        : amColors.value.colorCalCell,
       0.6
     ),
     '--am-c-cal-low-op80': useColorTransparency(
-      'colorCalCellLow' in amColors.value ? amColors.value.colorCalCellLow : amColors.value.colorCalCell,
+      'colorCalCellLow' in amColors.value
+        ? amColors.value.colorCalCellLow
+        : amColors.value.colorCalCell,
       0.8
     ),
     '--am-c-cal-high-op10': useColorTransparency(
-      'colorCalCellHigh' in amColors.value ? amColors.value.colorCalCellHigh : amColors.value.colorCalCell,
+      'colorCalCellHigh' in amColors.value
+        ? amColors.value.colorCalCellHigh
+        : amColors.value.colorCalCell,
       0.1
     ),
     '--am-c-cal-high-op20': useColorTransparency(
-      'colorCalCellHigh' in amColors.value ? amColors.value.colorCalCellHigh : amColors.value.colorCalCell,
+      'colorCalCellHigh' in amColors.value
+        ? amColors.value.colorCalCellHigh
+        : amColors.value.colorCalCell,
       0.2
     ),
     '--am-c-cal-high-op30': useColorTransparency(
-      'colorCalCellHigh' in amColors.value ? amColors.value.colorCalCellHigh : amColors.value.colorCalCell,
+      'colorCalCellHigh' in amColors.value
+        ? amColors.value.colorCalCellHigh
+        : amColors.value.colorCalCell,
       0.3
     ),
     '--am-c-cal-high-op60': useColorTransparency(
-      'colorCalCellHigh' in amColors.value ? amColors.value.colorCalCellHigh : amColors.value.colorCalCell,
+      'colorCalCellHigh' in amColors.value
+        ? amColors.value.colorCalCellHigh
+        : amColors.value.colorCalCell,
       0.6
     ),
     '--am-c-cal-high-op80': useColorTransparency(
-      'colorCalCellHigh' in amColors.value ? amColors.value.colorCalCellHigh : amColors.value.colorCalCell,
+      'colorCalCellHigh' in amColors.value
+        ? amColors.value.colorCalCellHigh
+        : amColors.value.colorCalCell,
       0.8
     ),
     '--am-c-advsc-bgr-op10': useColorTransparency(
@@ -1356,7 +1634,7 @@ $amCalClass: am-advsc;
 
                     &-frame::before {
                       visibility: var(--am-c-cal-indicator);
-                      content: "↘";
+                      content: '↘';
                       position: absolute;
                       top: -2px;
                       left: 2px;
@@ -1382,7 +1660,7 @@ $amCalClass: am-advsc;
 
                     &-frame::before {
                       visibility: var(--am-c-cal-indicator);
-                      content: "↗";
+                      content: '↗';
                       position: absolute;
                       top: -2px;
                       left: 2px;
@@ -1490,6 +1768,16 @@ $amCalClass: am-advsc;
             }
           }
         }
+
+        // Tighter inset for small screens so the selection frame doesn't hug edges
+        @media (max-width: 560px) {
+          &-frame {
+            width: calc(100% - 6px);
+            height: calc(100% - 6px);
+            top: 3px;
+            left: 3px;
+          }
+        }
       }
     }
 
@@ -1505,8 +1793,10 @@ $amCalClass: am-advsc;
                 padding: 3px;
                 .fc-daygrid-day {
                   &-frame {
-                    width: calc(100% - 6px);
-                    height: calc(100% - 4px);
+                    top: 3px;
+                    left: 4px;
+                    width: calc(100% - 8px);
+                    height: calc(100% - 6px);
                   }
                 }
               }
@@ -1600,6 +1890,14 @@ $amCalClass: am-advsc;
 
           &:last-child {
             max-width: 100%;
+          }
+
+          .am-advsc__waiting-tag {
+            margin-top: -4px;
+
+            &:before {
+              margin-top: 2px;
+            }
           }
         }
 
@@ -1695,6 +1993,50 @@ $amCalClass: am-advsc;
             border: transparent;
             cursor: not-allowed;
             color: var(--am-c-cal-disabled-text);
+          }
+        }
+
+        // Waiting list specific styling
+        &-waiting {
+          border-color: var(--am-c-rs-text-op60);
+          .am-advsc__slots-item__inner {
+            background: var(--am-c-cal-waiting);
+            border: 1px solid var(--am-c-cal-waiting-op40);
+            flex-direction: column;
+            line-height: 1.6;
+            color: var(--am-c-cal-waiting-text);
+
+            &.am-contains-waiting-tag {
+              padding: 3px 12px;
+            }
+          }
+          .am-advsc__waiting-tag {
+            background: transparent;
+            display: flex;
+            font-size: 10px;
+            line-height: 1;
+            border-radius: 10px;
+            text-transform: lowercase;
+            margin-top: -3px;
+
+            &:before {
+              margin-top: 1px;
+            }
+          }
+
+          &.am-advsc__slots-item-mobile {
+            .am-advsc__slots-item__inner.am-contains-waiting-tag {
+              line-height: 1.1;
+              white-space: nowrap;
+            }
+          }
+
+          &.am-advsc__slots-item__selected {
+            .am-advsc__slots-item__inner {
+              background: var(--am-c-cal-selected);
+              border: 1px solid var(--am-c-cal-selected);
+              color: var(--am-c-cal-selected-text);
+            }
           }
         }
       }

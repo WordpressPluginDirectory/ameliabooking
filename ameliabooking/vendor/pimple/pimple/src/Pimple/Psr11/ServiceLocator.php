@@ -28,7 +28,7 @@ namespace Pimple\Psr11;
 
 use Pimple\Container as PimpleContainer;
 use Pimple\Exception\UnknownIdentifierException;
-use AmeliaPsr\Container\ContainerInterface;
+use AmeliaVendor\Psr\Container\ContainerInterface;
 
 /**
  * Pimple PSR-11 service locator.
@@ -38,7 +38,7 @@ use AmeliaPsr\Container\ContainerInterface;
 class ServiceLocator implements ContainerInterface
 {
     private $container;
-    private $aliases = array();
+    private $aliases = [];
 
     /**
      * @param PimpleContainer $container The Container instance used to locate services
@@ -56,7 +56,7 @@ class ServiceLocator implements ContainerInterface
     /**
      * {@inheritdoc}
      */
-    public function get($id)
+    public function get(string $id)
     {
         if (!isset($this->aliases[$id])) {
             throw new UnknownIdentifierException($id);
@@ -68,7 +68,7 @@ class ServiceLocator implements ContainerInterface
     /**
      * {@inheritdoc}
      */
-    public function has($id)
+    public function has(string $id): bool
     {
         return isset($this->aliases[$id]) && isset($this->container[$this->aliases[$id]]);
     }

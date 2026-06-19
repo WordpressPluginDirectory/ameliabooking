@@ -1,9 +1,9 @@
-import moment from "moment";
-import httpClient from "../../../plugins/axios";
-import {useSortedDateStrings, useUrlParams} from "../common/helper";
-import {settings} from "../../../plugins/settings";
-import {useAvailableSlots, useDuration} from "../common/appointments";
-import {useCartItem} from "./cart";
+import moment from 'moment'
+import httpClient from '../../../plugins/axios'
+import { useSortedDateStrings, useUrlParams } from '../common/helper'
+import { settings } from '../../../plugins/settings'
+import { useAvailableSlots, useDuration } from '../common/appointments'
+import { useCartItem } from './cart'
 
 function useLocalFromUtcSlots (slots) {
   let formattedSlots = {}
@@ -60,7 +60,7 @@ function useAppointmentParams (store) {
   }
 }
 
-function useAppointmentSlots (params, fetchedSlots, callback, customCallback) {
+function useAppointmentSlots (params, fetchedSlots, callback, customCallback, waitingListOptions = null) {
   httpClient.get(
     '/slots',
     {params: useUrlParams(params)}
@@ -79,6 +79,72 @@ function useAppointmentSlots (params, fetchedSlots, callback, customCallback) {
     let occupied = 'queryTimeZone' in params && params.queryTimeZone
       ? useLocalFromUtcSlots(response.data.data.occupied) : response.data.data.occupied
 
+    // Waiting list slots provided by backend (preferred)
+    let waitingListSlots = {}
+
+    // Fallback: derive on frontend if backend doesn't yet supply and waiting list enabled
+    if (!Object.keys(waitingListSlots).length) {
+      const wlEnabled = !!(waitingListOptions && waitingListOptions.enabled)
+      if (wlEnabled) {
+        Object.keys(occupied || {}).forEach(date => {
+          Object.keys(occupied[date] || {}).forEach(time => {
+            if (!(date in slots) || !(time in slots[date])) {
+              const providersData = occupied[date][time] || []
+              const serviceId = params.serviceId
+              const duration = params.serviceDuration
+              // Consider only rows for this service; require at least one match
+              let serviceRows = providersData.filter(p => p.s === serviceId)
+              if (
+                'locationId' in params &&
+                params.locationId !== null &&
+                params.locationId !== ''
+              ) {
+                serviceRows = serviceRows.filter(
+                  (p) => p.l != null && p.l !== '' && String(p.l) === String(params.locationId)
+                )
+              }
+              if (!serviceRows.length) return
+              if (duration) {
+                const expectedDuration = duration / 60
+                serviceRows = serviceRows.filter(
+                  (p) => Number(p.d) === Number(expectedDuration)
+                )
+                if (!serviceRows.length) return
+              }
+              // Filter for selected providers only
+              const selectedProviderRows = params.providerIds && params.providerIds.length
+                ? serviceRows.filter(p => params.providerIds.includes(p.e))
+                : serviceRows
+
+              // Check if ALL selected providers are fully booked (no capacity available)
+              const allFullyBooked = selectedProviderRows.length > 0 && selectedProviderRows.every(p => p.c <= 0)
+
+              if (!allFullyBooked) return
+
+              // Filter providers that have waiting list capacity
+              const waitingListProviders = selectedProviderRows.filter(p => {
+                return (
+                  !waitingListOptions.maxCapacity ||
+                  (p.w || 0) < waitingListOptions.maxCapacity
+                )
+              })
+
+              // Add to waiting list only if all providers are fully booked and at least one has waiting capacity
+              if (waitingListProviders.length > 0) {
+                // If this time exists in regular slots, don't add waiting list (user can book the regular slot)
+                let regularSlotExists = slots[date] && slots[date][time]
+
+                if (!regularSlotExists) {
+                  if (!(date in waitingListSlots)) waitingListSlots[date] = {}
+                  waitingListSlots[date][time] = waitingListProviders
+                }
+              }
+            }
+          })
+        })
+      }
+    }
+
     callback(
       slots,
       occupied,
@@ -87,7 +153,8 @@ function useAppointmentSlots (params, fetchedSlots, callback, customCallback) {
       response.data.data.busyness,
       response.data.data.appCount,
       {providerId: response.data.data.lastProvider, fromBackend: true},
-      customCallback
+      customCallback,
+      waitingListSlots
     )
   })
 }

@@ -27,7 +27,13 @@ class Provider extends AbstractUser
     private $serviceList;
 
     /** @var Collection */
+    private $eventList;
+
+    /** @var Collection */
     private $dayOffList;
+
+    /** @var Collection */
+    private $blockTimeList;
 
     /** @var Collection */
     private $specialDayList;
@@ -73,6 +79,7 @@ class Provider extends AbstractUser
      * @param Collection $dayOffList
      * @param Collection $specialDayList
      * @param Collection $appointmentList
+     * @param Collection $blockTimeList
      */
     public function __construct(
         Name $firstName,
@@ -83,7 +90,8 @@ class Provider extends AbstractUser
         Collection $serviceList,
         Collection $dayOffList,
         Collection $specialDayList,
-        Collection $appointmentList
+        Collection $appointmentList,
+        Collection $blockTimeList
     ) {
         parent::__construct($firstName, $lastName, $email);
         $this->phone           = $phone;
@@ -92,6 +100,7 @@ class Provider extends AbstractUser
         $this->dayOffList      = $dayOffList;
         $this->specialDayList  = $specialDayList;
         $this->appointmentList = $appointmentList;
+        $this->blockTimeList   = $blockTimeList;
     }
 
     /**
@@ -137,6 +146,22 @@ class Provider extends AbstractUser
     /**
      * @return Collection
      */
+    public function getEventList()
+    {
+        return $this->eventList;
+    }
+
+    /**
+     * @param Collection $eventList
+     */
+    public function setEventList(Collection $eventList)
+    {
+        $this->eventList = $eventList;
+    }
+
+    /**
+     * @return Collection
+     */
     public function getDayOffList()
     {
         return $this->dayOffList;
@@ -148,6 +173,22 @@ class Provider extends AbstractUser
     public function setDayOffList(Collection $dayOffList)
     {
         $this->dayOffList = $dayOffList;
+    }
+
+    /**
+     * @return Collection
+     */
+    public function getBlockTimeList()
+    {
+        return $this->blockTimeList;
+    }
+
+    /**
+     * @param Collection $blockTimeList
+     */
+    public function setBlockTimeList(Collection $blockTimeList)
+    {
+        $this->blockTimeList = $blockTimeList;
     }
 
     /**
@@ -239,7 +280,7 @@ class Provider extends AbstractUser
     }
 
     /**
-     * @param Name $timeZone
+     * @param Name|null $timeZone
      */
     public function setTimeZone($timeZone)
     {
@@ -332,7 +373,9 @@ class Provider extends AbstractUser
                 'phone'                 => $this->phone->getValue(),
                 'weekDayList'           => $this->weekDayList->toArray(),
                 'serviceList'           => $this->serviceList->toArray(),
+                'eventList'             => $this->eventList ? $this->eventList->toArray() : [],
                 'dayOffList'            => $this->dayOffList->toArray(),
+                'blockTimeList'         => $this->blockTimeList->toArray(),
                 'specialDayList'        => $this->specialDayList->toArray(),
                 'locationId'            => $this->getLocationId() ? $this->getLocationId()->getValue() : null,
                 'googleCalendar'        => $this->getGoogleCalendar() ? $this->getGoogleCalendar()->toArray() : null,

@@ -1,6 +1,6 @@
 <template>
   <Content
-    v-if="!empty"
+    v-if="!structuralEmpty"
     ref="contentRef"
     :wrapper-class="`am-fcil ${pageWidth < 481 ? 'am-mobile' : ''}`"
     :form-class="`am-fcil__main ${pageWidth < 481 ? 'am-mobile' : ''}`"
@@ -213,11 +213,23 @@
               </div>
 
               <!-- Card Hero Image -->
-              <div v-if="item.pictureFullPath" class="am-fcil__item-hero" :style="{backgroundImage: `url(${item.pictureFullPath})`}"></div>
+              <div 
+                v-if="item.pictureFullPath"
+                class="am-fcil__item-hero"
+                :style="{backgroundImage: `url(${item.pictureFullPath})`}"
+                tabindex="0"
+                @click="selectPackage(item)"
+                @keydown.enter="selectPackage(item)"
+              />
 
               <!-- Card Heading -->
               <div class="am-fcil__item-heading">
-                <div class="am-fcil__item-name">
+                <div 
+                  class="am-fcil__item-name"
+                  tabindex="0"
+                  @click="selectPackage(item)"
+                  @keydown.enter="selectPackage(item)"
+                >
                   {{ item.name }}
                 </div>
                 <div
@@ -356,12 +368,24 @@
               <!-- /Card Badge -->
 
               <!-- Card Hero Image -->
-              <div v-if="item.pictureFullPath" class="am-fcil__item-hero" :style="{backgroundImage: `url(${item.pictureFullPath})`}"></div>
+              <div 
+                v-if="item.pictureFullPath"
+                class="am-fcil__item-hero"
+                :style="{backgroundImage: `url(${item.pictureFullPath})`}"
+                tabindex="0"
+                @click="selectService(item.id)"
+                @keydown.enter="selectService(item.id)"
+              />
               <!-- /Card Hero Image -->
 
               <!-- Card Heading -->
               <div class="am-fcil__item-heading">
-                <div class="am-fcil__item-name">
+                <div
+                  class="am-fcil__item-name"
+                  tabindex="0"
+                  @click="selectService(item.id)"
+                  @keydown.enter="selectService(item.id)"
+                >
                   {{ item.name }}
                 </div>
                 <div
@@ -504,8 +528,7 @@
                 <template #default>
                   <div
                     v-if="useDescriptionVisibility(employee.description)"
-                    class="am-fcil-employee__text"
-                    :class="{'ql-description': employee.description.includes('<!-- Content -->')}"
+                    class="am-fcil-employee__text ql-description"
                     v-html="employee.description"
                   ></div>
                 </template>
@@ -598,6 +621,7 @@ import {
   computed,
   onBeforeMount,
   onMounted,
+  onBeforeUnmount,
   provide
 } from "vue";
 
@@ -641,9 +665,6 @@ let {
 
 // * Root Urls
 const baseUrls = inject('baseUrls')
-
-// * Empty state
-let empty = ref(false)
 
 // * Booking Dialog
 let openBooking = ref(false)
@@ -748,7 +769,7 @@ let langDetection = computed(() => amSettings.general.usedLanguages.includes(loc
 let amLabels = computed(() => {
   let computedLabels = reactive({...labels})
 
-  if (amSettings.customizedData && amSettings.customizedData.cbf && amSettings.customizedData.cbf.categoryItemsList.translations) {
+  if (amSettings.customizedData?.cbf?.categoryItemsList?.translations) {
     let customizedLabels = amSettings.customizedData.cbf.categoryItemsList.translations
     Object.keys(customizedLabels).forEach(labelKey => {
       if (customizedLabels[labelKey][localLanguage.value] && langDetection.value) {
@@ -780,20 +801,20 @@ let filterWidth = computed(() => {
   return contentRef.value && contentRef.value.catHeaderWidth ? contentRef.value.catHeaderWidth : 0
 })
 
-// * window resize listener
-window.addEventListener('resize', resize);
-
 // * resize function
 function resize() {
-  nextTick(() => {
-    if (filterWidth.value > 480) {
-      filterMobileMenu.value = true
-    }
-  })
+  if (filterWidth.value > 480 && !filterMobileMenu.value) {
+    filterMobileMenu.value = true
+  }
 }
 
 onMounted(() => {
+  window.addEventListener('resize', resize)
   resize()
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', resize)
 })
 
 function searchingStrings (name) {
@@ -828,7 +849,34 @@ let categoriesMenu = computed(() => {
 
 // * Selected category
 let categorySelected = inject('categorySelected')
-let categoriesFiltered = computed(() => useAvailableCategories(amEntities.value, shortcodeData.value, employeeFilter.value, locationFilter.value))
+let categoriesForFiltering = computed(() => {
+  return {
+    ...amEntities.value,
+    categories: amEntities.value.categories.map((category) => ({ ...category })),
+  }
+})
+
+let categoriesFiltered = computed(() => {
+  return useAvailableCategories(
+    categoriesForFiltering.value,
+    shortcodeData.value,
+    employeeFilter.value,
+    locationFilter.value
+  )
+})
+
+let categoriesStructural = computed(() => {
+  const e = amEntities.value
+  return useAvailableCategories(
+    {
+      ...e,
+      categories: JSON.parse(JSON.stringify(e.categories)),
+    },
+    shortcodeData.value,
+    null,
+    null
+  )
+})
 
 let categoryPackages = computed(() => {
   let arr = []
@@ -893,6 +941,62 @@ let categoryServices = computed(() => {
   return arr
 })
 
+let categoryPackagesStructural = computed(() => {
+  let arr = []
+  if (categoriesStructural.value.find(cat => cat.id === categorySelected.value)) {
+    amEntities.value.packages.forEach(pack => {
+      categoriesStructural.value.find(cat => cat.id === categorySelected.value).packageList.forEach(packId => {
+        if (pack.id === packId) {
+          arr.push(pack)
+        }
+      })
+    })
+  } else {
+    amEntities.value.packages.forEach(pack => {
+      categoriesStructural.value.forEach(cat => {
+        cat.packageList.forEach(packId => {
+          if (
+            pack.id === packId
+            && !arr.find(p => p.id === packId)
+          ) {
+            arr.push(pack)
+          }
+        })
+      })
+    })
+  }
+
+  return arr
+})
+
+let categoryServicesStructural = computed(() => {
+  let arr = []
+
+  if (categorySelected.value && categoriesStructural.value.find(cat => cat.id === categorySelected.value)) {
+    amEntities.value.services.forEach(service => {
+      categoriesStructural.value.find(cat => cat.id === categorySelected.value).serviceIdList.forEach(serviceId => {
+        if (service.id === serviceId) {
+          arr.push(service)
+        }
+      })
+    })
+  } else {
+    amEntities.value.services.forEach(service => {
+      categoriesStructural.value.forEach(cat => {
+        cat.serviceIdList.forEach(serviceId => {
+          if (
+            service.id === serviceId
+          ) {
+            arr.push(service)
+          }
+        })
+      })
+    })
+  }
+
+  return arr
+})
+
 let employeeFilter = ref(null)
 
 let locationFilter = ref(null)
@@ -920,6 +1024,18 @@ function changeCategoryItemsVisibility(key) {
 
 onBeforeMount(() => {
   if (preselected.value.show) changeCategoryItemsVisibility(preselected.value.show)
+})
+
+// * Full-page empty: unfiltered entity lists only (not search / employee / location filters)
+const structuralEmpty = computed(() => {
+  const hasPackagesStructural =
+    displayCategoryPackages.value &&
+    !useCartHasItems(store) &&
+    categoryPackagesStructural.value.length > 0
+  const hasServicesStructural =
+    displayCategoryServices.value &&
+    categoryServicesStructural.value.length > 0
+  return !hasPackagesStructural && !hasServicesStructural
 })
 
 let filterClassWidth = computed(() => {
@@ -1023,12 +1139,6 @@ let headingStringRender = computed(() => {
   let connective = packagesLength ? '/' : ''
 
   return `${amLabels.value.available} - ${categoryServices.value.length} ${serviceString} ${connective} ${packagesLength} ${packageString}`
-})
-
-onMounted(() => {
-  nextTick(() => {
-    empty.value = categoryPackages.value.length === 0 && categoryServices.value.length === 0
-  })
 })
 
 // * Choose category from categories menu
@@ -1497,11 +1607,21 @@ export default {
 
       &-hero {
         padding: 56.25% 0 0;
-        background-size: cover;
+        background-size: 100%;
         background-repeat: no-repeat;
         background-position: center;
         border: 1px solid var(--am-c-fcil-main-text-op15);
         border-radius: 4px;
+        transition: background-size 0.2s ease-in-out;
+
+        & {
+          transition: background-size 0.3s ease-in-out;
+        }
+        &:hover {
+          cursor: pointer;
+          background-size: 105% !important;
+        }
+   
       }
 
       &-heading {
@@ -1522,6 +1642,7 @@ export default {
         overflow: hidden;
         color: var(--am-c-fcil-card-text);
         margin: 0 4px 0 0;
+        cursor: pointer;
       }
 
       &-cost {

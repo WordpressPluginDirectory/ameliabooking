@@ -48,7 +48,7 @@ class AutoUpdateHook
 
         // If a newer version is available, add the update
         if ($remoteInformation && version_compare(AMELIA_VERSION, $remoteInformation->new_version, '<')) {
-            $transient->response[AMELIA_PLUGIN_SLUG] = $remoteInformation;
+            $transient->response[AMELIA_PLUGIN_BASENAME] = $remoteInformation;
         }
 
         return $transient;
@@ -58,7 +58,7 @@ class AutoUpdateHook
      * Add our self-hosted description to the filter
      *
      * @param bool  $response
-     * @param array $action
+     * @param string $action
      * @param       $args
      *
      * @return bool|object
@@ -81,7 +81,7 @@ class AutoUpdateHook
         /** @var string $envatoTokenEmail */
         $envatoTokenEmail = $settingsService->getSetting('activation', 'envatoTokenEmail');
 
-        if ($args->slug === AMELIA_PLUGIN_SLUG) {
+        if (in_array($args->slug, [AMELIA_PLUGIN_SLUG, 'ameliabooking'], true)) {
             return self::getRemoteInformation($purchaseCode, $envatoTokenEmail);
         }
 
@@ -99,16 +99,13 @@ class AutoUpdateHook
         /** @var bool $activated */
         $activated = $settingsService->getSetting('activation', 'active');
 
-        /** @var array $settingsStrings */
-        $settingsStrings = BackendStrings::getSettingsStrings();
-
         /** @var string $url */
-        $url = AMELIA_SITE_URL . '/wp-admin/admin.php?page=wpamelia-settings&activeSetting=activation';
+        $url = AMELIA_SITE_URL . '/wp-admin/admin.php?page=wpamelia-settings#/activation';
 
-        $redirect = '<a href="' . $url . '" target="_blank">' . $settingsStrings['settings_lower'] . '</a>';
+        $redirect = '<a href="' . $url . '" target="_blank">' . BackendStrings::get('settings_lower') . '</a>';
 
         if (!$activated) {
-            echo sprintf(' ' . $settingsStrings['plugin_not_activated'], $redirect);
+            echo sprintf(' ' . BackendStrings::get('plugin_not_activated'), $redirect);
         }
     }
 
@@ -120,22 +117,17 @@ class AutoUpdateHook
      * @param WP_Upgrader $updater
      *
      * @return WP_Error|string|bool
-     *
-     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
     public static function addMessageOnUpdate($reply, $package, $updater)
     {
-        /** @var array $settingsStrings */
-        $settingsStrings = BackendStrings::getSettingsStrings();
+        $url = AMELIA_SITE_URL . '/wp-admin/admin.php?page=wpamelia-settings#/activation';
 
-        $url = AMELIA_SITE_URL . '/wp-admin/admin.php?page=wpamelia-settings&activeSetting=activation';
-
-        $redirect = '<a href="' . $url . '" target="_blank">' . $settingsStrings['settings_lower'] . '</a>';
+        $redirect = '<a href="' . $url . '" target="_blank">' . BackendStrings::get('settings_lower') . '</a>';
 
         if (!$package) {
             return new WP_Error(
                 'amelia_not_activated',
-                sprintf(' ' . $settingsStrings['plugin_not_activated'], $redirect)
+                sprintf(' ' . BackendStrings::get('plugin_not_activated'), $redirect)
             );
         }
 
@@ -152,21 +144,17 @@ class AutoUpdateHook
      */
     private static function getRemoteInformation($purchaseCode, $envatoTokenEmail)
     {
-        $serverName = (defined('WP_CLI') && WP_CLI) ? php_uname('n') : $_SERVER['SERVER_NAME'];
+        $siteUrl = parse_url(AMELIA_SITE_URL, PHP_URL_HOST);
 
         $request = wp_remote_post(
             AMELIA_STORE_API_URL . 'autoupdate/info',
             [
                 'body' => [
-                    'slug'             => 'ameliabooking',
+                    'slug'             => AMELIA_PLUGIN_SLUG,
                     'purchaseCode'     => trim($purchaseCode),
                     'envatoTokenEmail' => trim($envatoTokenEmail),
-                    'domain'           => self::getDomain(
-                        $serverName
-                    ),
-                    'subdomain'        => self::getSubDomain(
-                        $serverName
-                    )
+                    'domain'           => self::getDomain($siteUrl),
+                    'subdomain'        => self::getSubDomain($siteUrl),
                 ]
             ]
         );
@@ -174,7 +162,20 @@ class AutoUpdateHook
         if ((!is_wp_error($request) || wp_remote_retrieve_response_code($request) === 200) && isset($request['body'])) {
             $body = json_decode($request['body']);
 
-            return $body && isset($body->info) ? unserialize($body->info) : false;
+            if (!$body || !isset($body->info)) {
+                return false;
+            }
+
+            $info = unserialize($body->info);
+
+            if ($info) {
+                // Override the slug with the actual installed folder name so WordPress
+                // recognises the plugin as already installed (not showing "Install Now").
+                // The store API always returns 'ameliabooking' but the folder can differ.
+                $info->slug = dirname(AMELIA_PLUGIN_BASENAME);
+            }
+
+            return $info;
         }
 
         return false;
@@ -231,15 +232,14 @@ class AutoUpdateHook
      */
     public static function isIP($domain)
     {
-
         if (
             preg_match("/^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/", $domain) ||
             preg_match("/^((?:[0-9A-Fa-f]{1,4}))((?::[0-9A-Fa-f]{1,4}))*::((?:[0-9A-Fa-f]{1,4}))((?::[0-9A-Fa-f]{1,4}))*|((?:[0-9A-Fa-f]{1,4}))((?::[0-9A-Fa-f]{1,4})){7}$/", $domain)
         ) {
             return true;
-        } else {
-            return false;
         }
+
+        return false;
     }
 
     /**

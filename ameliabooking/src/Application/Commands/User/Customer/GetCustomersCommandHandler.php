@@ -5,19 +5,21 @@ namespace AmeliaBooking\Application\Commands\User\Customer;
 use AmeliaBooking\Application\Commands\CommandHandler;
 use AmeliaBooking\Application\Commands\CommandResult;
 use AmeliaBooking\Application\Common\Exceptions\AccessDeniedException;
-use AmeliaBooking\Application\Services\User\ProviderApplicationService;
+use AmeliaBooking\Application\Services\CustomField\AbstractCustomFieldApplicationService;
 use AmeliaBooking\Application\Services\User\UserApplicationService;
 use AmeliaBooking\Domain\Collection\Collection;
 use AmeliaBooking\Domain\Common\Exceptions\AuthorizationException;
 use AmeliaBooking\Domain\Common\Exceptions\InvalidArgumentException;
 use AmeliaBooking\Domain\Entity\Entities;
 use AmeliaBooking\Domain\Entity\User\AbstractUser;
+use AmeliaBooking\Domain\Factory\User\UserFactory;
 use AmeliaBooking\Domain\Services\Settings\SettingsService;
 use AmeliaBooking\Infrastructure\Common\Exceptions\QueryExecutionException;
 use AmeliaBooking\Infrastructure\Repository\Booking\Appointment\CustomerBookingRepository;
+use AmeliaBooking\Infrastructure\Repository\CustomField\CustomFieldRepository;
 use AmeliaBooking\Infrastructure\Repository\User\CustomerRepository;
+use AmeliaBooking\Infrastructure\Repository\User\UserRepository;
 use Exception;
-use Interop\Container\Exception\ContainerException;
 use Slim\Exception\ContainerValueNotFoundException;
 
 /**
@@ -34,7 +36,6 @@ class GetCustomersCommandHandler extends CommandHandler
      * @throws InvalidArgumentException
      * @throws ContainerValueNotFoundException
      * @throws QueryExecutionException
-     * @throws ContainerException
      * @throws Exception
      * @throws AccessDeniedException
      */
@@ -73,35 +74,78 @@ class GetCustomersCommandHandler extends CommandHandler
         /** @var CustomerRepository $customerRepository */
         $customerRepository = $this->getContainer()->get('domain.users.customers.repository');
 
+        /** @var UserRepository $userRepository */
+        $userRepository = $this->container->get('domain.users.repository');
+
+        /** @var CustomFieldRepository $customFieldRepository */
+        $customFieldRepository = $this->container->get('domain.customField.repository');
+
         /** @var SettingsService $settingsService */
         $settingsService = $this->container->get('domain.settings.service');
 
-        /** @var ProviderApplicationService $providerAS */
-        $providerAS = $this->container->get('application.user.provider.service');
+        $rolesSettings = $settingsService->getCategorySettings('roles');
 
         $params = $command->getField('params');
 
         $countParams = [];
 
+        $itemsPerPage = !empty($params['limit']) ? (int)$params['limit'] : 10;
+
+        $allowedCustomerIds = null;
+
         if (
-            empty($params['customers']) &&
-            !$command->getPermissionService()->currentUserCanReadOthers(Entities::CUSTOMERS)
+            $currentUser !== null &&
+            $currentUser->getType() === Entities::PROVIDER &&
+            empty($rolesSettings['allowReadAllCustomers'])
         ) {
             /** @var Collection $providerCustomers */
-            $providerCustomers = $providerAS->getAllowedCustomers($currentUser);
+            $providerCustomers = $userRepository->getProviderAllowedCustomers(
+                $currentUser->getId()->getValue()
+            );
 
-            $params['customers'] = array_column($providerCustomers->toArray(), 'id');
+            $allowedCustomerIds = $providerCustomers->keys();
+
+            $params['customers'] = empty($params['customers'])
+                ? $allowedCustomerIds
+                : array_intersect(
+                    array_map('intval', $params['customers']),
+                    $allowedCustomerIds
+                );
 
             $countParams['customers'] = $params['customers'];
         }
-
-        $itemsPerPage = !empty($params['limit']) ?
-            $params['limit'] : $settingsService->getSetting('general', 'itemsPerPageBackEnd');
 
         $users = $customerRepository->getFiltered(
             array_merge($params, ['ignoredBookings' => empty($params['noShow'])]),
             $itemsPerPage
         );
+
+        if (!empty($params['includeCustomers'])) {
+            $includeCustomerIds = $params['includeCustomers'];
+
+            // Apply provider allowlist if restricted
+            if ($allowedCustomerIds !== null) {
+                $includeCustomerIds = array_values(array_intersect(
+                    array_map('intval', $includeCustomerIds),
+                    $allowedCustomerIds
+                ));
+            }
+
+            if (!empty($includeCustomerIds)) {
+                $additionalCustomers = $customerRepository->getFiltered(
+                    [
+                        'customers'       => $includeCustomerIds,
+                        'ignoredBookings' => empty($params['noShow'])
+                    ]
+                );
+
+                foreach ($additionalCustomers as $customerId => $customerData) {
+                    if (!isset($users[$customerId])) {
+                        $users[$customerId] = $customerData;
+                    }
+                }
+            }
+        }
 
         if (!empty($users)) {
             $usersWithBookingsStats = $customerRepository->getFiltered(
@@ -116,7 +160,7 @@ class GetCustomersCommandHandler extends CommandHandler
 
         $customersNoShowCount = [];
 
-        $noShowTagEnabled = $settingsService->getSetting('roles', 'enableNoShowTag');
+        $noShowTagEnabled = $settingsService->isFeatureEnabled('noShowTag');
 
         if ($noShowTagEnabled && $users) {
             /** @var CustomerBookingRepository $bookingRepository */
@@ -130,7 +174,15 @@ class GetCustomersCommandHandler extends CommandHandler
             );
 
             $customersNoShowCount =  $usersIds ? $bookingRepository->countByNoShowStatus($usersIds) : [];
+
+            $customersNoShowCount = $customersNoShowCount ? array_values($customersNoShowCount) : [];
         }
+
+        /** @var AbstractCustomFieldApplicationService $customFieldService */
+        $customFieldService = $this->container->get('application.customField.service');
+
+        /** @var Collection $customFieldsCollection */
+        $customFieldsCollection = $customFieldRepository->getAll([], false);
 
         $users = array_values($users);
 
@@ -139,6 +191,12 @@ class GetCustomersCommandHandler extends CommandHandler
 
             if ($noShowTagEnabled) {
                 $user['noShowCount'] = $customersNoShowCount[$key]['count'];
+            }
+
+            $customFields = [];
+
+            if (!empty($user['customFields'])) {
+                $user['customFields'] = $customFieldService->reformatCustomField(UserFactory::create($user), $customFields, $customFieldsCollection);
             }
 
             $user = array_map(

@@ -11,8 +11,10 @@ use AmeliaBooking\Domain\Repository\Booking\Appointment\AppointmentRepositoryInt
 use AmeliaBooking\Domain\Services\DateTime\DateTimeService;
 use AmeliaBooking\Infrastructure\Common\Exceptions\QueryExecutionException;
 use AmeliaBooking\Infrastructure\Connection;
+use AmeliaBooking\Infrastructure\DB\WPDB\Statement;
 use AmeliaBooking\Infrastructure\Repository\AbstractRepository;
 use AmeliaBooking\Infrastructure\WP\InstallActions\DB\Location\LocationsTable;
+use AmeliaBooking\Domain\ValueObjects\String\BookingStatus;
 
 /**
  * Class AppointmentRepository
@@ -109,6 +111,8 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
      */
     public function getById($id)
     {
+        $locationsTable = LocationsTable::getTableName();
+
         try {
             $statement = $this->connection->prepare(
                 "SELECT
@@ -144,6 +148,7 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
                     cb.duration AS booking_duration,
                     cb.created AS booking_created,
                     cb.tax AS booking_tax,
+                    cb.ivyEntryId AS booking_ivyEntryId,
                     
                     cbe.id AS bookingExtra_id,
                     cbe.extraId AS bookingExtra_extraId,
@@ -173,6 +178,7 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
                     c.discount AS coupon_discount,
                     c.deduction AS coupon_deduction,
                     c.expirationDate AS coupon_expirationDate,
+                    c.startDate AS coupon_startDate,
                     c.limit AS coupon_limit,
                     c.customerLimit AS coupon_customerLimit,
                     c.status AS coupon_status,
@@ -181,7 +187,41 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
                     pc.packageId AS package_customer_packageId,
                     pc.tax AS package_customer_tax,
                     pc.price AS package_customer_price,
-                    pc.couponId AS package_customer_couponId
+                    pc.couponId AS package_customer_couponId,
+                    
+                    s.id AS service_id,
+                    s.name AS service_name,
+                    s.color AS service_color,
+                    s.price AS service_price,
+                    s.timeBefore AS service_timeBefore,
+                    s.timeAfter AS service_timeAfter,
+                    s.aggregatedPrice AS service_aggregatedPrice,
+                    s.pictureFullPath AS service_pictureFullPath,
+                    s.pictureThumbPath AS service_pictureThumbPath,
+                    s.categoryId AS service_categoryId,
+                    
+                    pu.id AS provider_id,
+                    pu.firstname AS provider_firstName,
+                    pu.lastname AS provider_lastName,
+                    pu.email AS provider_email,
+                    pu.pictureFullPath AS provider_pictureFullPath,
+                    pu.pictureThumbPath AS provider_pictureThumbPath,
+                    pu.zoomUserId AS provider_zoomUserId,
+                    
+                    cu.id AS customer_id,
+                    cu.firstname AS customer_firstName,
+                    cu.lastname AS customer_lastName,
+                    cu.email AS customer_email,
+                    cu.note AS customer_note,
+                    cu.phone AS customer_phone,
+                    cu.countryPhoneIso AS customer_countryPhoneIso,
+                    cu.gender AS customer_gender,
+                    cu.status AS customer_status,
+                    cu.birthday AS customer_birthday,
+                    
+                    l.id AS location_id,
+                    l.name AS location_name
+
                 FROM {$this->table} a
                 INNER JOIN {$this->bookingsTable} cb ON cb.appointmentId = a.id
                 LEFT JOIN {$this->packagesCustomersServicesTable} pcs ON pcs.id = cb.packageCustomerServiceId
@@ -192,6 +232,10 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
                     )
                 LEFT JOIN {$this->customerBookingsExtrasTable} cbe ON cbe.customerBookingId = cb.id
                 LEFT JOIN {$this->couponsTable} c ON (pc.couponId IS NOT NULL AND c.id = pc.couponId) OR (c.id = cb.couponId)
+                LEFT JOIN {$this->servicesTable} s ON s.id = a.serviceId
+                LEFT JOIN {$this->usersTable} pu ON pu.id = a.providerId
+                LEFT JOIN {$this->usersTable} cu ON cu.id = cb.customerId
+                LEFT JOIN {$locationsTable} l ON l.id = a.locationId
                 WHERE a.id = :appointmentId
                 ORDER BY cb.id, p.id"
             );
@@ -202,7 +246,7 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find appointment by id in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find appointment by id in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return call_user_func([static::FACTORY, 'createCollection'], $rows)->getItem($id);
@@ -277,13 +321,14 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
                     c.discount AS coupon_discount,
                     c.deduction AS coupon_deduction,
                     c.expirationDate AS coupon_expirationDate,
+                    c.startDate AS coupon_startDate,
                     c.limit AS coupon_limit,
                     c.customerLimit AS coupon_customerLimit,
                     c.status AS coupon_status        
                 FROM {$this->table} a
                 INNER JOIN {$this->bookingsTable} cb ON cb.appointmentId = a.id
-                LEFT JOIN {$this->packagesCustomersTable} pc ON pc.customerId = cb.customerId
                 LEFT JOIN {$this->packagesCustomersServicesTable} pcs ON pcs.id = cb.packageCustomerServiceId
+                LEFT JOIN {$this->packagesCustomersTable} pc ON pc.id = pcs.packageCustomerId
                 LEFT JOIN {$this->paymentsTable} p ON (
                     (p.customerBookingId = cb.id AND cb.packageCustomerServiceId IS NULL) OR
                     (p.packageCustomerId = pc.id AND cb.packageCustomerServiceId IS NOT NULL AND cb.packageCustomerServiceId = pcs.id)
@@ -302,7 +347,7 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find appointment by id in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find appointment by id in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         /** @var Collection $appointments */
@@ -380,6 +425,7 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
                     c.discount AS coupon_discount,
                     c.deduction AS coupon_deduction,
                     c.expirationDate AS coupon_expirationDate,
+                    c.startDate AS coupon_startDate,
                     c.limit AS coupon_limit,
                     c.customerLimit AS coupon_customerLimit,
                     c.status AS coupon_status
@@ -408,7 +454,7 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find appointment by id in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find appointment by id in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         /** @var Collection $appointments */
@@ -420,7 +466,7 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
     /**
      * @param Appointment $entity
      *
-     * @return bool
+     * @return int
      * @throws QueryExecutionException
      */
     public function add($entity)
@@ -475,15 +521,11 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
                 )"
             );
 
-            $res = $statement->execute($params);
-
-            if (!$res) {
-                throw new QueryExecutionException('Unable to add data in ' . __CLASS__);
-            }
+            $statement->execute($params);
 
             return $this->connection->lastInsertId();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to add data in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to add data in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
     }
 
@@ -539,49 +581,11 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
                 WHERE id = :id"
             );
 
-            $res = $statement->execute($params);
+            $statement->execute($params);
 
-            if (!$res) {
-                throw new QueryExecutionException('Unable to save data in ' . __CLASS__);
-            }
-
-            return $res;
+            return true;
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to save data in ' . __CLASS__, $e->getCode(), $e);
-        }
-    }
-
-    /**
-     * @param int $id
-     * @param int $status
-     *
-     * @return mixed
-     * @throws QueryExecutionException
-     */
-    public function updateStatusById($id, $status)
-    {
-        $params = [
-            ':id'     => $id,
-            ':status' => $status
-        ];
-
-        try {
-            $statement = $this->connection->prepare(
-                "UPDATE {$this->table}
-                SET
-                `status` = :status
-                WHERE id = :id"
-            );
-
-            $res = $statement->execute($params);
-
-            if (!$res) {
-                throw new QueryExecutionException('Unable to save data in ' . __CLASS__);
-            }
-
-            return $res;
-        } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to save data in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to save data in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
     }
 
@@ -614,7 +618,7 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find appointments in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find appointments in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         $result = [];
@@ -647,8 +651,8 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
         $params = [];
 
         $where = [
-            "a.status IN ('approved', 'pending')",
-            "cb.status IN ('approved', 'pending')",
+            "a.status IN ('approved', 'pending', 'waiting')",
+            "cb.status IN ('approved', 'pending', 'waiting')",
             "a.bookingStart >= STR_TO_DATE('{$startDateTime}', '%Y-%m-%d %H:%i:%s')",
         ];
 
@@ -740,7 +744,7 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
                 }
             }
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find appointments in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find appointments in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
     }
 
@@ -788,7 +792,7 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find appointments in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find appointments in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return $rows ? array_column($rows, 'serviceId') : [];
@@ -838,7 +842,7 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find appointments in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find appointments in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return $rows ? array_column($rows, 'providerId') : [];
@@ -955,10 +959,21 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
                 $params[':providerId'] = $criteria['providerId'];
             }
 
-            if (array_key_exists('status', $criteria)) {
-                $where[] = 'a.status = :status';
+            if (!empty($criteria['status'])) {
+                if (!is_array($criteria['status'])) {
+                    $criteria['status'] = [$criteria['status']];
+                }
+                $queryStatuses = [];
 
-                $params[':status'] = $criteria['status'];
+                foreach ((array)$criteria['status'] as $index => $value) {
+                    $param = ':status' . $index;
+
+                    $queryStatuses[] = $param;
+
+                    $params[$param] = $value;
+                }
+
+                $where[] = 'a.status IN (' . implode(', ', $queryStatuses) . ')';
             }
 
             if (!empty($criteria['statuses'])) {
@@ -1038,21 +1053,21 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
             }
 
             if (!empty($criteria['packageCustomerServices'])) {
-                $queryLocations = [];
+                $queryPackageCustomerService = [];
 
                 foreach ($criteria['packageCustomerServices'] as $index => $value) {
                     $param = ':packageCustomerServices' . $index;
 
-                    $queryLocations[] = $param;
+                    $queryPackageCustomerService[] = $param;
 
                     $params[$param] = $value;
                 }
 
-                $where[] = 'cb.packageCustomerServiceId IN (' . implode(', ', $queryLocations) . ')';
+                $where[] = 'cb.packageCustomerServiceId IN (' . implode(', ', $queryPackageCustomerService) . ')';
             }
 
             $packagesJoin = '';
-            if (isset($criteria['packageId'])) {
+            if (!empty($criteria['packageId'])) {
                 $where[] = 'pc.packageId = :packageId';
                 $params[':packageId'] = $criteria['packageId'];
 
@@ -1067,6 +1082,23 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
             } elseif (!empty($criteria['joinPackages'])) {
                 $packagesJoin = "LEFT JOIN {$this->packagesCustomersServicesTable} pcs ON pcs.id = cb.packageCustomerServiceId
                                  LEFT JOIN {$this->packagesCustomersTable} pc ON pcs.packageCustomerId = pc.id";
+            }
+
+            $packageCustomersJoin = '';
+            if (!empty($criteria['packageCustomers'])) {
+                $queryPackageCustomers = [];
+
+                foreach ($criteria['packageCustomers'] as $index => $value) {
+                    $param = ':packageCustomer' . $index;
+
+                    $queryPackageCustomers[] = $param;
+
+                    $params[$param] = $value;
+                }
+
+                $where[] = 'pcs.packageCustomerId IN (' . implode(', ', $queryPackageCustomers) . ')';
+
+                $packageCustomersJoin = "LEFT JOIN {$this->packagesCustomersServicesTable} pcs ON pcs.id = cb.packageCustomerServiceId";
             }
 
 
@@ -1102,9 +1134,14 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
                 pu.note AS provider_note,
                 pu.description AS provider_description,
                 pu.phone AS provider_phone,
+                pu.countryPhoneIso AS provider_countryPhoneIso,
                 pu.gender AS provider_gender,
                 pu.translations AS provider_translations,
                 pu.timeZone AS provider_timeZone,
+                pu.badgeId AS provider_badgeId,
+                pu.pictureFullPath AS provider_pictureFullPath,
+                pu.pictureThumbPath AS provider_pictureThumbPath,
+                pu.zoomUserId AS provider_zoomUserId,
             ';
 
             $providersJoin = "INNER JOIN {$this->usersTable} pu ON pu.id = a.providerId";
@@ -1138,6 +1175,7 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
                 cu.email AS customer_email,
                 cu.note AS customer_note,
                 cu.phone AS customer_phone,
+                cu.countryPhoneIso AS customer_countryPhoneIso,
                 cu.gender AS customer_gender,
                 cu.status AS customer_status,
             ';
@@ -1202,6 +1240,7 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
                 c.discount AS coupon_discount,
                 c.deduction AS coupon_deduction,
                 c.expirationDate AS coupon_expirationDate,
+                c.startDate AS coupon_startDate,
                 c.limit AS coupon_limit,
                 c.customerLimit AS coupon_customerLimit,
                 c.status AS coupon_status,
@@ -1241,6 +1280,28 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
 
             $where = $where ? 'WHERE ' . implode(' AND ', $where) : '';
 
+            $order = "ORDER BY a.bookingStart";
+            if (!empty($criteria['sort'])) {
+                $column = $criteria['sort'][0] === '-' ? substr($criteria['sort'], 1) : $criteria['sort'];
+                $orderColumn = 'a.bookingStart';
+                switch ($column) {
+                    case 'id':
+                        $orderColumn = 'a.id';
+                        break;
+                    case 'customer':
+                        $orderColumn = 'CONCAT(cu.firstName, \' \', cu.lastName), a.bookingStart';
+                        break;
+                    case 'service':
+                        $orderColumn = 's.name, a.bookingStart';
+                        break;
+                    case 'created':
+                        $orderColumn = 'cb.created';
+                        break;
+                }
+                $orderDirection = $criteria['sort'][0] === '-' ? 'DESC' : 'ASC';
+                $order = "ORDER BY {$orderColumn} {$orderDirection}, a.id";
+            }
+
             $statement = $this->connection->prepare(
                 "SELECT
                     {$customersFields}
@@ -1271,6 +1332,7 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
                 FROM {$this->table} a
                 {$bookingsJoin}
                 {$packagesJoin}
+                {$packageCustomersJoin}
                 {$customersJoin}
                 {$providersJoin}
                 {$locationsJoin}
@@ -1279,14 +1341,14 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
                 {$bookingExtrasJoin}
                 {$couponsJoin}
                 {$where}
-                ORDER BY a.bookingStart, a.id"
+                {$order}"
             );
 
             $statement->execute($params);
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return call_user_func([static::FACTORY, 'createCollection'], $rows);
@@ -1313,14 +1375,16 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
                 a.microsoftTeamsUrl AS appointment_microsoft_teams_url,
                 a.appleCalendarEventId AS appointment_apple_calendar_event_id,
                 a.notifyParticipants AS appointment_notifyParticipants
-            FROM {$this->table} a WHERE (
-                  SELECT COUNT(*) FROM {$this->bookingsTable} cb WHERE a.id = cb.appointmentId
-                ) = 0"
+                FROM {$this->table} a WHERE NOT EXISTS (
+                  SELECT 1
+                  FROM {$this->bookingsTable} cb
+                  WHERE cb.appointmentId = a.id
+                )"
             );
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find data from ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find data from ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return call_user_func([static::FACTORY, 'createCollection'], $rows);
@@ -1337,6 +1401,20 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
         $params = [];
 
         $where = [];
+
+        if (!empty($criteria['appointments'])) {
+            $queryAppointments = [];
+
+            foreach ((array)$criteria['appointments'] as $index => $value) {
+                $param = ':id' . $index;
+
+                $queryAppointments[] = $param;
+
+                $params[$param] = $value;
+            }
+
+            $where[] = 'a.id IN (' . implode(', ', $queryAppointments) . ')';
+        }
 
         if (!empty($criteria['dates'])) {
             if (isset($criteria['dates'][0], $criteria['dates'][1])) {
@@ -1370,6 +1448,55 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
         }
 
         $whereOr = [];
+        if (!empty($criteria['search'])) {
+            if (!empty($criteria['search']['services'])) {
+                $queryServices = [];
+
+                foreach ((array)$criteria['search']['services'] as $index => $value) {
+                    $param = ':service' . $index;
+
+                    $queryServices[] = $param;
+
+                    $params[$param] = $value;
+                }
+
+                $whereOr[] = 'a.serviceId IN (' . implode(', ', $queryServices) . ')';
+            }
+
+            if (!empty($criteria['search']['providers'])) {
+                $queryProviders = [];
+
+                foreach ((array)$criteria['search']['providers'] as $index => $value) {
+                    $param = ':provider' . $index;
+
+                    $queryProviders[] = $param;
+
+                    $params[$param] = $value;
+                }
+
+                $whereOr[] = 'a.providerId IN (' . implode(', ', $queryProviders) . ')';
+            }
+            if (empty($criteria['skipBookings']) && !empty($criteria['search']['customers'])) {
+                $queryCustomers = [];
+
+                foreach ((array)$criteria['search']['customers'] as $index => $value) {
+                    $param = ':customer' . $index;
+
+                    $queryCustomers[] = $param;
+
+                    $params[$param] = $value;
+                }
+
+                $whereOr[] = 'cb.customerId IN (' . implode(', ', $queryCustomers) . ')';
+            }
+        }
+
+        if (!empty($criteria['searchTerm'])) {
+            $params[':search'] = "%{$criteria['searchTerm']}%";
+
+            $whereOr[] = 'a.id LIKE :search';
+        }
+
         if (!empty($criteria['services'])) {
             $queryServices = [];
 
@@ -1398,6 +1525,20 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
             $where[] = 'a.providerId IN (' . implode(', ', $queryProviders) . ')';
         }
 
+        if (!empty($criteria['locations'])) {
+            $queryLocations = [];
+
+            foreach ((array)$criteria['locations'] as $index => $value) {
+                $param = ':location' . $index;
+
+                $queryLocations[] = $param;
+
+                $params[$param] = $value;
+            }
+
+            $where[] = 'a.locationId IN (' . implode(', ', $queryLocations) . ')';
+        }
+
         $bookingsJoin = "INNER JOIN {$this->bookingsTable} cb ON cb.appointmentId = a.id";
 
         if (!empty($criteria['skipBookings'])) {
@@ -1415,9 +1556,10 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
                 $params[$param] = $value;
             }
 
-            $whereOr[] = 'cb.customerId IN (' . implode(', ', $queryCustomers) . ')';
+            $where[] = 'cb.customerId IN (' . implode(', ', $queryCustomers) . ')';
         }
 
+        // TODO: Redesign - replace 'customerId' parameter with 'customers' on all /appointments calls and remove this part
         if (empty($criteria['skipBookings']) && isset($criteria['customerId'])) {
             $where[] = 'cb.customerId = :customerId';
             $params[':customerId'] = $criteria['customerId'];
@@ -1429,23 +1571,20 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
         }
 
         if (array_key_exists('status', $criteria)) {
-            $where[] = 'a.status = :status';
+            if (!is_array($criteria['status'])) {
+                $criteria['status'] = [$criteria['status']];
+            }
+            $queryStatuses = [];
 
-            $params[':status'] = $criteria['status'];
-        }
+            foreach ((array)$criteria['status'] as $index => $value) {
+                $param = ':status' . $index;
 
-        if (!empty($criteria['locations'])) {
-            $queryLocations = [];
-
-            foreach ((array)$criteria['locations'] as $index => $value) {
-                $param = ':location' . $index;
-
-                $queryLocations[] = $param;
+                $queryStatuses[] = $param;
 
                 $params[$param] = $value;
             }
 
-            $where[] = 'a.locationId IN (' . implode(', ', $queryLocations) . ')';
+            $where[] = 'a.status IN (' . implode(', ', $queryStatuses) . ')';
         }
 
         $limit = $this->getLimit(
@@ -1458,6 +1597,29 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
         }
 
         $where = $where ? 'WHERE ' . implode(' AND ', $where) : '';
+
+        $order = "ORDER BY a.bookingStart";
+        $orderJoins = '';
+        if (!empty($criteria['sort'])) {
+            $column = $criteria['sort'][0] === '-' ? substr($criteria['sort'], 1) : $criteria['sort'];
+            $orderColumn = 'a.bookingStart';
+            switch ($column) {
+                case 'id':
+                    $orderColumn = 'a.id';
+                    break;
+                case 'customer':
+                    $orderColumn = 'CONCAT(u.firstName, \' \', u.lastName), a.bookingStart';
+                    $bookingsJoin = "INNER JOIN {$this->bookingsTable} cb ON cb.appointmentId = a.id";
+                    $orderJoins = "INNER JOIN {$this->usersTable} u ON u.id = cb.customerId";
+                    break;
+                case 'service':
+                    $orderColumn = 's.name, a.bookingStart';
+                    $orderJoins = "INNER JOIN {$this->servicesTable} s ON s.id = a.serviceId";
+                    break;
+            }
+            $orderDirection = $criteria['sort'][0] === '-' ? 'DESC' : 'ASC';
+            $order = "ORDER BY {$orderColumn} {$orderDirection}";
+        }
 
         try {
             $statement = $this->connection->prepare(
@@ -1481,9 +1643,10 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
                     a.parentId AS appointment_parentId
                 FROM {$this->table} a
                 {$bookingsJoin}
+                {$orderJoins}
                 {$where}
                 GROUP BY a.id
-                ORDER BY a.bookingStart, a.id
+                {$order}
                 {$limit}
                 "
             );
@@ -1492,7 +1655,7 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return call_user_func([static::FACTORY, 'createCollection'], $rows);
@@ -1531,7 +1694,6 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
             }
         }
 
-        $whereOr = [];
         if (!empty($criteria['services'])) {
             $queryServices = [];
 
@@ -1560,6 +1722,56 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
             $where[] = 'a.providerId IN (' . implode(', ', $queryProviders) . ')';
         }
 
+        $whereOr = [];
+        if (!empty($criteria['search'])) {
+            if (!empty($criteria['search']['services'])) {
+                $queryServices = [];
+
+                foreach ((array)$criteria['search']['services'] as $index => $value) {
+                    $param = ':service' . $index;
+
+                    $queryServices[] = $param;
+
+                    $params[$param] = $value;
+                }
+
+                $whereOr[] = 'a.serviceId IN (' . implode(', ', $queryServices) . ')';
+            }
+
+            if (!empty($criteria['search']['providers'])) {
+                $queryProviders = [];
+
+                foreach ((array)$criteria['search']['providers'] as $index => $value) {
+                    $param = ':provider' . $index;
+
+                    $queryProviders[] = $param;
+
+                    $params[$param] = $value;
+                }
+
+                $whereOr[] = 'a.providerId IN (' . implode(', ', $queryProviders) . ')';
+            }
+            if (empty($criteria['skipBookings']) && !empty($criteria['search']['customers'])) {
+                $queryCustomers = [];
+
+                foreach ((array)$criteria['search']['customers'] as $index => $value) {
+                    $param = ':customer' . $index;
+
+                    $queryCustomers[] = $param;
+
+                    $params[$param] = $value;
+                }
+
+                $whereOr[] = 'cb.customerId IN (' . implode(', ', $queryCustomers) . ')';
+            }
+        }
+
+        if (!empty($criteria['searchTerm'])) {
+            $params[':search'] = "%{$criteria['searchTerm']}%";
+
+            $whereOr[] = 'a.id LIKE :search';
+        }
+
         if (!empty($criteria['customers'])) {
             $queryCustomers = [];
 
@@ -1571,7 +1783,7 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
                 $params[$param] = $value;
             }
 
-            $whereOr[] = 'cb.customerId IN (' . implode(', ', $queryCustomers) . ')';
+            $where[] = 'cb.customerId IN (' . implode(', ', $queryCustomers) . ')';
         }
 
         if (isset($criteria['customerId'])) {
@@ -1585,9 +1797,20 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
         }
 
         if (array_key_exists('status', $criteria)) {
-            $where[] = 'a.status = :status';
+            if (!is_array($criteria['status'])) {
+                $criteria['status'] = [$criteria['status']];
+            }
+            $queryStatuses = [];
 
-            $params[':status'] = $criteria['status'];
+            foreach ((array)$criteria['status'] as $index => $value) {
+                $param = ':status' . $index;
+
+                $queryStatuses[] = $param;
+
+                $params[$param] = $value;
+            }
+
+            $where[] = 'a.status IN (' . implode(', ', $queryStatuses) . ')';
         }
 
         $customerBookingJoin = !empty($criteria['customers']) || isset($criteria['customerId']) ?
@@ -1612,12 +1835,61 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
 
             $statement->execute($params);
 
-            $rows = $statement->fetch()['count'];
+            $rows = (int)$statement->fetch()['count'];
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return $rows;
+    }
+
+    /**
+     * @return int
+     * @throws QueryExecutionException
+     */
+    public function getAppointmentsCount(): int
+    {
+        return $this->countAppointments();
+    }
+
+    /**
+     * @return int
+     * @throws QueryExecutionException
+     */
+    public function getApprovedAppointmentsCount(): int
+    {
+        return $this->countAppointments(BookingStatus::APPROVED);
+    }
+
+    /**
+     * @param string|null $status
+     *
+     * @return int
+     * @throws QueryExecutionException
+     */
+    private function countAppointments(?string $status = null): int
+    {
+        $sql = "SELECT COUNT(*) AS count FROM {$this->table}";
+
+        $params = [];
+
+        if ($status !== null) {
+            $sql .= ' WHERE status = :status';
+            $params[':status'] = $status;
+        }
+
+        try {
+            $statement = $this->connection->prepare($sql);
+            $statement->execute($params);
+
+            return (int) $statement->fetch()['count'];
+        } catch (\Exception $e) {
+            throw new QueryExecutionException(
+                'Unable to count appointments in ' . __CLASS__ . '. ' . $e->getMessage(),
+                $e->getCode(),
+                $e
+            );
+        }
     }
 
     /**
@@ -1683,7 +1955,7 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
 
             $rows = $statement->fetch()['count'];
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return $rows;
@@ -1728,9 +2000,9 @@ class AppointmentRepository extends AbstractRepository implements AppointmentRep
 
             $statement->execute($params);
 
-            $rows = $statement->fetchAll(\PDO::FETCH_COLUMN);
+            $rows = $statement->fetchAll(Statement::FETCH_COLUMN);
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return !empty($rows) ? $rows[0] : $providerIds[0];

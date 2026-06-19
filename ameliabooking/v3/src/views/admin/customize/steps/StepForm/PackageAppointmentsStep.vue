@@ -1,62 +1,80 @@
 <template>
   <div class="am-fs__pas" :class="props.globalClass">
     <div class="am-fs__pas-service">
-      {{packageServiceSelection.service.name}}
+      {{ packageServiceSelection.service.name }}
     </div>
     <div class="am-fs__pas-msg">
-      {{ `${labelsDisplay('package_appointment_required')}: 1. ${labelsDisplay('package_appointment_remaining')}` }}
+      {{
+        `${labelsDisplay('package_appointment_required')}: 1. ${labelsDisplay(
+          'package_appointment_remaining'
+        )}`
+      }}
     </div>
     <el-form
-        ref="packageFormRef"
-        :rules="rules"
-        :model="packageFormData"
-        label-position="top"
+      ref="packageFormRef"
+      :rules="rules"
+      :model="packageFormData"
+      label-position="top"
     >
       <div class="am-fs__pas-filter">
-        <el-form-item v-if="amCustomize[pageRenderKey].packageAppointmentsStep.options.employee.visibility" :prop="'provider'">
+        <el-form-item
+          v-if="
+            amCustomize[pageRenderKey].packageAppointmentsStep.options.employee
+              .visibility
+          "
+          :prop="'provider'"
+        >
           <template #label>
             <p>{{ `${labelsDisplay('package_appointment_employee')}:` }}</p>
           </template>
           <AmSelect
-              v-model="packageFormData.provider"
-              clearable
-              filterable
-              :placeholder="`${labelsDisplay('package_select_employee')}...`"
-              :fit-input-width="true"
+            v-model="packageFormData.provider"
+            clearable
+            filterable
+            :placeholder="`${labelsDisplay('package_select_employee')}...`"
+            :fit-input-width="true"
           >
             <AmOption
-                v-for="provider in filteredEmployees"
-                :key="provider.id"
-                :value="provider.id"
-                :label="provider.firstName + ' ' + provider.lastName"
+              v-for="provider in filteredEmployees"
+              :key="provider.id"
+              :value="provider.id"
+              :label="provider.firstName + ' ' + provider.lastName"
             >
               <AmOptionTemplate2
-                  :identifier="provider.id"
-                  :label="`${provider.firstName} ${provider.lastName}`"
-                  :dialog-title="labelsDisplay('employee_information_package')"
-                  :dialog-button-text="labelsDisplay('select_this_employee_package')"
-                  :description="provider.description"
+                :identifier="provider.id"
+                :label="`${provider.firstName} ${provider.lastName}`"
+                :dialog-title="labelsDisplay('employee_information_package')"
+                :dialog-button-text="
+                  labelsDisplay('select_this_employee_package')
+                "
+                :description="provider.description"
               ></AmOptionTemplate2>
             </AmOption>
           </AmSelect>
         </el-form-item>
 
-        <el-form-item v-if="amCustomize[pageRenderKey].packageAppointmentsStep.options.location.visibility"  :prop="'location'">
+        <el-form-item
+          v-if="
+            amCustomize[pageRenderKey].packageAppointmentsStep.options.location
+              .visibility
+          "
+          :prop="'location'"
+        >
           <template #label>
             <p>{{ `${labelsDisplay('package_appointment_location')}:` }}</p>
           </template>
           <AmSelect
-              v-model="packageFormData.location"
-              clearable
-              filterable
-              :placeholder="`${labelsDisplay('package_select_location')}...`"
-              :fit-input-width="true"
+            v-model="packageFormData.location"
+            clearable
+            filterable
+            :placeholder="`${labelsDisplay('package_select_location')}...`"
+            :fit-input-width="true"
           >
             <AmOption
-                v-for="location in filteredLocations"
-                :key="location.id"
-                :value="location.id"
-                :label="location.name"
+              v-for="location in filteredLocations"
+              :key="location.id"
+              :value="location.id"
+              :label="location.name"
             ></AmOption>
           </AmSelect>
         </el-form-item>
@@ -70,7 +88,7 @@
     <AmCollapse>
       <AmCollapseItem
         v-for="(appointment, index) in packageServiceSelection.list"
-        :ref="el => packageAppointmentsList[index] = el"
+        :ref="(el) => (packageAppointmentsList[index] = el)"
         :key="index"
         :name="index.toString()"
         class="am-fs__pas-app-items"
@@ -82,13 +100,32 @@
         <template #heading>
           <div class="am-fs__pas-app-heading">
             <span>
-              {{ (index + 1) + '. ' + (appointment.date && appointment.time ? getFrontedFormattedDate(appointment.date) + ' ' + getFrontedFormattedTime(appointment.time) : labelsDisplay('package_appointments_date')) }}
+              {{
+                index +
+                1 +
+                '. ' +
+                (appointment.date && appointment.time
+                  ? getFrontedFormattedDate(appointment.date) +
+                    ' ' +
+                    getFrontedFormattedTime(appointment.time)
+                  : labelsDisplay('package_appointments_date'))
+              }}
             </span>
           </div>
         </template>
         <template #icon-start>
-          <span class="am-fs__pas-app-text" :class="{'am-fs__pas-app-text-selected' : appointment.date && appointment.time}">
-             {{ appointment.date && appointment.time ? labelsDisplay('package_appointments_selected') : labelsDisplay('package_appointments_select') }}
+          <span
+            class="am-fs__pas-app-text"
+            :class="{
+              'am-fs__pas-app-text-selected':
+                appointment.date && appointment.time,
+            }"
+          >
+            {{
+              appointment.date && appointment.time
+                ? labelsDisplay('package_appointments_selected')
+                : labelsDisplay('package_appointments_select')
+            }}
           </span>
         </template>
         <template #default>
@@ -97,9 +134,23 @@
               :id="0"
               :slots="calendarEvents"
               :calendar-minimum-date="moment().format('YYYY-MM-DD hh:mm')"
-              :calendar-maximum-date="moment().add(1,'year').format('YYYY-MM-DD hh:mm')"
-              :time-zone="amCustomize[pageRenderKey].packageAppointmentsStep.options.timeZoneVisibility.visibility"
-              :label-slots-selected="labelsDisplay('package_appointments_slots_selected')"
+              :calendar-maximum-date="
+                moment().add(1, 'year').format('YYYY-MM-DD hh:mm')
+              "
+              :time-zone="
+                features.timeZones &&
+                amCustomize[pageRenderKey].packageAppointmentsStep.options
+                  .timeZoneVisibility.visibility
+              "
+              :show-people-waiting="false"
+              :show-calendar-date-busyness="
+                amCustomize[pageRenderKey].packageAppointmentsStep.options
+                  .calendarDateBusynessVisibility?.visibility ?? true
+              "
+              :label-slots-selected="
+                labelsDisplay('package_appointments_slots_selected')
+              "
+              :busyness="previewCalendarBusyness"
             ></AmAdvancedSlotCalendar>
           </div>
         </template>
@@ -107,43 +158,62 @@
     </AmCollapse>
 
     <div class="am-fs__pas-btn">
-      <AmButton size="medium" category="secondary" type="plain" :prefix="'plus'">
+      <AmButton
+        size="medium"
+        category="secondary"
+        type="plain"
+        :prefix="'plus'"
+      >
         {{ labelsDisplay('package_appointments_add_more') }}
       </AmButton>
     </div>
-
   </div>
 </template>
 
 <script setup>
-import {ref, provide, inject, computed} from "vue";
-import AmCollapse from "../../../../_components/collapse/AmCollapse.vue";
-import AmCollapseItem from "../../../../_components/collapse/AmCollapseItem.vue";
-import AmSelect from "../../../../_components/select/AmSelect.vue";
-import AmOption from "../../../../_components/select/AmOption.vue";
-import AmOptionTemplate2 from "../../../../_components/select/parts/AmOptionTemplate2.vue";
-import AmButton from "../../../../_components/button/AmButton.vue";
-import AmAdvancedSlotCalendar from "../../../../_components/advanced-slot-calendar/AmAdvancedSlotCalendar.vue";
-import { getFrontedFormattedTime, getFrontedFormattedDate } from '../../../../../assets/js/common/date'
-import moment from "moment";
+import { ref, provide, inject, computed } from 'vue'
+import AmCollapse from '../../../../_components/collapse/AmCollapse.vue'
+import AmCollapseItem from '../../../../_components/collapse/AmCollapseItem.vue'
+import AmSelect from '../../../../_components/select/AmSelect.vue'
+import AmOption from '../../../../_components/select/AmOption.vue'
+import AmOptionTemplate2 from '../../../../_components/select/parts/AmOptionTemplate2.vue'
+import AmButton from '../../../../_components/button/AmButton.vue'
+import AmAdvancedSlotCalendar from '../../../../_components/advanced-slot-calendar/AmAdvancedSlotCalendar.vue'
+import {
+  getFrontedFormattedTime,
+  getFrontedFormattedDate,
+} from '../../../../../assets/js/common/date'
+import moment from 'moment'
+import { useReactiveCustomize } from '../../../../../assets/js/admin/useReactiveCustomize.js'
 
 let props = defineProps({
   globalClass: {
     type: String,
-    default: ''
-  }
+    default: '',
+  },
 })
+
+// * Features
+let features = inject('features')
 
 let packageServiceSelection = ref({
   service: {
-    name: 'Service 1'
+    name: 'Service 1',
   },
   list: [
-    {date: moment().format('YYYY-MM-DD'), time: '13:05'},
-    {date: moment().add(3, 'days').format('YYYY-MM-DD'), time: '13:05', isSubstitute: false},
-    {date: '', time: '', isSubstitute: true},
-    {date: moment().add(9, 'days').format('YYYY-MM-DD'), time: '13:05', isSubstitute: true},
-  ]
+    { date: moment().format('YYYY-MM-DD'), time: '13:05' },
+    {
+      date: moment().add(3, 'days').format('YYYY-MM-DD'),
+      time: '13:05',
+      isSubstitute: false,
+    },
+    { date: '', time: '', isSubstitute: true },
+    {
+      date: moment().add(9, 'days').format('YYYY-MM-DD'),
+      time: '13:05',
+      isSubstitute: true,
+    },
+  ],
 })
 
 let calendarEvents = ref([])
@@ -152,14 +222,14 @@ let today = moment().format('YYYY-MM-DD')
 
 for (let i = 0; i <= 31; i++) {
   let block = {
-    display: "background",
+    display: 'background',
     extendedProps: {
-      slots: {'09:00': [7, 3]},
+      slots: { '09:00': [7, 3] },
       slotsAvailable: 1,
-      slotsTotal: 100
+      slotsTotal: 100,
     },
     start: moment(today).add(i, 'd').format('YYYY-MM-DD'),
-    title: "e"
+    title: 'e',
   }
   calendarEvents.value.push(block)
 }
@@ -170,6 +240,7 @@ let calendarEventSlots = ref([])
 let calendarEventSlot = ref('')
 let calendarStartDate = ref(moment().format('YYYY-MM-DD'))
 let calendarChangeSideBar = ref(true)
+let calendarWaitingListSlots = ref([])
 
 provide('calendarEventDate', calendarEventDate)
 provide('calendarServiceDuration', calendarServiceDuration)
@@ -178,6 +249,7 @@ provide('calendarEventSlots', calendarEventSlots)
 provide('calendarEventSlot', calendarEventSlot)
 provide('calendarStartDate', calendarStartDate)
 provide('calendarChangeSideBar', calendarChangeSideBar)
+provide('calendarWaitingListSlots', calendarWaitingListSlots)
 
 /**********
  * Filter *
@@ -187,32 +259,49 @@ let packageFormRef = ref(null)
 
 let packageFormData = ref({
   provider: '',
-  location: ''
+  location: '',
 })
 
 let langKey = inject('langKey')
 let amLabels = inject('labels')
 
-let amCustomize = inject('customize')
+const { amCustomize } = useReactiveCustomize()
 let pageRenderKey = inject('pageRenderKey')
+
+let previewCalendarBusyness = computed(() => {
+  const opts =
+    amCustomize.value[pageRenderKey.value].packageAppointmentsStep.options
+  if (!(opts.calendarDateBusynessVisibility?.visibility ?? true)) {
+    return {}
+  }
+  const base = moment().startOf('day')
+  return {
+    [base.clone().add(6, 'days').format('YYYY-MM-DD')]: 40,
+    [base.clone().add(20, 'days').format('YYYY-MM-DD')]: 82,
+  }
+})
 
 // * Form validation rules
 let rules = computed(() => {
   return {
     provider: [
       {
-        required: amCustomize.value[pageRenderKey.value].packageAppointmentsStep.options.employee.required,
+        required:
+          amCustomize.value[pageRenderKey.value].packageAppointmentsStep.options
+            .employee.required,
         message: labelsDisplay('please_select_employee', 'initStep'),
         trigger: ['blur', 'change'],
-      }
+      },
     ],
     location: [
       {
-        required: amCustomize.value[pageRenderKey.value].packageAppointmentsStep.options.location.required,
+        required:
+          amCustomize.value[pageRenderKey.value].packageAppointmentsStep.options
+            .location.required,
         message: labelsDisplay('please_select_location', 'initStep'),
         trigger: ['blur', 'change'],
-      }
-    ]
+      },
+    ],
   }
 })
 
@@ -223,7 +312,7 @@ let filteredEmployees = ref([
     lastName: 'Doe',
     price: 125,
     pictureThumbPath: '',
-    description: 'This is Jane Doe\'s description'
+    description: "This is Jane Doe's description",
   },
   {
     id: 2,
@@ -231,7 +320,7 @@ let filteredEmployees = ref([
     lastName: 'Doe',
     price: 125,
     pictureThumbPath: '',
-    description: ''
+    description: '',
   },
   {
     id: 3,
@@ -239,31 +328,31 @@ let filteredEmployees = ref([
     lastName: 'Avgust',
     price: 125,
     pictureThumbPath: '',
-    description: ''
-  }
+    description: '',
+  },
 ])
 
 let filteredLocations = ref([
   {
     id: 1,
-    name: 'Location 1'
+    name: 'Location 1',
   },
   {
     id: 2,
-    name: 'Location 2'
+    name: 'Location 2',
   },
   {
     id: 3,
-    name: 'Location 3'
+    name: 'Location 3',
   },
   {
     id: 4,
-    name: 'Location 4'
+    name: 'Location 4',
   },
   {
     id: 5,
-    name: 'Location 5'
-  }
+    name: 'Location 5',
+  },
 ])
 
 /*********
@@ -274,7 +363,7 @@ provide('calendarSlotDuration', calendarSlotDuration)
 
 let packageAppointmentsList = ref([])
 
-function collapseClicked (value) {
+function collapseClicked(value) {
   packageAppointmentsList.value.forEach((item, index) => {
     if (index !== value && item.contentVisibility) {
       item.closingFromParent()
@@ -282,15 +371,19 @@ function collapseClicked (value) {
   })
 }
 
-function selectCalendar () {}
+function selectCalendar() {}
 
 // * Label computed function
-function labelsDisplay (label) {
+function labelsDisplay(label) {
   let computedLabel = computed(() => {
-    return amCustomize.value[pageRenderKey.value].packageAppointmentsStep.translations
-    && amCustomize.value[pageRenderKey.value].packageAppointmentsStep.translations[label]
-    && amCustomize.value[pageRenderKey.value].packageAppointmentsStep.translations[label][langKey.value]
-      ? amCustomize.value[pageRenderKey.value].packageAppointmentsStep.translations[label][langKey.value]
+    return amCustomize.value[pageRenderKey.value].packageAppointmentsStep
+      .translations &&
+      amCustomize.value[pageRenderKey.value].packageAppointmentsStep
+        .translations[label] &&
+      amCustomize.value[pageRenderKey.value].packageAppointmentsStep
+        .translations[label][langKey.value]
+      ? amCustomize.value[pageRenderKey.value].packageAppointmentsStep
+          .translations[label][langKey.value]
       : amLabels[label]
   })
 
@@ -309,7 +402,7 @@ export default {
     finished: false,
     selected: false,
     type: 'packageAppointments',
-  }
+  },
 }
 </script>
 
@@ -330,7 +423,11 @@ export default {
           $count: 5;
           @for $i from 0 through $count {
             &:nth-child(#{$i + 1}) {
-              animation: 600ms cubic-bezier(.45,1,.4,1.2) #{$i*100}ms am-animation-slide-up;
+              animation: 600ms
+                cubic-bezier(0.45, 1, 0.4, 1.2)
+                #{$i *
+                100}ms
+                am-animation-slide-up;
               animation-fill-mode: both;
             }
           }
@@ -358,16 +455,16 @@ export default {
           gap: 12px;
 
           & > div {
-            & > p, & > label > p {
+            & > p,
+            & > label > p {
               font-weight: 500;
               font-size: 15px;
               line-height: 20px;
               /* $shade-900 */
               color: var(--am-c-pas-text);
               margin-bottom: 4px;
-              display: inline
+              display: inline;
             }
-
           }
         }
 
@@ -389,7 +486,7 @@ export default {
               }
 
               &__trigger {
-                padding: 0
+                padding: 0;
               }
             }
           }
@@ -407,7 +504,6 @@ export default {
           }
 
           &-content {
-
             .fc-col-header {
               width: 100%;
             }
@@ -437,7 +533,7 @@ export default {
               color: var(--am-c-pas-success);
             }
             margin-right: 10px;
-            white-space: nowrap
+            white-space: nowrap;
           }
         }
 
@@ -459,13 +555,17 @@ export default {
           $count: 20;
           @for $i from 0 through $count {
             &:nth-child(#{$i + 1}) {
-              animation: 600ms cubic-bezier(.45, 1, .4, 1.2) #{$i*100}ms am-animation-slide-up;
+              animation: 600ms
+                cubic-bezier(0.45, 1, 0.4, 1.2)
+                #{$i *
+                100}ms
+                am-animation-slide-up;
               animation-fill-mode: both;
             }
           }
 
           &__heading {
-            transition-delay: .5s;
+            transition-delay: 0.5s;
 
             &-side {
               transition-delay: 0s;

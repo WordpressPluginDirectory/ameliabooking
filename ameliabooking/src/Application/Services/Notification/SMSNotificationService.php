@@ -1,7 +1,7 @@
 <?php
 
 /**
- * @copyright © TMS-Plugins. All rights reserved.
+ * @copyright © Melograno Ventures. All rights reserved.
  * @licence   See LICENCE.md for license details.
  */
 
@@ -22,7 +22,7 @@ use AmeliaBooking\Infrastructure\Common\Exceptions\QueryExecutionException;
 use AmeliaBooking\Infrastructure\Repository\Notification\NotificationLogRepository;
 use AmeliaBooking\Infrastructure\Repository\Notification\NotificationSMSHistoryRepository;
 use Exception;
-use Interop\Container\Exception\ContainerException;
+use Slim\Exception\ContainerException;
 use Slim\Exception\ContainerValueNotFoundException;
 
 /**
@@ -37,14 +37,15 @@ class SMSNotificationService extends AbstractNotificationService
 
     /** @noinspection MoreThanThreeArgumentsInspection */
     /**
-     * @param array        $appointmentArray
+     * @param array $appointmentArray
      * @param Notification $notification
-     * @param bool         $logNotification
-     * @param int|null     $bookingKey
-     *
+     * @param bool $logNotification
+     * @param int|null $bookingKey
+     * @param null $allBookings
+     * @param array $invoice
+     * @throws InvalidArgumentException
      * @throws NotFoundException
      * @throws QueryExecutionException
-     * @throws ContainerException
      * @throws Exception
      */
     public function sendNotification(
@@ -106,6 +107,12 @@ class SMSNotificationService extends AbstractNotificationService
         );
 
         foreach ($users as $user) {
+            if (!empty($user['phone_country'])) {
+                $allowedCountries = apply_filters('amelia_whitelists_sms_countries', []);
+                if (!empty($allowedCountries) && !in_array(strtoupper($user['phone_country']), $allowedCountries)) {
+                    continue;
+                }
+            }
             if ($user['phone']) {
                 if (!$isCustomerPackage && !empty($data['providersAppointments'][$user['id']])) {
                     $text = $placeholderService->applyPlaceholders(
@@ -150,7 +157,6 @@ class SMSNotificationService extends AbstractNotificationService
                         );
                     }
                 } catch (QueryExecutionException $e) {
-                } catch (ContainerException $e) {
                 }
             }
         }
@@ -209,7 +215,7 @@ class SMSNotificationService extends AbstractNotificationService
             try {
                 $data = json_decode($undeliveredNotification->getData()->getValue(), true);
 
-                if ($history = $notificationsSMSHistoryRepo->getById($data['historyId'])) {
+                if ($history = $notificationsSMSHistoryRepo->getItemById($data['historyId'])) {
                     $apiResponse = $smsApiService->send(
                         $history['phone'],
                         $data['body'],
@@ -310,7 +316,7 @@ class SMSNotificationService extends AbstractNotificationService
 
                         if (empty($smsData['skipSending'])) {
                             $apiResponse = $smsApiService->send(
-                                $smsData['customer_phone'],
+                                $smsData['to'],
                                 $smsData['text'],
                                 AMELIA_ACTION_URL . '/notifications/sms/history/' . $historyId
                             );
@@ -467,9 +473,30 @@ class SMSNotificationService extends AbstractNotificationService
         /** @var SMSAPIService $smsApiService */
         $smsApiService = $this->container->get('application.smsApi.service');
 
+        $smsData = apply_filters(
+            'amelia_manipulate_sms_data',
+            [
+                'text' => $data['body'],
+                'to'   => $data['sendTo']
+            ]
+        );
+
+        $data = array_merge(
+            $data,
+            [
+                'text' => $data['body'],
+                'to'   => $data['sendTo']
+            ],
+            is_array($smsData) ? $smsData : []
+        );
+
+        if (!empty($data['skipSending'])) {
+            return;
+        }
+
         $apiResponse = $smsApiService->send(
-            $data['sendTo'],
-            $data['body'],
+            $data['to'],
+            $data['text'],
             AMELIA_ACTION_URL . '/notifications/sms/history/' . $data['historyId']
         );
 

@@ -76,7 +76,12 @@
           :key="range"
           class="am-fs__bringing-content-text am-fs__bringing-content-price-text"
           :class="{'am-fs__bringing-content-price-text-selected': selectedGroup(item.from, item.to)}"
+          tabindex="0"
+          role="button"
+          :aria-label="`${item.from === item.to ? item.from : item.from + ' - ' + item.to }: ${item.prices[0] === item.prices[1] ? useFormattedPrice(item.prices[0]) : useFormattedPrice(item.prices[0])  + ' - ' + useFormattedPrice(item.prices[1])}`"
           @click="rangeSelected(item.from)"
+          @keydown.enter="rangeSelected(item.from)"
+          @keydown.space.prevent="rangeSelected(item.from)"
         >
           <span class="am-icon-users"></span>
           <span>{{item.from === item.to ? item.from : item.from + ' - ' + item.to }}</span>
@@ -154,6 +159,12 @@ const globalLabels = inject('labels')
 // * Customize
 const amCustomize = inject('amCustomize')
 
+let { bringingAnyoneOptions } = inject('bringingOptions', ref({
+  availability: false,
+  min: 0,
+  max: 1,
+}))
+
 // * Package
 let packagesOptions = computed(() =>
   store.getters['entities/filteredPackages'](
@@ -168,11 +179,7 @@ provide('packagesVisibility', packagesVisibility)
 let amLabels = computed(() => {
   let computedLabels = reactive({ ...globalLabels })
 
-  if (
-    amSettings.customizedData &&
-    amSettings.customizedData.sbsNew &&
-    amSettings.customizedData.sbsNew.bringingAnyone.translations
-  ) {
+  if (amSettings.customizedData?.sbsNew?.bringingAnyone?.translations) {
     let customizedLabels =
       amSettings.customizedData.sbsNew.bringingAnyone.translations
     Object.keys(customizedLabels).forEach((labelKey) => {
@@ -226,7 +233,6 @@ let employeesServices = computed(() => store.getters['entities/getEmployeeServic
 
 let options = computed(() => {
   if (props.inPopup) {
-    let { bringingAnyoneOptions } = inject('bringingOptions')
     return bringingAnyoneOptions.value
   }
 
@@ -296,8 +302,10 @@ let personPricing = computed(() => {
     store.commit('booking/setBookingPersons', maxCapacity)
   }
 
+  let additionalOffset = amSettings.appointments.bringingAnyoneLogic === 'additional' ? 1 : 0
+
   Object.keys(service.customPricing.persons).forEach((key) => {
-    if (service.customPricing.persons[key].from in allowedRanges && service.customPricing.persons[key].from <= options.value.max) {
+    if (service.customPricing.persons[key].from in allowedRanges && service.customPricing.persons[key].from <= options.value.max + additionalOffset) {
       ranges[service.customPricing.persons[key].from] = {from: service.customPricing.persons[key].from, to: parseInt(key), prices: []}
     }
   })
@@ -414,6 +422,11 @@ export default {
           border-radius: 8px;
           display: inline-block;
           margin: 3px 0 0 3px;
+
+          &:focus {
+            outline: none;
+            border-color: var(--am-c-ps-primary);
+          }
 
           span {
             margin: 3px;

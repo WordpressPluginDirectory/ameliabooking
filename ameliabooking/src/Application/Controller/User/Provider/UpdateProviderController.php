@@ -6,7 +6,7 @@ use AmeliaBooking\Application\Commands\CommandResult;
 use AmeliaBooking\Application\Commands\User\Provider\UpdateProviderCommand;
 use AmeliaBooking\Application\Controller\Controller;
 use AmeliaBooking\Domain\Events\DomainEventBus;
-use Slim\Http\Request;
+use AmeliaVendor\Psr\Http\Message\ServerRequestInterface as Request;
 
 /**
  * Class UpdateProviderController
@@ -38,15 +38,19 @@ class UpdateProviderController extends Controller
         'serviceList',
         'weekDayList',
         'specialDayList',
+        'removedSpecialDayList',
         'timeOutList',
         'periodList',
         'dayOffList',
+        'removedDayOffList',
         'pictureFullPath',
         'pictureThumbPath',
         'zoomUserId',
         'appleCalendarId',
+        'googleCalendarId',
         'googleCalendar',
         'outlookCalendar',
+        'outlookCalendarId',
         'password',
         'sendEmployeePanelAccessEmail',
         'translations',

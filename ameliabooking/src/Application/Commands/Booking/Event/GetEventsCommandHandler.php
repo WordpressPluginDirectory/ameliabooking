@@ -6,24 +6,18 @@ use AmeliaBooking\Application\Commands\CommandHandler;
 use AmeliaBooking\Application\Commands\CommandResult;
 use AmeliaBooking\Application\Common\Exceptions\AccessDeniedException;
 use AmeliaBooking\Application\Services\Booking\EventApplicationService;
-use AmeliaBooking\Application\Services\Reservation\EventReservationService;
+use AmeliaBooking\Application\Services\User\ProviderApplicationService;
 use AmeliaBooking\Application\Services\User\UserApplicationService;
 use AmeliaBooking\Domain\Collection\Collection;
 use AmeliaBooking\Domain\Common\Exceptions\AuthorizationException;
 use AmeliaBooking\Domain\Common\Exceptions\InvalidArgumentException;
 use AmeliaBooking\Domain\Entity\Booking\Appointment\CustomerBooking;
-use AmeliaBooking\Domain\Entity\Booking\Event\CustomerBookingEventTicket;
 use AmeliaBooking\Domain\Entity\Booking\Event\Event;
 use AmeliaBooking\Domain\Entity\Booking\Event\EventPeriod;
-use AmeliaBooking\Domain\Entity\Booking\Event\EventTicket;
 use AmeliaBooking\Domain\Entity\Entities;
 use AmeliaBooking\Domain\Entity\User\AbstractUser;
-use AmeliaBooking\Domain\Entity\User\Provider;
 use AmeliaBooking\Domain\Factory\Booking\Event\EventPeriodFactory;
-use AmeliaBooking\Domain\Services\DateTime\DateTimeService;
 use AmeliaBooking\Domain\Services\Settings\SettingsService;
-use AmeliaBooking\Domain\ValueObjects\Number\Integer\IntegerValue;
-use AmeliaBooking\Domain\ValueObjects\String\BookingStatus;
 use AmeliaBooking\Infrastructure\Common\Exceptions\QueryExecutionException;
 use AmeliaBooking\Infrastructure\Repository\Booking\Appointment\CustomerBookingRepository;
 use AmeliaBooking\Infrastructure\Repository\Booking\Event\EventRepository;
@@ -53,29 +47,37 @@ class GetEventsCommandHandler extends CommandHandler
 
         /** @var SettingsService $settingsDS */
         $settingsDS = $this->container->get('domain.settings.service');
-        /** @var EventReservationService $reservationService */
-        $reservationService = $this->container->get('application.reservation.service')->get(Entities::EVENT);
         /** @var EventRepository $eventRepository */
         $eventRepository = $this->container->get('domain.booking.event.repository');
         /** @var UserApplicationService $userAS */
         $userAS = $this->container->get('application.user.service');
         /** @var EventApplicationService $eventAS */
         $eventAS = $this->container->get('application.booking.event.service');
+        /** @var ProviderApplicationService $providerAS */
+        $providerAS = $this->container->get('application.user.provider.service');
+
 
         $params = $command->getField('params');
 
         /** @var AbstractUser|null $user */
         $user = null;
 
-        $isFrontEnd = isset($params['page']) && empty($params['group']);
+        // Cabinet requests (source=cabinet-provider/customer) use page for *pagination*,
+        // not to signal a frontend booking-form context. Without this guard, sending
+        // page=1 from a provider JWT makes $isFrontEnd=true, which skips the auth block,
+        // clears provider scoping, and adds show=1 — exposing all published events.
+        $isCabinetPage = $command->getPage() === 'cabinet';
+
+        $isFrontEnd = isset($params['page']) && empty($params['group']) && !$isCabinetPage;
+
+        $fetchBookings = !$isFrontEnd && (
+            !isset($params['bookings']) || filter_var($params['bookings'], FILTER_VALIDATE_BOOLEAN)
+        );
 
         $isCalendarPage = $isFrontEnd && (int)$params['page'] === 0;
 
-        $isCabinetPage = $command->getPage() === 'cabinet';
-
         if (!$isFrontEnd) {
             try {
-                /** @var AbstractUser $user */
                 $user = $command->getUserApplicationService()->authorization(
                     $isCabinetPage ? $command->getToken() : null,
                     $command->getCabinetType()
@@ -120,126 +122,194 @@ class GetEventsCommandHandler extends CommandHandler
             }
         }
 
+        if (isset($params['range']) && $isFrontEnd) {
+            if ($params['range'] === 'future') {
+                $startDate = date('Y-m-d 00:00:00');
+
+                // Date filter is selected on the frontend,
+                // so if the provided date is in the past,
+                // we can return empty result right away
+                if (!empty($params['dates'][0]) && $params['dates'][0] < $startDate) {
+                    $result->setResult(CommandResult::RESULT_SUCCESS);
+                    $result->setData(
+                        [
+                            Entities::EVENTS       => [],
+                            'count'                => 0,
+                            'countTotal'           => 0,
+                            'customersNoShowCount' => []
+                        ]
+                    );
+                    return $result;
+                }
+
+                // Date filter selected and date is in future or present.
+                // Intentionally discard any user-provided end date because a
+                // "future" widget has no upper bound.
+                if (!empty($params['dates'][0])) {
+                    $params['dates'][1] = null;
+                }
+
+                // Date filter not selected
+                if (empty($params['dates'][0])) {
+                    $params['dates'][0] = $startDate;
+                    $params['dates'][1] = null;
+                }
+            }
+
+            if ($params['range'] === 'past') {
+                $endDate = date('Y-m-d 23:59:59', strtotime('-1 day'));
+
+                // Date filter is selected on the frontend,
+                // so if the provided date is in the future,
+                // we can return empty result right away
+                if (!empty($params['dates'][0]) && $params['dates'][0] > $endDate) {
+                    $result->setResult(CommandResult::RESULT_SUCCESS);
+                    $result->setData(
+                        [
+                            Entities::EVENTS       => [],
+                            'count'                => 0,
+                            'countTotal'           => 0,
+                            'customersNoShowCount' => []
+                        ]
+                    );
+                    return $result;
+                }
+
+                // Date filter selected and date is in past
+                if (!empty($params['dates'][0])) {
+                    $params['dates'][1] = $endDate;
+                }
+
+                // Date filter not selected
+                if (empty($params['dates'][0])) {
+                    $params['dates'][0] = null;
+                    $params['dates'][1] = $endDate;
+                }
+            }
+
+            if (is_array($params['range'])) {
+                $startDate = !empty($params['range'][0]) ? $params['range'][0] . ' 00:00:00' : null;
+                $endDate = !empty($params['range'][1]) ? $params['range'][1] . ' 23:59:59' : null;
+
+                // Date filter is selected on the frontend,
+                // so if the provided date is out of range,
+                // we can return empty result right away
+                if (!empty($params['dates'][0]) && ($params['dates'][0] < $startDate || $params['dates'][0] > $endDate)) {
+                    $result->setResult(CommandResult::RESULT_SUCCESS);
+                    $result->setData(
+                        [
+                            Entities::EVENTS       => [],
+                            'count'                => 0,
+                            'countTotal'           => 0,
+                            'customersNoShowCount' => []
+                        ]
+                    );
+
+                    return $result;
+                }
+
+                // Date filter selected and date is in range
+                if (!empty($params['dates'][0])) {
+                    $params['dates'][1] = $endDate;
+                }
+
+                // Date filter not selected
+                if (empty($params['dates'][0])) {
+                    $params['dates'][0] = $startDate;
+                    $params['dates'][1] = $endDate;
+                }
+            }
+        }
+
         $criteria = [
             'fetchEventsPeriods'    => true,
             'fetchEventsTickets'    => true,
             'fetchEventsTags'       => $isFrontEnd,
-            'fetchEventsProviders'  => ($isFrontEnd || $command->getPage() === 'calendar'),
-            'fetchEventsImages'     => $isFrontEnd,
-            'fetchBookings'         => true,
-            'fetchBookingsTickets'  => true,
-            'fetchBookingsCoupons'  => $isCabinetPage,
-            'fetchBookingsPayments' => $isCabinetPage,
-            'fetchBookingsUsers'    => $isCabinetPage,
+            'fetchEventsProviders'  => true,
+            'fetchEventsOrganizer'  => true,
+            'fetchEventsImages'     => true,
+            'fetchBookings'         => $fetchBookings,
+            'fetchBookingsTickets'  => $fetchBookings,
+            'fetchBookingsCoupons'  => $fetchBookings && $isCabinetPage,
+            'fetchBookingsPayments' => $fetchBookings && $isCabinetPage,
+            'fetchBookingsUsers'    => $fetchBookings && $isCabinetPage,
+            'fetchOccupancy'        => !$fetchBookings,
         ];
 
         /** @var Collection $events */
         $events = $eventAS->getEventsByCriteria(
             $params,
             $criteria,
-            $isFrontEnd
-                ? (!empty($params['limit']) ? $params['limit'] : $settingsDS->getSetting('general', 'itemsPerPage'))
-                : $settingsDS->getSetting('general', 'itemsPerPageBackEnd')
+            !empty($params['limit'])
+                ? $params['limit']
+                : ($isFrontEnd ? $settingsDS->getSetting('general', 'itemsPerPage') : 10)
         );
 
-        $popupEventId = !empty($params['idPopup']) ? $params['idPopup'] : null;
+        $selectedEventIds = [];
 
-        /** @var Collection $requestedEvents */
-        $requestedEvents = $popupEventId && !$events->keyExists($popupEventId) ? $eventAS->getEventsByCriteria(
-            array_merge($params, ['id' => [$popupEventId]]),
-            $criteria,
-            1
-        ) : new Collection();
-
-        foreach ($requestedEvents->getItems() as $event) {
-            $events->placeItem($event, $event->getId()->getValue(), true);
+        if (!empty($params['idPopup']) && !$events->keyExists($params['idPopup'])) {
+            $selectedEventIds = [$params['idPopup']];
+        } elseif (!empty($params['ids'])) {
+            $missingIds = array_values(array_diff(array_map('intval', $params['ids']), $events->keys()));
+            if (!empty($missingIds)) {
+                $selectedEventIds = $missingIds;
+            }
         }
 
-        $currentDateTime = DateTimeService::getNowDateTimeObject();
+        /** @var Collection $requestedEvents */
+        $requestedEvents = !empty($selectedEventIds) ? $eventAS->getEventsByCriteria(
+            ['id' => $selectedEventIds, 'search' => !empty($params['search']) ? $params['search'] : null],
+            $criteria,
+            0
+        ) : new Collection();
+
+        $existingSeriesIds = [];
+        /** @var Event $existingEvent */
+        foreach ($events->getItems() as $existingEvent) {
+            $seriesId = $existingEvent->getParentId()
+                ? $existingEvent->getParentId()->getValue()
+                : $existingEvent->getId()->getValue();
+            $existingSeriesIds[$seriesId] = $existingEvent->getId()->getValue();
+        }
+
+        $replacedEventIds = [];
+
+        foreach ($requestedEvents->getItems() as $event) {
+            if ($events->keyExists($event->getId()->getValue())) {
+                continue;
+            }
+
+            $requestedSeriesId = $event->getParentId()
+                ? $event->getParentId()->getValue()
+                : $event->getId()->getValue();
+            if (!empty($existingSeriesIds[$requestedSeriesId]) && !empty($params['skipRecurring'])) {
+                $replacedEventIds[$event->getId()->getValue()] = $existingSeriesIds[$requestedSeriesId];
+                continue;
+            }
+
+            $events->prependItem($event, $event->getId()->getValue(), true);
+        }
 
         $eventsArray = [];
 
         $customersNoShowCountIds = [];
 
-        $noShowTagEnabled = $settingsDS->getSetting('roles', 'enableNoShowTag');
+        $noShowTagEnabled = $settingsDS->isFeatureEnabled('noShowTag');
 
         /** @var Event $event */
         foreach ($events->getItems() as $event) {
+            // this would affect paging on frontend, should be done in the database?
             if ($isFrontEnd && !$event->getShow()->getValue()) {
                 continue;
-            }
-
-            $persons = 0;
-
-            if ($event->getCustomPricing()->getValue()) {
-                /** @var CustomerBooking $booking */
-                foreach ($event->getBookings()->getItems() as $booking) {
-                    /** @var CustomerBookingEventTicket $bookedTicket */
-                    foreach ($booking->getTicketsBooking()->getItems() as $bookedTicket) {
-                        /** @var EventTicket $ticket */
-                        $ticket = $event->getCustomTickets()->getItem($bookedTicket->getEventTicketId()->getValue());
-
-                        $ticket->setSold(
-                            new IntegerValue(
-                                ($ticket->getSold() ? $ticket->getSold()->getValue() : 0) +
-                                ($booking->getStatus()->getValue() === BookingStatus::APPROVED || $booking->getStatus()->getValue() === BookingStatus::PENDING ?
-                                    $bookedTicket->getPersons()->getValue() : 0)
-                            )
-                        );
-
-                        $ticket->setWaiting(
-                            new IntegerValue(
-                                ($ticket->getWaiting() ? $ticket->getWaiting()->getValue() : 0) +
-                                ($booking->getStatus()->getValue() === BookingStatus::WAITING ?
-                                    $bookedTicket->getPersons()->getValue() : 0)
-                            )
-                        );
-                    }
-
-                    if ($noShowTagEnabled) {
-                        $customersNoShowCountIds[] = $booking->getCustomerId()->getValue();
-                    }
-                }
-
-                $maxCapacity = 0;
-
-                $event->setCustomTickets($eventAS->getTicketsPriceByDateRange($event->getCustomTickets()));
-
-                /** @var EventTicket $ticket */
-                foreach ($event->getCustomTickets()->getItems() as $ticket) {
-                    $maxCapacity += $ticket->getSpots()->getValue();
-
-                    $persons += ($ticket->getSold() ? $ticket->getSold()->getValue() : 0);
-                }
-
-                $event->setMaxCapacity($event->getMaxCustomCapacity() ?: new IntegerValue($maxCapacity));
-            } else {
-                /** @var CustomerBooking $booking */
-                foreach ($event->getBookings()->getItems() as $booking) {
-                    if ($booking->getStatus()->getValue() === BookingStatus::APPROVED || $booking->getStatus()->getValue() === BookingStatus::PENDING) {
-                        $persons += $booking->getPersons()->getValue();
-                    }
-
-                    if ($noShowTagEnabled) {
-                        $customersNoShowCountIds[] = $booking->getCustomerId()->getValue();
-                    }
-                }
             }
 
             if (
                 ($isFrontEnd && $settingsDS->getSetting('general', 'showClientTimeZone')) ||
                 $isCabinetPage || ($user && $user->getType() === AbstractUser::USER_ROLE_PROVIDER)
             ) {
-                $timeZone = 'UTC';
-
-                if (!empty($params['timeZone'])) {
-                    $timeZone = $params['timeZone'];
-                } elseif (
-                    $user instanceof Provider &&
-                    empty($user->getTimeZone()) && !empty(get_option('timezone_string'))
-                ) {
-                    $timeZone = get_option('timezone_string');
-                }
+                $timeZone = !empty($params['timeZone'])
+                    ? $params['timeZone']
+                    : ($user && $user->getType() === Entities::PROVIDER ? $providerAS->getTimeZone($user) : 'UTC');
 
                 /** @var EventPeriod $period */
                 foreach ($event->getPeriods()->getItems() as $period) {
@@ -248,64 +318,7 @@ class GetEventsCommandHandler extends CommandHandler
                 }
             }
 
-            $bookingOpens = $event->getBookingOpens() ?
-                $event->getBookingOpens()->getValue() : $event->getCreated()->getValue();
-
-            $bookingCloses = $event->getBookingCloses() ?
-                $event->getBookingCloses()->getValue() : $event->getPeriods()->getItem(0)->getPeriodStart()->getValue();
-
-            $minimumCancelTimeInSeconds = $settingsDS
-                ->getEntitySettings($event->getSettings())
-                ->getGeneralSettings()
-                ->getMinimumTimeRequirementPriorToCanceling();
-
-            $minimumCancelTime = DateTimeService::getCustomDateTimeObject(
-                $event->getPeriods()->getItem(0)->getPeriodStart()->getValue()->format('Y-m-d H:i:s')
-            )->modify("-{$minimumCancelTimeInSeconds} seconds");
-
-            $minimumReached = null;
-            if ($event->getCloseAfterMin() !== null && $event->getCloseAfterMinBookings() !== null) {
-                if ($event->getCloseAfterMinBookings()->getValue()) {
-                    $approvedBookings = array_filter(
-                        $event->getBookings()->toArray(),
-                        function ($value) {
-                            return $value['status'] === 'approved';
-                        }
-                    );
-                    $minimumReached   = count($approvedBookings) >= $event->getCloseAfterMin()->getValue();
-                } else {
-                    $minimumReached = $persons >= $event->getCloseAfterMin()->getValue();
-                }
-            }
-
-            $peopleWaiting = false;
-            $eventSettings = $event->getSettings() ? json_decode($event->getSettings()->getValue(), true) : null;
-
-            if ($eventSettings && !empty($eventSettings['waitingList']) && $eventSettings['waitingList']['enabled']) {
-                foreach ($event->getBookings()->getItems() as $booking) {
-                    if ($booking->getStatus()->getValue() === BookingStatus::WAITING) {
-                        $peopleWaiting = true;
-                        break;
-                    }
-                }
-            }
-
-            $eventsInfo = [
-                'bookable'   => $reservationService->isBookable($event, null, $currentDateTime) && !$minimumReached,
-                'cancelable' =>
-                    $currentDateTime <= $minimumCancelTime &&
-                    (
-                        $event->getStatus()->getValue() === BookingStatus::APPROVED ||
-                        $event->getStatus()->getValue() === BookingStatus::PENDING
-                    ),
-                'opened'     => ($currentDateTime > $bookingOpens) && ($currentDateTime < $bookingCloses),
-                'closed'     => $currentDateTime > $bookingCloses || $minimumReached,
-                'places'     => $event->getMaxCapacity()->getValue() - $persons,
-                'upcoming'   => $currentDateTime < $bookingOpens && $event->getStatus()->getValue() === BookingStatus::APPROVED,
-                'full'       => ($event->getMaxCapacity()->getValue() <= $persons
-                                  && $currentDateTime < $event->getPeriods()->getItem(0)->getPeriodStart()->getValue())
-                                  || ($peopleWaiting && !($currentDateTime > $bookingCloses || $minimumReached))
-            ];
+            $eventsInfo = $eventAS->getEventInfo($event, $isFrontEnd);
 
             if ($isFrontEnd) {
                 $event->setBookings(new Collection());
@@ -340,7 +353,49 @@ class GetEventsCommandHandler extends CommandHandler
                 continue;
             }
 
-            $eventsArray[] = array_merge($event->toArray(), $eventsInfo);
+            /** @var CustomerBooking $booking */
+            foreach ($event->getBookings()->getItems() as $booking) {
+                if ($noShowTagEnabled) {
+                    $customersNoShowCountIds[] = $booking->getCustomerId()->getValue();
+                }
+            }
+
+            $eventArray = $event->toArray();
+
+            $eventArray['staff'] = array_map(
+                function ($provider) use ($providerAS) {
+                    return [
+                        'id' => $provider['id'],
+                        'firstName' => $provider['firstName'],
+                        'lastName' => $provider['lastName'],
+                        'picture' => $provider['pictureThumbPath'],
+                        'badge' => $providerAS->getBadge($provider['badgeId'])
+                    ];
+                },
+                $eventArray['providers']
+            );
+
+            // TODO - Redesign: Check if providers can be removed
+            // unset($eventArray['providers']);
+
+            if (!empty($eventArray['organizerId'])) {
+                $eventArray['organizer'] = [
+                    'id' => $eventArray['organizerId'],
+                    'firstName' => !empty($eventArray['organizer']) ? $eventArray['organizer']['firstName'] : '',
+                    'lastName' => !empty($eventArray['organizer']) ? $eventArray['organizer']['lastName'] : '',
+                    'picture' => !empty($eventArray['organizer']) ? $eventArray['organizer']['pictureThumbPath'] : '',
+                    'badge' => !empty($eventArray['organizer']) ? $providerAS->getBadge($eventArray['organizer']['badgeId']) : null
+                ];
+            }
+
+            usort(
+                $eventArray['gallery'],
+                function ($picture1, $picture2) {
+                    return $picture1['position'] <=> $picture2['position'];
+                }
+            );
+
+            $eventsArray[] = array_merge($eventArray, $eventsInfo);
         }
 
         $customersNoShowCount = [];
@@ -361,8 +416,10 @@ class GetEventsCommandHandler extends CommandHandler
         $result->setData(
             [
                 Entities::EVENTS       => $eventsArray,
-                'count'                => !$isCalendarPage && empty($params['skipCount']) ? (int)$eventRepository->getFilteredIdsCount($params) : null,
-                'customersNoShowCount' => $customersNoShowCount
+                'count'                => !$isCalendarPage && empty($params['skipCount']) ? (int)sizeof($eventRepository->getFilteredIds($params, 0)) : null,
+                'countTotal'           => !$isCalendarPage && empty($params['skipCount']) ? (int)sizeof($eventRepository->getFilteredIds([], 0)) : null,
+                'customersNoShowCount' => $customersNoShowCount ? array_values($customersNoShowCount) : [],
+                'replacedEventIds'     => !empty($replacedEventIds) ? $replacedEventIds : null,
             ]
         );
 

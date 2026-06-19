@@ -7,7 +7,7 @@ use AmeliaBooking\Application\Commands\CommandResult;
 use AmeliaBooking\Application\Controller\Controller;
 use AmeliaBooking\Domain\Events\DomainEventBus;
 use RuntimeException;
-use Slim\Http\Request;
+use AmeliaVendor\Psr\Http\Message\ServerRequestInterface as Request;
 
 /**
  * Class UpdateEventController
@@ -40,6 +40,8 @@ class UpdateEventController extends Controller
         'providers',
         'tags',
         'description',
+        'pictureFullPath',
+        'pictureThumbPath',
         'gallery',
         'color',
         'show',

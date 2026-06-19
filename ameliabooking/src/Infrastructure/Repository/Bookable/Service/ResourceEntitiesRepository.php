@@ -1,7 +1,7 @@
 <?php
 
 /**
- * @copyright © TMS-Plugins. All rights reserved.
+ * @copyright © Melograno Ventures. All rights reserved.
  * @licence   See LICENCE.md for license details.
  */
 
@@ -32,7 +32,7 @@ class ResourceEntitiesRepository extends AbstractRepository
     /**
      * @param array $entity
      *
-     * @return bool
+     * @return int
      * @throws QueryExecutionException
      */
     public function add($entity)
@@ -58,15 +58,11 @@ class ResourceEntitiesRepository extends AbstractRepository
                 )"
             );
 
-            $result = $statement->execute($params);
-
-            if (!$result) {
-                throw new QueryExecutionException('Unable to add data in ' . __CLASS__);
-            }
+            $statement->execute($params);
 
             return $this->connection->lastInsertId();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to add data in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to add data in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
     }
 
@@ -97,13 +93,9 @@ class ResourceEntitiesRepository extends AbstractRepository
                 id = :id"
             );
 
-            $result = $statement->execute($params);
-
-            if (!$result) {
-                throw new QueryExecutionException('Unable to save data in ' . __CLASS__);
-            }
+            $statement->execute($params);
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to save data in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to save data in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
     }
 
@@ -128,7 +120,7 @@ class ResourceEntitiesRepository extends AbstractRepository
 
             $entityRows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to get entities in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to get entities in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return $entityRows;
@@ -153,9 +145,10 @@ class ResourceEntitiesRepository extends AbstractRepository
                 "DELETE FROM {$this->table} WHERE entityId = :entityId AND entityType = :entityType"
             );
 
-            return $statement->execute($params);
+            $statement->execute($params);
+            return true;
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to delete entities in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to delete entities in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
     }
 
@@ -180,9 +173,10 @@ class ResourceEntitiesRepository extends AbstractRepository
                 "DELETE FROM {$this->table} WHERE entityId = :entityId AND entityType = :entityType AND resourceId = :resourceId"
             );
 
-            return $statement->execute($params);
+            $statement->execute($params);
+            return true;
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to delete entities in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to delete entities in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
     }
 }

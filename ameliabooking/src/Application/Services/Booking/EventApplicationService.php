@@ -4,6 +4,7 @@ namespace AmeliaBooking\Application\Services\Booking;
 
 use AmeliaBooking\Application\Services\Gallery\GalleryApplicationService;
 use AmeliaBooking\Application\Services\Payment\PaymentApplicationService;
+use AmeliaBooking\Application\Services\Reservation\EventReservationService;
 use AmeliaBooking\Domain\Collection\Collection;
 use AmeliaBooking\Domain\Common\Exceptions\InvalidArgumentException;
 use AmeliaBooking\Domain\Entity\Booking\Appointment\Appointment;
@@ -15,6 +16,7 @@ use AmeliaBooking\Domain\Entity\Booking\Event\EventTag;
 use AmeliaBooking\Domain\Entity\Booking\Event\EventTicket;
 use AmeliaBooking\Domain\Entity\Entities;
 use AmeliaBooking\Domain\Entity\Payment\Payment;
+use AmeliaBooking\Domain\Entity\User\AbstractUser;
 use AmeliaBooking\Domain\Entity\User\Customer;
 use AmeliaBooking\Domain\Entity\User\Provider;
 use AmeliaBooking\Domain\Factory\Booking\Appointment\AppointmentFactory;
@@ -24,9 +26,11 @@ use AmeliaBooking\Domain\Factory\Booking\Event\EventTicketFactory;
 use AmeliaBooking\Domain\Factory\Booking\Event\RecurringFactory;
 use AmeliaBooking\Domain\Services\Booking\EventDomainService;
 use AmeliaBooking\Domain\Services\DateTime\DateTimeService;
+use AmeliaBooking\Domain\Services\Settings\SettingsService;
 use AmeliaBooking\Domain\ValueObjects\BooleanValueObject;
 use AmeliaBooking\Domain\ValueObjects\Json;
 use AmeliaBooking\Domain\ValueObjects\Number\Float\Price;
+use AmeliaBooking\Domain\ValueObjects\Number\Integer\IntegerValue;
 use AmeliaBooking\Domain\ValueObjects\Number\Integer\WholeNumber;
 use AmeliaBooking\Domain\ValueObjects\String\BookingStatus;
 use AmeliaBooking\Infrastructure\Common\Exceptions\QueryExecutionException;
@@ -47,6 +51,7 @@ use AmeliaBooking\Infrastructure\Repository\Notification\NotificationsToEntities
 use AmeliaBooking\Infrastructure\Repository\Payment\PaymentRepository;
 use AmeliaBooking\Infrastructure\Repository\Tax\TaxEntityRepository;
 use AmeliaBooking\Infrastructure\Repository\User\CustomerRepository;
+use AmeliaBooking\Infrastructure\Repository\User\ProviderRepository;
 use Exception;
 use Interop\Container\Exception\ContainerException;
 use Slim\Exception\ContainerValueNotFoundException;
@@ -83,6 +88,27 @@ class EventApplicationService
      */
     public function build($data)
     {
+        /** @var ProviderRepository $providerRepository */
+        $providerRepository = $this->container->get('domain.users.providers.repository');
+
+        if (!empty($data['providers']) && $providersIds = array_column($data['providers'], 'id')) {
+            /** @var Collection $providers */
+            $providers = $providerRepository->getByIds($providersIds);
+
+            $data['providers'] = [];
+
+            /** @var AbstractUser $provider */
+            foreach ($providers->getItems() as $provider) {
+                $data['providers'][] = [
+                    'id'        => $provider->getId()->getValue(),
+                    'type'      => 'provider',
+                    'email'     => $provider->getEmail()->getValue(),
+                    'firstName' => $provider->getFirstName()->getValue(),
+                    'lastName'  => $provider->getLastName()->getValue(),
+                ];
+            }
+        }
+
         foreach ($data['periods'] as &$period) {
             if (!empty($data['utc'])) {
                 $period['periodStart'] = DateTimeService::getCustomDateTimeFromUtc(
@@ -102,6 +128,9 @@ class EventApplicationService
                     $period['periodEnd'],
                     $data['timeZone']
                 )->setTimezone(DateTimeService::getTimeZone())->format('Y-m-d H:i:s');
+            }
+            if (empty($period['eventId']) && !empty($data['id'])) {
+                $period['eventId'] = $data['id'];
             }
         }
 
@@ -463,7 +492,7 @@ class EventApplicationService
                                 'monthlyOnRepeat' => $newEvent->getRecurring()->getMonthlyOnRepeat(),
                                 'monthlyOnDay'  => $newEvent->getRecurring()->getMonthlyOnDay(),
                                 'monthDate'  => $newEvent->getRecurring()->getMonthDate()
-                                    ? $newEvent->getRecurring()->getMonthDate()->getValue()->format('Y-m-d H:i:s')
+                                    ? $newEvent->getPeriods()->getItem(0)->getPeriodStart()->getValue()->format('Y-m-d H:i:s')
                                     : null,
                                 'until' => $newEvent->getRecurring()->getUntil()->getValue()->format('Y-m-d H:i:s'),
                                 'order' =>
@@ -678,9 +707,9 @@ class EventApplicationService
                             }
                         }
                     }
-                    if (!$bookingOpensSame) {
+                    if (!$bookingClosesSame) {
                         $periodStartClose = DateTimeService::getCustomDateTimeObject($periodStart);
-                        if (isset($eventDateDiffCloses)) {
+                        if ($eventDateDiffCloses) {
                             $periodStartClose = $periodStartClose->sub($eventDateDiffCloses);
                         }
                         $lastEvent->setBookingCloses(new DateTimeValue($periodStartClose));
@@ -796,7 +825,7 @@ class EventApplicationService
     }
 
     /**
-     * @param Event  $event
+     * @param Collection  $events
      * @param String $status
      * @param bool   $updateFollowing
      *
@@ -808,13 +837,10 @@ class EventApplicationService
      * @throws QueryExecutionException
      * @throws InvalidArgumentException
      */
-    public function updateStatus($event, $status, $updateFollowing)
+    public function updateStatus($events, $status, $updateFollowing)
     {
         /** @var EventRepository $eventRepository */
         $eventRepository = $this->container->get('domain.booking.event.repository');
-
-        /** @var CustomerBookingRepository $bookingRepository */
-        $bookingRepository = $this->container->get('domain.booking.customerBooking.repository');
 
         /** @var EventApplicationService $eventAS */
         $eventAS = $this->container->get('application.booking.event.service');
@@ -822,32 +848,37 @@ class EventApplicationService
         /** @var Collection $updatedEvents */
         $updatedEvents = new Collection();
 
-        if ($event->getStatus()->getValue() !== $status) {
-            $eventRepository->updateStatusById($event->getId()->getValue(), $status);
+        foreach ($events->getItems() as $event) {
+            if ($event->getStatus()->getValue() !== $status) {
+                $event->setStatus(new BookingStatus($status));
 
-            $event->setStatus(new BookingStatus($status));
+                $updatedEvents->addItem($event, $event->getId()->getValue());
 
-            $updatedEvents->addItem($event, $event->getId()->getValue());
+                /** @var CustomerBooking $booking */
+                foreach ($event->getBookings()->getItems() as $booking) {
+                    if (
+                        $status === BookingStatus::REJECTED &&
+                        $booking->getStatus()->getValue() === BookingStatus::APPROVED
+                    ) {
+                        $booking->setChangedStatus(new BooleanValueObject(true));
+                    }
 
-            /** @var CustomerBooking $booking */
-            foreach ($event->getBookings()->getItems() as $booking) {
-                if (
-                    $status === BookingStatus::REJECTED &&
-                    $booking->getStatus()->getValue() === BookingStatus::APPROVED
-                ) {
-                    $booking->setChangedStatus(new BooleanValueObject(true));
-                }
-
-                if (
-                    $status === BookingStatus::APPROVED &&
-                    $booking->getStatus()->getValue() === BookingStatus::APPROVED
-                ) {
-                    $booking->setChangedStatus(new BooleanValueObject(true));
+                    if (
+                        $status === BookingStatus::APPROVED &&
+                        $booking->getStatus()->getValue() === BookingStatus::APPROVED
+                    ) {
+                        $booking->setChangedStatus(new BooleanValueObject(true));
+                    }
                 }
             }
         }
+        if ($updatedEvents->length() > 0) {
+            $eventRepository->updateFieldByIds(array_column($updatedEvents->toArray(), 'id'), $status, 'status');
+        }
 
         if ($updateFollowing) {
+            // update following is possible only in single delete, not bulk, so it is the only element in the collection
+            $event = $events->getItem($events->keys()[0]);
             /** @var Collection $followingEvents */
             $followingEvents = $eventAS->getEventsByCriteria(
                 [
@@ -881,16 +912,11 @@ class EventApplicationService
                                 $status === BookingStatus::REJECTED &&
                                 $booking->getStatus()->getValue() === BookingStatus::APPROVED
                             ) {
-                                $bookingRepository->updateStatusById(
-                                    $booking->getId()->getValue(),
-                                    BookingStatus::REJECTED
-                                );
-
                                 $booking->setChangedStatus(new BooleanValueObject(true));
                             }
                         }
 
-                        $eventRepository->updateStatusById($followingEvent->getId()->getValue(), $status);
+                        $eventRepository->updateFieldById($followingEvent->getId()->getValue(), $status, 'status');
 
                         $followingEvent->setStatus(new BookingStatus($status));
 
@@ -925,41 +951,41 @@ class EventApplicationService
         /** @var EventApplicationService $eventAS */
         $eventAS = $this->container->get('application.booking.event.service');
 
-        /** @var Collection $recurringEvents */
-        $recurringEvents = $eventAS->getEventsByCriteria(
-            [
-                'parentId' => $event->getParentId() ?
-                    $event->getParentId()->getValue() : $event->getId()->getValue()
-            ],
-            [
-                'fetchEventsPeriods' => true,
-                'fetchEventsTickets' => true,
-                'fetchEventsTags'    => true,
-                'fetchEventsImages'  => true,
-                'fetchBookings'      => true,
-                'fetchBookingsUsers' => true,
-            ],
-            0
-        );
-
         $deletedEvents = new Collection();
         /** @var Event|null $newOriginRecurringEvent **/
         $newOriginRecurringEvent = null;
 
         $hasRecurringApprovedEvents = false;
 
+        $recurringEvents = new Collection();
+
         if (!$event->getRecurring()) {
             $notificationEntitiesRepo->removeIfOnly($event->getId()->getValue());
+        } else {
+            /** @var Collection $recurringEvents */
+            $recurringEvents = $eventAS->getEventsByCriteria(
+                [
+                    'parentId' => $event->getParentId() ?
+                        $event->getParentId()->getValue() : $event->getId()->getValue(),
+                ],
+                [
+                    'fetchEventsPeriods' => true,
+                    'fetchEventsTickets' => true,
+                    'fetchEventsTags'    => true,
+                    'fetchEventsImages'  => true,
+                    'fetchBookings'      => true,
+                    'fetchBookingsUsers' => true,
+                ],
+                0
+            );
         }
+
+        // delete event
+        $deletedEvents->addItem($event);
+        $this->deleteEvent($event);
 
         /** @var Event $recurringEvent */
         foreach ($recurringEvents->getItems() as $key => $recurringEvent) {
-            // delete event
-            if ($recurringEvent->getId()->getValue() === $event->getId()->getValue()) {
-                $deletedEvents->addItem($recurringEvent);
-                $this->deleteEvent($recurringEvent);
-            }
-
             if ($recurringEvent->getId()->getValue() > $event->getId()->getValue()) {
                 $recurringEventStatus = $recurringEvent->getStatus()->getValue();
 
@@ -1507,6 +1533,8 @@ class EventApplicationService
 
         $eventsIds = $eventRepository->getFilteredIds($params, $limit);
 
+        $criteria['sort'] = !empty($params['sort']) ? $params['sort'] : null;
+
         return $eventsIds ? $this->getEventsByIds(
             $eventsIds,
             $criteria
@@ -1531,7 +1559,6 @@ class EventApplicationService
         /** @var CustomerRepository $customerRepository */
         $customerRepository = $this->container->get('domain.users.customers.repository');
 
-        /** @var Collection $events */
         $events = $eventRepository->getByIdsWithEntities(
             $ids,
             [
@@ -1543,12 +1570,112 @@ class EventApplicationService
                     $criteria['fetchEventsTags'] : false,
                 'fetchEventsProviders' => !empty($criteria['fetchEventsProviders']) ?
                     $criteria['fetchEventsProviders'] : false,
+                'fetchEventsOrganizer' => !empty($criteria['fetchEventsOrganizer']) ?
+                    $criteria['fetchEventsOrganizer'] : false,
                 'fetchEventsImages'    => !empty($criteria['fetchEventsImages']) ?
                     $criteria['fetchEventsImages'] : false,
                 'ordered'              => !empty($criteria['ordered']) ?
                     $criteria['ordered'] : false,
-            ]
+                'fetchEventsLocation'  => !empty($criteria['fetchEventsLocation']) ?
+                    $criteria['fetchEventsLocation'] : false,
+            ],
+            !empty($criteria['sort']) ? $criteria['sort'] : null
         );
+
+        if (!empty($criteria['fetchOccupancy'])) {
+            $spotsEventsIds = [];
+
+            $ticketsIds = [];
+
+            /** @var Event $event */
+            foreach ($events->getItems() as $event) {
+                if ($event->getCustomPricing() && $event->getCustomPricing()->getValue()) {
+                    $ticketsIds[] = $event->getId()->getValue();
+                } else {
+                    $spotsEventsIds[] = $event->getId()->getValue();
+                }
+            }
+
+            $spots = $spotsEventsIds ? $eventRepository->getEventsSpotsCount($spotsEventsIds) : [];
+
+            foreach ($spots as $eventId => $spotsData) {
+                if ($events->keyExists($eventId)) {
+                    /** @var Event $event */
+                    $event = $events->getItem($eventId);
+
+                    $event->setSpotsSold(
+                        new IntegerValue(
+                            (!empty($spotsData[BookingStatus::APPROVED]) ? $spotsData[BookingStatus::APPROVED] : 0) +
+                            (!empty($spotsData[BookingStatus::PENDING]) ? $spotsData[BookingStatus::PENDING] : 0)
+                        )
+                    );
+
+                    $event->setSpotsWaiting(
+                        new IntegerValue(
+                            !empty($spotsData[BookingStatus::WAITING]) ? $spotsData[BookingStatus::WAITING] : 0
+                        )
+                    );
+                }
+            }
+
+            $tickets = $ticketsIds ? $eventRepository->getEventsTicketsCount($ticketsIds) : [];
+
+            foreach ($tickets as $eventId => $ticketsData) {
+                if ($events->keyExists($eventId)) {
+                    /** @var Event $event */
+                    $event = $events->getItem($eventId);
+
+                    foreach ($ticketsData as $ticketId => $ticketData) {
+                        if ($event->getCustomTickets()->keyExists($ticketId)) {
+                            /** @var EventTicket $ticket */
+                            $ticket = $event->getCustomTickets()->getItem($ticketId);
+
+                            $ticket->setSold(
+                                new IntegerValue(
+                                    (!empty($ticketData[BookingStatus::APPROVED]) ? $ticketData[BookingStatus::APPROVED] : 0) +
+                                    (!empty($ticketData[BookingStatus::PENDING]) ? $ticketData[BookingStatus::PENDING] : 0)
+                                )
+                            );
+
+                            $ticket->setWaiting(
+                                new IntegerValue(
+                                    !empty($ticketData[BookingStatus::WAITING]) ? $ticketData[BookingStatus::WAITING] : 0
+                                )
+                            );
+                        }
+                    }
+                }
+            }
+
+            $statuses = $spotsEventsIds || $ticketsIds
+                ? $eventRepository->getEventsBookingsStatusesCount(array_merge($spotsEventsIds, $ticketsIds))
+                : [];
+
+            foreach ($statuses as $eventId => $statusesData) {
+                if ($events->keyExists($eventId)) {
+                    /** @var Event $event */
+                    $event = $events->getItem($eventId);
+
+                    $event->setBookingsApproved(
+                        new IntegerValue(
+                            (!empty($statusesData[BookingStatus::APPROVED]) ? $statusesData[BookingStatus::APPROVED] : 0)
+                        )
+                    );
+
+                    $event->setBookingsPending(
+                        new IntegerValue(
+                            (!empty($statusesData[BookingStatus::PENDING]) ? $statusesData[BookingStatus::PENDING] : 0)
+                        )
+                    );
+
+                    $event->setBookingsWaiting(
+                        new IntegerValue(
+                            (!empty($statusesData[BookingStatus::WAITING]) ? $statusesData[BookingStatus::WAITING] : 0)
+                        )
+                    );
+                }
+            }
+        }
 
         /** @var Collection $eventsBookings */
         $eventsBookings = $events->length() && !empty($criteria['fetchBookings']) ? $eventRepository->getBookingsByCriteria(
@@ -1577,7 +1704,6 @@ class EventApplicationService
                 }
             }
 
-            /** @var Collection $customers */
             $customers = $customerIds ? $customerRepository->getByCriteria(['ids' => $customerIds]) : new Collection();
 
             /** @var Collection $eventBookings */
@@ -1606,7 +1732,7 @@ class EventApplicationService
      * @param int   $id
      * @param array $criteria
      *
-     * @return Event
+     * @return Event|null
      *
      * @throws ContainerValueNotFoundException
      * @throws QueryExecutionException
@@ -1640,6 +1766,12 @@ class EventApplicationService
                     $criteria['fetchBookingsPayments'] : false,
                 'fetchBookingsCoupons'  => !empty($criteria['fetchBookingsCoupons']) ?
                     $criteria['fetchBookingsCoupons'] : false,
+                'fetchEventsOrganizer' => !empty($criteria['fetchEventsOrganizer']) ?
+                    $criteria['fetchEventsOrganizer'] : false,
+                'fetchEventsLocation'  => !empty($criteria['fetchEventsLocation']) ?
+                    $criteria['fetchEventsLocation'] : false,
+                'fetchOccupancy'       => !empty($criteria['fetchOccupancy']) ?
+                    $criteria['fetchOccupancy'] : false,
             ]
         );
 
@@ -1706,5 +1838,285 @@ class EventApplicationService
             ($event->getCustomLocation() ? $event->getCustomLocation()->getValue() : null) ||
             ($newEvent->getOrganizerId() ? $newEvent->getOrganizerId()->getValue() : null) !==
             ($event->getOrganizerId() ? $event->getOrganizerId()->getValue() : null);
+    }
+
+    /**
+     * @param Event $event
+     * @param bool  $isFrontEnd
+     * @return array
+     * @throws InvalidArgumentException
+     */
+    public function getEventInfo($event, $isFrontEnd = false)
+    {
+        /** @var EventReservationService $reservationService */
+        $reservationService = $this->container->get('application.reservation.service')->get(Entities::EVENT);
+        /** @var SettingsService $settingsDS */
+        $settingsDS = $this->container->get('domain.settings.service');
+
+        $persons = $this->getEventPersonsAndSetCapacity($event);
+
+        $currentDateTime = DateTimeService::getNowDateTimeObject();
+
+        $bookingOpens = $event->getBookingOpens() ?
+            $event->getBookingOpens()->getValue() : $event->getCreated()->getValue();
+
+        $bookingCloses = $event->getBookingCloses() ?
+            $event->getBookingCloses()->getValue() : $event->getPeriods()->getItem(0)->getPeriodStart()->getValue();
+
+        $minimumCancelTimeInSeconds = $settingsDS
+            ->getEntitySettings($event->getSettings())
+            ->getGeneralSettings()
+            ->getMinimumTimeRequirementPriorToCanceling();
+
+        $minimumCancelTime = DateTimeService::getCustomDateTimeObject(
+            $event->getPeriods()->getItem(0)->getPeriodStart()->getValue()->format('Y-m-d H:i:s')
+        )->modify("-{$minimumCancelTimeInSeconds} seconds");
+
+        $minimumReached = null;
+        if ($event->getCloseAfterMin() !== null && $event->getCloseAfterMinBookings() !== null) {
+            if ($event->getCloseAfterMinBookings()->getValue()) {
+                $approvedBookings = !$event->getBookings()->length() && $event->getBookingsApproved()
+                    ? $event->getBookingsApproved()->getValue()
+                    : count(array_filter(
+                        $event->getBookings()->toArray(),
+                        function ($value) {
+                            return $value['status'] === 'approved';
+                        }
+                    ));
+                $minimumReached   = $approvedBookings >= $event->getCloseAfterMin()->getValue();
+            } else {
+                $minimumReached = $persons['booked'] >= $event->getCloseAfterMin()->getValue();
+            }
+        }
+
+        $peopleWaiting = false;
+        $eventSettings = $event->getSettings() ? json_decode($event->getSettings()->getValue(), true) : null;
+
+        if ($eventSettings && !empty($eventSettings['waitingList']) && $eventSettings['waitingList']['enabled']) {
+            $peopleWaiting =
+                !$event->getBookings()->length() &&
+                $event->getBookingsWaiting() &&
+                $event->getBookingsWaiting()->getValue();
+
+            /** @var CustomerBooking $booking */
+            foreach ($event->getBookings()->getItems() as $booking) {
+                if ($booking->getStatus()->getValue() === BookingStatus::WAITING) {
+                    $peopleWaiting = true;
+                    break;
+                }
+            }
+        }
+
+        $info = [
+            'bookable'   => $reservationService->isBookable($event, null, $currentDateTime) && !$minimumReached,
+            'upcoming'   => $currentDateTime < $bookingOpens,
+            'full'       => ($event->getMaxCapacity()->getValue() <= $persons['booked']
+                    && $currentDateTime < $event->getPeriods()->getItem(0)->getPeriodStart()->getValue())
+                || ($peopleWaiting && !($currentDateTime > $bookingCloses || $minimumReached)),
+            'opened'      => ($currentDateTime > $bookingOpens) && ($currentDateTime < $bookingCloses),
+            'closed'      => $currentDateTime > $bookingCloses || $minimumReached,
+        ];
+
+        $approvedStatus = $this->getApprovedStatus($info);
+        $displayStatus  = $this->eventDisplayStatus($event, $info);
+
+        $eventSettings = $settingsDS->isFeatureEnabled('waitingList') && $event->getSettings() && $event->getSettings()->getValue()
+            ? json_decode($event->getSettings()->getValue(), true)
+            : null;
+
+        $waitingCapacity = 0;
+        $isWaitingList = false;
+
+        if ($eventSettings && !empty($eventSettings['waitingList']['enabled'])) {
+            $isWaitingList = true;
+
+            if ($event->getCustomPricing()->getValue()) {
+                /** @var EventTicket $ticket */
+                foreach ($event->getCustomTickets()->getItems() as $ticket) {
+                    if ($ticket->getWaitingListSpots()) {
+                        $waitingCapacity += $ticket->getWaitingListSpots()->getValue();
+                    }
+                }
+            } else {
+                $waitingCapacity = $eventSettings['waitingList']['maxCapacity'];
+            }
+        }
+
+        // TODO - Redesign: Change event list to use this status and remove full and upcoming properties and isFrontEnd param
+        return array_merge(
+            $info,
+            [
+                'bookable'    => $info['bookable'],
+                'cancelable'  => $currentDateTime <= $minimumCancelTime &&
+                    ($event->getStatus()->getValue() === BookingStatus::APPROVED || $event->getStatus()->getValue() === BookingStatus::PENDING),
+                'places'      => $event->getMaxCapacity()->getValue() - $persons['booked'],
+                'status'      => $isFrontEnd ? $event->getStatus()->getValue() : $displayStatus,
+                'bookedSpots' => $persons['booked'],
+                'waiting'     => $persons['waiting'],
+                'approvedStatus' => $approvedStatus,
+                'maxCapacity' => $event->getMaxCapacity()->getValue(),
+                'waitingCapacity' => $waitingCapacity,
+                'isWaitingList' => $isWaitingList,
+            ]
+        );
+    }
+
+    /**
+     * @param array $info
+     *
+     * @return string
+     */
+    public function getApprovedStatus($info)
+    {
+        if ($info['full']) {
+            return 'full';
+        }
+        if ($info['upcoming']) {
+            return 'upcoming';
+        }
+        return $info['closed'] ? 'closed' : 'open';
+    }
+
+    /**
+     * @param Event $event
+     * @param array $info
+     *
+     * @return string
+     */
+    public function eventDisplayStatus($event, $info)
+    {
+        if ($event->getStatus()->getValue() === BookingStatus::APPROVED || $event->getStatus()->getValue() === BookingStatus::PENDING) {
+            if ($info['full']) {
+                return 'full';
+            }
+            if ($info['upcoming']) {
+                return 'upcoming';
+            }
+            return !$info['bookable'] ? 'closed' : 'open';
+        } else {
+            return 'canceled';
+        }
+    }
+
+    /**
+     * @param Event $event
+     *
+     * @return array
+     * @throws InvalidArgumentException
+     */
+    private function getEventPersonsAndSetCapacity($event)
+    {
+        $persons = 0;
+        $waiting = 0;
+
+        if ($event->getCustomPricing()->getValue()) {
+            if ($event->getBookings()->length()) {
+                /** @var EventTicket $ticket */
+                foreach ($event->getCustomTickets()->getItems() as $ticket) {
+                    $ticket->setSold(new IntegerValue(0));
+
+                    $ticket->setWaiting(new IntegerValue(0));
+                }
+            }
+
+            /** @var CustomerBooking $booking */
+            foreach ($event->getBookings()->getItems() as $booking) {
+                /** @var CustomerBookingEventTicket $bookedTicket */
+                foreach ($booking->getTicketsBooking()->getItems() as $bookedTicket) {
+                    /** @var EventTicket $ticket */
+                    $ticket = $event->getCustomTickets()->getItem($bookedTicket->getEventTicketId()->getValue());
+
+
+                    $ticket->setSold(
+                        new IntegerValue(
+                            ($ticket->getSold() ? $ticket->getSold()->getValue() : 0) +
+                            ($booking->getStatus()->getValue() === BookingStatus::APPROVED || $booking->getStatus()->getValue() === BookingStatus::PENDING ?
+                                $bookedTicket->getPersons()->getValue() : 0)
+                        )
+                    );
+
+                    $ticket->setWaiting(
+                        new IntegerValue(
+                            ($ticket->getWaiting() ? $ticket->getWaiting()->getValue() : 0) +
+                            ($booking->getStatus()->getValue() === BookingStatus::WAITING ?
+                                $bookedTicket->getPersons()->getValue() : 0)
+                        )
+                    );
+                }
+            }
+
+            $maxCapacity = 0;
+
+            $event->setCustomTickets($this->getTicketsPriceByDateRange($event->getCustomTickets()));
+
+            /** @var EventTicket $ticket */
+            foreach ($event->getCustomTickets()->getItems() as $ticket) {
+                $maxCapacity += $ticket->getSpots()->getValue();
+
+                $persons += ($ticket->getSold() ? $ticket->getSold()->getValue() : 0);
+
+                $waiting += ($ticket->getWaiting() ? $ticket->getWaiting()->getValue() : 0);
+            }
+
+            $event->setMaxCapacity($event->getMaxCustomCapacity() ?: new IntegerValue($maxCapacity));
+        } else {
+            if (!$event->getBookings()->length()) {
+                $persons = $event->getSpotsSold() ? $event->getSpotsSold()->getValue() : 0;
+
+                $waiting = $event->getSpotsWaiting() ? $event->getSpotsWaiting()->getValue() : 0;
+            }
+
+            /** @var CustomerBooking $booking */
+            foreach ($event->getBookings()->getItems() as $booking) {
+                if ($booking->getStatus()->getValue() === BookingStatus::APPROVED || $booking->getStatus()->getValue() === BookingStatus::PENDING) {
+                    $persons += $booking->getPersons()->getValue();
+                } elseif ($booking->getStatus()->getValue() === BookingStatus::WAITING) {
+                    $waiting += $booking->getPersons()->getValue();
+                }
+            }
+        }
+
+        return ['booked' => $persons, 'waiting' => $waiting];
+    }
+
+    /**
+     * @param Event        $event
+     * @param AbstractUser $user
+     *
+     * @return bool
+     */
+    public function isCancelable($event, $user)
+    {
+        /** @var SettingsService $settingsDS */
+        $settingsDS = $this->container->get('domain.settings.service');
+
+        $cancelable = true;
+
+        if ($user->getType() === Entities::CUSTOMER) {
+            $eventStart = null;
+
+            foreach ($event->getPeriods()->getItems() as $eventPeriod) {
+                if ($eventStart === null || $eventPeriod->getPeriodStart()->getValue() < $eventStart) {
+                    $eventStart = $eventPeriod->getPeriodStart();
+                }
+            }
+
+            $currentDateTime = DateTimeService::getNowDateTimeObject();
+
+            $minimumCancelTimeInSeconds = $settingsDS
+                ->getEntitySettings($event->getSettings())
+                ->getGeneralSettings()
+                ->getMinimumTimeRequirementPriorToCanceling();
+
+            $minimumCancelTime = DateTimeService::getCustomDateTimeObject(
+                $eventStart->getValue()->format('Y-m-d H:i:s')
+            )->modify("-{$minimumCancelTimeInSeconds} seconds");
+
+            $cancelable =
+                $eventStart->getValue() > $currentDateTime &&
+                $currentDateTime <= $minimumCancelTime;
+        }
+
+        return $cancelable;
     }
 }

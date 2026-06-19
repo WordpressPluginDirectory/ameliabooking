@@ -20,7 +20,7 @@ class TimeOutRepository extends AbstractRepository
      * @param TimeOut $entity
      * @param int     $weekDayId
      *
-     * @return bool
+     * @return int
      * @throws QueryExecutionException
      */
     public function add($entity, $weekDayId)
@@ -40,12 +40,9 @@ class TimeOutRepository extends AbstractRepository
                 VALUES (:weekDayId, :startTime, :endTime)"
             );
 
-            $res = $statement->execute($params);
-            if (!$res) {
-                throw new QueryExecutionException('Unable to add data in ' . __CLASS__);
-            }
+            $statement->execute($params);
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to add data in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to add data in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return $this->connection->lastInsertId();
@@ -55,7 +52,7 @@ class TimeOutRepository extends AbstractRepository
      * @param TimeOut $entity
      * @param int     $id
      *
-     * @return int
+     * @return void
      * @throws QueryExecutionException
      */
     public function update($entity, $id)
@@ -75,14 +72,9 @@ class TimeOutRepository extends AbstractRepository
                 WHERE id = :id"
             );
 
-            $res = $statement->execute($params);
-            if (!$res) {
-                throw new QueryExecutionException('Unable to save data in ' . __CLASS__);
-            }
-
-            return $res;
+            $statement->execute($params);
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to save data in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to save data in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
     }
 }

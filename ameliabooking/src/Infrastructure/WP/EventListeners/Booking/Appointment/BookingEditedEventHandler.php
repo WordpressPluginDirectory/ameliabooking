@@ -1,7 +1,7 @@
 <?php
 
 /**
- * @copyright © TMS-Plugins. All rights reserved.
+ * @copyright © Melograno Ventures. All rights reserved.
  * @licence   See LICENCE.md for license details.
  */
 
@@ -34,6 +34,8 @@ class BookingEditedEventHandler
 {
     /** @var string */
     public const BOOKING_STATUS_UPDATED = 'bookingStatusUpdated';
+
+    public const BOOKING_CANCELED = 'bookingCanceled';
 
     /**
      * @param CommandResult $commandResult
@@ -110,27 +112,41 @@ class BookingEditedEventHandler
             }
 
             if (
-                !empty($paymentId) && $booking['status'] === BookingStatus::APPROVED
-                && $settingsService->getSetting('notifications', 'sendInvoice')
+                !empty($paymentId) && $booking['status'] === BookingStatus::APPROVED &&
+                $settingsService->isFeatureEnabled('invoices') &&
+                $settingsService->getSetting('notifications', 'sendInvoice')
             ) {
                 $sendInvoice = true;
             }
 
 
-            $emailNotificationService->sendCustomerBookingNotification($appointment, $booking, $sendInvoice);
-            $emailNotificationService->sendProviderBookingNotification($appointment, $booking);
+            $bookingForNotification = $booking;
+            if (
+                $appointment['type'] === Entities::EVENT &&
+                $booking['status'] === BookingStatus::CANCELED &&
+                $appointment['status'] === BookingStatus::APPROVED
+            ) {
+                $bookingForNotification['status'] = BookingStatus::REJECTED;
+            }
+
+            $emailNotificationService->sendCustomerBookingNotification($appointment, $bookingForNotification, $sendInvoice);
+            $emailNotificationService->sendProviderBookingNotification($appointment, $bookingForNotification);
 
             if ($settingsService->getSetting('notifications', 'smsSignedIn') === true) {
-                $smsNotificationService->sendCustomerBookingNotification($appointment, $booking);
-                $smsNotificationService->sendProviderBookingNotification($appointment, $booking);
+                $smsNotificationService->sendCustomerBookingNotification($appointment, $bookingForNotification);
+                $smsNotificationService->sendProviderBookingNotification($appointment, $bookingForNotification);
             }
 
             if ($whatsAppNotificationService->checkRequiredFields()) {
-                $whatsAppNotificationService->sendCustomerBookingNotification($appointment, $booking);
-                $whatsAppNotificationService->sendProviderBookingNotification($appointment, $booking);
+                $whatsAppNotificationService->sendCustomerBookingNotification($appointment, $bookingForNotification);
+                $whatsAppNotificationService->sendProviderBookingNotification($appointment, $bookingForNotification);
             }
 
-            $webHookService->process(self::BOOKING_STATUS_UPDATED, $appointment, [$booking]);
+            if ($booking['status'] === BookingStatus::CANCELED) {
+                $webHookService->process(self::BOOKING_CANCELED, $appointment, [$booking]);
+            } else {
+                $webHookService->process(self::BOOKING_STATUS_UPDATED, $appointment, [$booking]);
+            }
         }
     }
 }

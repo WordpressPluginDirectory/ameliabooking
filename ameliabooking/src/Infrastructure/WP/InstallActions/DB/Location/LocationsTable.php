@@ -28,6 +28,8 @@ class LocationsTable extends AbstractDatabaseTable
     {
         $table = self::getTableName();
 
+        $charsetCollate = self::getCharsetCollate();
+
         $name        = Name::MAX_LENGTH;
         $description = Description::MAX_LENGTH;
         $address     = Address::MAX_LENGTH;
@@ -48,7 +50,8 @@ class LocationsTable extends AbstractDatabaseTable
                     `pictureThumbPath` varchar ({$picture}) NULL,
                     `pin` varchar ({$url}) NULL,
                     `translations` TEXT NULL DEFAULT NULL,
+                    `countryPhoneIso` varchar(2) DEFAULT NULL,
                     PRIMARY KEY (`id`)
-                ) DEFAULT CHARSET=utf8 COLLATE utf8_general_ci";
+                ) {$charsetCollate};";
     }
 }

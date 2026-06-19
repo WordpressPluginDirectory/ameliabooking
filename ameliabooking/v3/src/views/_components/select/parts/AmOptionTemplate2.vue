@@ -8,7 +8,7 @@
           </span>
         </span>
       </span>
-      <span class="am-oit__content am-oit__content-short">
+      <span class="am-oit__content">
         <span class="am-oit__data">
           <span :class="`am-oit__data-label ${badge ? 'am-oit__data-label-wrap':''}`">
             <span class="am-oit__data-label-name">
@@ -20,7 +20,7 @@
           </span>
           <span v-if="!badge && useDescriptionVisibility(description)" class="am-oit__data-description" v-html="replaceNewLines(description)"></span>
         </span>
-        <span style="display: flex;">
+        <span class="am-oit__meta">
           <span v-if="prop.price" class="am-oit__price" :style="cssVarsPrice">
             {{ prop.price }}
           </span>
@@ -153,9 +153,13 @@ const handleClick = () => {
 }
 
 function replaceNewLines (description) {
-  description = description.replace(/<\/p>/g, ' </p>').replace(/<\/h1>/g, ' </h1>').replace(/<\/h2>/g, ' </h2>').replace(/<\/h3>/g, ' </h3>').replace(/<\/h4>/g, ' </h4>')
-  description = description.replace(/<\/li>/g, ' </li>')
-  return description
+  if (!description) return ''
+  let text = description.replace(/<br\s*\/?>/gi, ' ')
+  text = text.replace(/<\/p>/gi, ' ').replace(/<\/div>/gi, ' ').replace(/<\/li>/gi, ' ')
+  text = text.replace(/<[^>]*>/g, '')
+  text = text.replace(/&nbsp;/g, ' ')
+  text = text.replace(/\s+/g, ' ').trim()
+  return text
 }
 
 function imagePlaceholder () {
@@ -214,6 +218,7 @@ export default {
 
     &__wrapper {
       display: flex;
+      width: 100%;
     }
 
     &__img {
@@ -251,17 +256,21 @@ export default {
 
     &__content {
       display: flex;
-      width: 100%;
-      &-short {
-        width: 88%;
-      }
+      align-items: center;
+      flex: 1;
+      min-width: 0;
+    }
+
+    &__meta {
+      display: flex;
+      flex-shrink: 0;
+      align-items: center;
     }
 
     &__data {
       display: flex;
-      flex-shrink: 1;
+      flex: 1;
       min-width: 0;
-      width: 100%;
       justify-content: space-between;
       flex-direction: column;
 
@@ -272,6 +281,7 @@ export default {
 
         &-name {
           color: var(--am-c-option-text);
+          min-width: 0;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
@@ -330,12 +340,13 @@ export default {
 
     &__info {
       &-trigger {
-        position: absolute;
-        top: 6px;
-        right: 6px;
-        color: var(--am-c-option-text);
         .am-icon-circle-info {
-          font-size: 16px;
+          font-size: 44px;
+          color: var(--am-c-option-text);
+
+          &:hover {
+            color: var(--am-c-option-selected);
+          }
         }
       }
     }

@@ -5,7 +5,8 @@
     :style="cssVars"
   >
     <div
-      v-if="ready && !loading && !integrationsLoading"
+      v-if="ready"
+      v-show="!loading"
       class="am-caep__inner"
       :class="responsiveClass"
     >
@@ -63,6 +64,7 @@
           name="specialDays"
         >
           <SpecialDays
+            ref="specialDaysRef"
             :responsive-class="responsiveClass"
           />
         </el-tab-pane>
@@ -73,6 +75,7 @@
           name="daysOff"
         >
           <DaysOff
+            ref="daysOffRef"
             :responsive-class="responsiveClass"
           />
         </el-tab-pane>
@@ -94,17 +97,18 @@
         </el-tab-pane>
 
         <el-tab-pane
-          v-if="amSettings.zoom.enabled ||
-          amSettings.googleCalendar.enabled ||
-          amSettings.outlookCalendar.enabled ||
-          amSettings.appleCalendar ||
-          (amSettings.payments.stripe.enabled && amSettings.payments.stripe.connect.enabled)"
+          v-if="
+            amSettings.zoom.enabled ||
+            amSettings.googleCalendar.enabled ||
+            amSettings.outlookCalendar.enabled ||
+            amSettings.appleCalendar.enabled ||
+            (amSettings.payments.stripe.enabled &&
+              amSettings.payments.stripe.connect.enabled)
+          "
           :label="amLabels.integrations_settings"
           name="integrations"
         >
-          <Integrations
-            :responsive-class="responsiveClass"
-          />
+          <EmployeeIntegrations :responsive-class="responsiveClass" />
         </el-tab-pane>
       </el-tabs>
 
@@ -118,7 +122,7 @@
       />
       <!-- /Profile Footer -->
     </div>
-    <Skeleton v-else></Skeleton>
+    <Skeleton v-if="!ready || loading"></Skeleton>
   </div>
 </template>
 
@@ -141,9 +145,6 @@ import httpClient from "../../../../../plugins/axios";
 
 // * Composables
 import {
-  useAuthorizationHeaderObject,
-} from "../../../../../assets/js/public/panel";
-import {
   useBackendEmployee,
 } from "../../../../../assets/js/common/employee";
 import {
@@ -154,17 +155,17 @@ import {
 } from "../../../../../assets/js/common/colorManipulation";
 
 // * Dedicated components
-import Skeleton from "../Authentication/parts/Skeleton.vue";
-import Details from "./parts/Details.vue";
-import Services from "./parts/Services.vue";
-import WeekDays from "./parts/WeekDays.vue";
-import SpecialDays from "./parts/SpecialDays.vue";
-import DaysOff from "./parts/DaysOff.vue";
-import Integrations from "./parts/Integrations.vue";
-import ProfileFooter from "./parts/ProfileFooter.vue";
-import ChangePassword from "./parts/ChangePassword.vue";
-import AmAlert from "../../../../_components/alert/AmAlert.vue";
-import ProfileSkeleton from "./parts/ProfileSkeleton.vue";
+import Skeleton from '../Authentication/parts/Skeleton.vue'
+import Details from './parts/Details.vue'
+import Services from './parts/Services.vue'
+import WeekDays from './parts/WeekDays.vue'
+import SpecialDays from './parts/SpecialDays.vue'
+import DaysOff from './parts/DaysOff.vue'
+import ProfileFooter from './parts/ProfileFooter.vue'
+import ChangePassword from './parts/ChangePassword.vue'
+import AmAlert from '../../../../_components/alert/AmAlert.vue'
+import ProfileSkeleton from './parts/ProfileSkeleton.vue'
+import EmployeeIntegrations from './parts/Integrations/EmployeeIntegrations.vue'
 
 // * Store
 let store = useStore()
@@ -213,26 +214,35 @@ function closeAlert () {
  * Details *
  ***********/
 let detailsRef = ref(null)
+let daysOffRef = ref(null)
+let specialDaysRef = ref(null)
 
 let employee = computed(() => {
   return store.getters['employee/getEmployee']
 })
-
-let integrationsLoading = computed(
-  () => store.getters['auth/getGoogleLoading'] ||
-    store.getters['auth/getOutlookLoading'] ||
-    store.getters['auth/getAppleLoading'] ||
-    store.getters['auth/getStripeLoading'] ||
-    store.getters['auth/getZoomLoading']
-)
 
 let loading = ref(false)
 
 let timeZone = inject('timeZone')
 
 function saveEmployee () {
-  detailsRef.value.employeeFormRef.validate((valid) => {
-    if (!valid) {
+  Promise.all([
+    detailsRef.value?.employeeFormRef ? detailsRef.value.employeeFormRef.validate().then(() => true).catch(() => false) : Promise.resolve(true),
+    daysOffRef.value ? daysOffRef.value.validate() : Promise.resolve(true),
+    specialDaysRef.value ? specialDaysRef.value.validate() : Promise.resolve(true),
+  ]).then(([detailsValid, daysOffValid, specialDaysValid]) => {
+    if (!detailsValid) {
+      activeTab.value = 'details'
+      return
+    }
+
+    if (!daysOffValid) {
+      activeTab.value = 'daysOff'
+      return
+    }
+
+    if (!specialDaysValid) {
+      activeTab.value = 'specialDays'
       return
     }
 
@@ -241,8 +251,14 @@ function saveEmployee () {
     httpClient.post(
       '/users/providers/' + employee.value.id,
       useBackendEmployee(store, timeZone.value),
-      Object.assign(useAuthorizationHeaderObject(store), {params: {source: 'cabinet-provider'}})
-    ).then(() => {
+      {params: {source: 'cabinet-provider'}}
+    ).then((response) => {
+      store.commit('employee/setSavedSpecialDayList', JSON.parse(JSON.stringify(response.data.data.user.specialDayList)))
+      store.commit('employee/setSavedDayOffList', JSON.parse(JSON.stringify(response.data.data.user.dayOffList)))
+
+      if (daysOffRef.value) daysOffRef.value.commitEditedState()
+      if (specialDaysRef.value) specialDaysRef.value.commitEditedState()
+
       message.value = amLabels.profile_data_success
       messageType.value = 'success'
     }).catch((error) => {
@@ -275,10 +291,11 @@ function savePassword () {
 
       httpClient.post(
         '/users/providers/' + user.id,
-        {password: store.getters['auth/getNewPassword']},
-        useAuthorizationHeaderObject(store)
+        {password: store.getters['auth/getNewPassword']}
       ).then(() => {
         message.value = amLabels.password_success
+        messageType.value = 'success'
+        alertVisibility.value = true
 
         changePasswordEnabled.value = false
 

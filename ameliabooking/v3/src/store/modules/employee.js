@@ -13,25 +13,35 @@ export default {
       id: null,
       calendarId: '',
       token: null,
+      accounts: [],
+      blockedCalendars: [],
+      calendarList: [],
     },
     googleCalendar: {
       id: null,
       calendarId: '',
       token: null,
+      accounts: [],
+      blockedCalendars: [],
+      calendarList: [],
     },
     appleCalendarId: '',
+    googleCalendarId: '',
+    outlookCalendarId: '',
     employeeAppleCalendar: {
       iCloudId: null,
       appSpecificPassword: null
     },
     stripeConnect: null,
     zoomUserId: '',
-    note: '',
     description: '',
     descriptionMode: 'html',
     weekDayList: [],
     specialDayList: [],
+    savedSpecialDayList: [],
     dayOffList: [],
+    savedDayOffList: [],
+    badgeId: null,
   },
 
   getters: {
@@ -79,6 +89,14 @@ export default {
       return state.outlookCalendar.token
     },
 
+    getOutlookCalendarAccounts (state) {
+      return state.outlookCalendar.accounts
+    },
+
+    getOutlookCalendarBlockedCalendars (state) {
+      return state.outlookCalendar.blockedCalendars
+    },
+
     getGoogleCalendarId (state) {
       return state.googleCalendar.calendarId
     },
@@ -87,8 +105,24 @@ export default {
       return state.googleCalendar.token
     },
 
+    getGoogleCalendarAccounts (state) {
+      return state.googleCalendar.accounts
+    },
+
+    getGoogleCalendarBlockedCalendars (state) {
+      return state.googleCalendar.blockedCalendars
+    },
+
     getAppleCalendarId (state) {
       return state.appleCalendarId
+    },
+
+    getUserTableGoogleCalendarId (state) {
+      return state.googleCalendarId
+    },
+
+    getUserTableOutlookCalendarId (state) {
+      return state.outlookCalendarId
     },
 
     getEmployeeAppleCalendarICloudId (state) {
@@ -103,16 +137,20 @@ export default {
       return state.stripeConnect
     },
 
-    getNote (state) {
-      return state.note
-    },
-
     getDescription (state) {
       return state.description
     },
 
     getDescriptionMode (state) {
       return state.descriptionMode
+    },
+
+    getSavedSpecialDayList (state) {
+      return state.savedSpecialDayList
+    },
+
+    getSavedDayOffList (state) {
+      return state.savedDayOffList
     },
   },
 
@@ -165,6 +203,14 @@ export default {
       state.outlookCalendar.token = payload
     },
 
+    setOutlookCalendarAccounts (state, payload) {
+      state.outlookCalendar.accounts = payload
+    },
+
+    setOutlookCalendarBlockedCalendars (state, payload) {
+      state.outlookCalendar.blockedCalendars = payload
+    },
+
     setGoogleId (state, payload) {
       state.googleCalendar.id = payload
     },
@@ -177,8 +223,24 @@ export default {
       state.googleCalendar.token = payload
     },
 
+    setGoogleCalendarAccounts (state, payload) {
+      state.googleCalendar.accounts = payload
+    },
+
+    setGoogleCalendarBlockedCalendars (state, payload) {
+      state.googleCalendar.blockedCalendars = payload
+    },
+
+    setEmployeeOutlookCalendarId(state, payload) {
+      state.outlookCalendarId = payload
+    },
+
     setAppleCalendarId (state, payload) {
       state.appleCalendarId = payload
+    },
+
+    setEmployeeGoogleCalendarId (state, payload) {
+      state.googleCalendarId = payload
     },
 
     setEmployeeAppleCalendarICloudId (state, payload) {
@@ -193,10 +255,6 @@ export default {
       state.stripeConnect = payload
     },
 
-    setNote (state, payload) {
-      state.note = payload
-    },
-
     setDescription (state, payload) {
       state.description = payload
     },
@@ -208,7 +266,15 @@ export default {
     setServiceEnabled (state, payload) {
       let { serviceId, categoryId, value } = payload
       state.serviceList[categoryId][serviceId].enabled = value
-    }
+    },
+
+    setSavedSpecialDayList (state, payload) {
+      state.savedSpecialDayList = payload
+    },
+
+    setSavedDayOffList (state, payload) {
+      state.savedDayOffList = payload
+    },
   },
 
   actions: {

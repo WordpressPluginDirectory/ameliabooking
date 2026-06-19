@@ -1,7 +1,7 @@
 <?php
 
 /**
- * @copyright © TMS-Plugins. All rights reserved.
+ * @copyright © Melograno Ventures. All rights reserved.
  * @licence   See COPYING.md for license details.
  */
 
@@ -25,6 +25,6 @@ class Import
      */
     public static function routes(App $app)
     {
-        $app->post('/import/customers', ImportCustomersController::class)->setOutputBuffering(false);
+        $app->post('/import/customers', ImportCustomersController::class);
     }
 }

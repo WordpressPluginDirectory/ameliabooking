@@ -40,6 +40,8 @@ let defaultCustomizeSettings = {
       colorCalCellLowText: '#1246D6',
       colorCalCellHigh: '#265CF2',
       colorCalCellHighText: '#1246D6',
+      colorCalCellWaiting: 'rgba(26, 44, 55, 0.04)',
+      colorCalCellWaitingText: '#1A2C37',
       colorCalCellSelected: '#1246D6',
       colorCalCellSelectedText: '#FFFFFF',
       colorCalCellDisabled: 'rgba(87, 88, 139, 0.05)',
@@ -294,6 +296,10 @@ let defaultCustomizeSettings = {
           name: globalLabels.show_busy_slots,
           visibility: false,
         },
+        calendarDateBusynessVisibility: {
+          name: globalLabels.show_calendar_date_busyness,
+          visibility: true,
+        },
         primaryFooterButton: {
           name: globalLabels.continue_button_type,
           buttonType: 'filled',
@@ -364,9 +370,17 @@ let defaultCustomizeSettings = {
           name: globalLabels.show_indicator_pricing,
           visibility: false
         },
+        peopleWaitingVisibility: {
+          name: globalLabels.show_people_waiting,
+          visibility: true
+        },
         busyTimeSlotsVisibility: {
           name: globalLabels.show_busy_slots,
           visibility: false,
+        },
+        calendarDateBusynessVisibility: {
+          name: globalLabels.show_calendar_date_busyness,
+          visibility: true,
         },
         primaryFooterButton: {
           name: globalLabels.continue_button_type,
@@ -458,6 +472,10 @@ let defaultCustomizeSettings = {
         busyTimeSlotsVisibility: {
           name: globalLabels.show_busy_slots,
           visibility: false,
+        },
+        calendarDateBusynessVisibility: {
+          name: globalLabels.show_calendar_date_busyness,
+          visibility: true,
         },
         primaryFooterButton: {
           name: globalLabels.continue_button_type,
@@ -2315,7 +2333,8 @@ let defaultTranslations = {
         labels: {
           date_time_slots_selected: null,
           total_tax_colon: null,
-          incl_tax:null
+          incl_tax:null,
+          waiting_list: null
         }
       },
       footer: {
@@ -2568,7 +2587,9 @@ let defaultTranslations = {
         name: globalLabels.heading_title,
         labels: {
           congratulations: null,
-          appointment_id: null
+          appointment_id: null,
+          your_position_on_waiting_list: null,
+          appointment_waiting_list_notify_message: null
         }
       },
       content: {
@@ -3283,7 +3304,8 @@ let defaultTranslations = {
           lesson_space_link: null,
           custom_fields: null,
           event_tickets: null,
-          event_ticket: null
+          event_ticket: null,
+          e_tickets: null,
         }
       },
       messages: {
@@ -3395,6 +3417,8 @@ let defaultTranslations = {
         name: globalLabels.page_card,
         labels: {
           reschedule: null,
+          preview_invoice: null,
+          download_invoice: null,
           cancel: null,
           google_meet_link: null,
           microsoft_teams_link: null,

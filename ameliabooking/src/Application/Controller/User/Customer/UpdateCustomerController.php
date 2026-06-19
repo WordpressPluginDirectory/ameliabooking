@@ -6,7 +6,7 @@ use AmeliaBooking\Application\Commands\User\Customer\UpdateCustomerCommand;
 use AmeliaBooking\Application\Commands\CommandResult;
 use AmeliaBooking\Application\Controller\Controller;
 use AmeliaBooking\Domain\Events\DomainEventBus;
-use Slim\Http\Request;
+use AmeliaVendor\Psr\Http\Message\ServerRequestInterface as Request;
 
 /**
  * Class UpdateCustomerController
@@ -37,7 +37,7 @@ class UpdateCustomerController extends Controller
         'pictureFullPath',
         'pictureThumbPath',
         'translations',
-        'customFields'
+        'customFields',
     ];
 
     /**
@@ -59,7 +59,11 @@ class UpdateCustomerController extends Controller
         $command->setField('id', $args['id']);
         $command->setToken($request);
 
-        $params = $request->getQueryParams();
+        $params = (array)$request->getQueryParams();
+
+        if (!empty($params)) {
+            $command->setField('params', $params);
+        }
 
         if (isset($params['source'])) {
             $command->setPage($params['source']);

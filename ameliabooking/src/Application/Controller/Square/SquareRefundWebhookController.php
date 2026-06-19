@@ -4,7 +4,7 @@ namespace AmeliaBooking\Application\Controller\Square;
 
 use AmeliaBooking\Application\Commands\Square\SquareRefundWebhookCommand;
 use AmeliaBooking\Application\Controller\Controller;
-use Slim\Http\Request;
+use AmeliaVendor\Psr\Http\Message\ServerRequestInterface as Request;
 
 /**
  * Class SquareRefundWebhookController
@@ -19,7 +19,8 @@ class SquareRefundWebhookController extends Controller
      * @var array
      */
     protected $allowedFields = [
-        'data'
+        'data',
+        'signature',
     ];
 
     /**

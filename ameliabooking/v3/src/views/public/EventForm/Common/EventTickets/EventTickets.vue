@@ -3,10 +3,15 @@
     class="am-elt"
     :class="props.globalClass"
     :style="cssVars"
+    role="region"
+    :aria-labelledby="ticketsHeadingId"
   >
     <div class="am-elt__header">
       <div  class="am-elt__header-left">
-        <p class="am-elt__heading">
+        <p
+          :id="ticketsHeadingId"
+          class="am-elt__heading"
+        >
           {{ amLabels.event_tickets }}
         </p>
         <p>
@@ -75,6 +80,9 @@ let props = defineProps({
   }
 })
 
+const uid = Math.random().toString(36).slice(2, 8)
+const ticketsHeadingId = `am-elt-heading-${uid}`
+
 // * Step functionality
 let {
   nextStep,
@@ -128,7 +136,7 @@ let isWaitingList = computed(() => store.getters['eventWaitingListOptions/getAva
 
 // * Event Tickets
 let tickets = computed(() => {
-  const sorted = [...(store.getters['tickets/getTicketsData'] || [])].sort((a, b) => a.price - b.price)
+  const sorted = [...(store.getters['tickets/getTicketsData'] || [])]
   if (window?.ameliaActions?.EventTickets) {
     let override
     useAction(
@@ -206,7 +214,7 @@ export default {
   .am-elt {
 
     & > * {
-      font-family: var(--am-font-family);
+      font-family: var(--am-font-family), sans-serif;
       box-sizing: border-box;
       word-break: break-word;
 

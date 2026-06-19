@@ -116,9 +116,6 @@ import {
   useExtrasData
 } from "../../../../../../assets/js/admin/booking";
 import {
-  useAuthorizationHeaderObject
-} from "../../../../../../assets/js/public/panel";
-import {
   useColorTransparency
 } from "../../../../../../assets/js/common/colorManipulation";
 
@@ -189,7 +186,7 @@ function cancelBooking () {
   httpClient.post(
     '/bookings/cancel/' + targetBooking.value.id,
     {type: 'appointment'},
-    Object.assign(useAuthorizationHeaderObject(store), {params: {source: 'cabinet-' + cabinetType.value}})
+    {params: {source: 'cabinet-' + cabinetType.value}}
   ).then(() => {
     targetBooking.value = null
     emits('canceled', {message: amLabels.value.appointment_canceled})
@@ -282,12 +279,17 @@ function appointmentCustomers(appointment) {
   return appointment.bookings
     .filter((b) => b.status !== 'rejected' && b.status !== 'canceled')
     .map((b) => {
+      let customer
       if ('info' in b && b.info) {
-        let customer = 'customer' in b ? b.customer : {}
-        return Object.assign(customer, JSON.parse(b.info))
+        customer = 'customer' in b ? b.customer : {}
+        customer = Object.assign(customer, JSON.parse(b.info))
       } else {
-        return b.customer
+        customer = b.customer
       }
+      
+      // Add booking status to customer data
+      customer.bookingStatus = b.status
+      return customer
     })
 }
 

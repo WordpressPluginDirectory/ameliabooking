@@ -63,12 +63,20 @@
             v-if="item.id in customizedOptions && 'visibility' in customizedOptions[item.id] ? customizedOptions[item.id].visibility : true"
             ref="customerCollectorRef"
             v-model="infoFormData[item.id]"
-            v-model:countryPhoneIso="infoFormConstruction[item.id].countryPhoneIso"
+            v-model:countryCode="infoFormConstruction[item.id].countryCode"
             v-bind="infoFormConstruction[item.id].props"
+            v-on="'handlers' in infoFormConstruction[item.id] ? infoFormConstruction[item.id].handlers : {}"
           ></component>
         </template>
 
-        <el-form-item v-if="amSettings.mailchimp.subscribeFieldVisible && customizedOptions.email.visibility" class="am-elfci__item am-subscribe" >
+        <el-form-item
+          v-if="
+            amSettings.featuresIntegrations.mailchimp.enabled &&
+            amSettings.mailchimp.subscribeFieldVisible &&
+            customizedOptions.email.visibility
+          "
+          class="am-elfci__item am-subscribe"
+        >
           <AmCheckbox
             v-model="subscribeToMailchimp"
             :label="amLabels.subscribe_to_mailing_list"
@@ -149,6 +157,7 @@ import AmSocialButton from "../../../../common/FormFields/AmSocialButton.vue";
 import {SocialAuthOptions} from "../../../../../assets/js/admin/socialAuthOptions";
 import AmCheckbox from "../../../../_components/checkbox/AmCheckbox.vue";
 import {mapAddressComponentsForXML} from "../../../../../assets/js/common/helper";
+import { useIvyMapping } from "../../../../../assets/js/public/ivy";
 
 let props = defineProps({
   globalClass: {
@@ -168,6 +177,8 @@ const store = useStore()
 store.dispatch('customerInfo/requestCurrentUserData')
 // filter custom fields
 store.dispatch('customFields/filterEventCustomFields')
+
+const shortcodeData = inject('shortcodeData')
 
 watch(
     () => store.getters['customerInfo/getLoggedUser'],
@@ -289,6 +300,10 @@ let couponCode = ref('')
 // * Form field date picker needs refresh
 let refreshDatePickerValue = ref(false)
 
+let phoneError = ref(false)
+let isPhoneValid = ref(false)
+let refreshPhoneComponent = ref(0)
+
 // * Form data
 let infoFormData = ref({
   firstName: computed({
@@ -326,9 +341,6 @@ let infoFormConstruction = ref({
       label: amLabels.value.first_name_colon,
       placeholder: amLabels.value.enter_first_name,
       class: 'am-elfci__item',
-      disabled: computed(() => {
-        return !!(store.getters['customerInfo/getCustomerFirstName'] && store.getters['customerInfo/getLoggedUser'])
-      })
     }
   },
   lastName: {
@@ -338,9 +350,6 @@ let infoFormConstruction = ref({
       label: amLabels.value.last_name_colon,
       placeholder: amLabels.value.enter_last_name,
       class: 'am-elfci__item',
-      disabled: computed(() => {
-        return !!(store.getters['customerInfo/getCustomerLastName'] && store.getters['customerInfo/getLoggedUser'])
-      })
     }
   },
   email: {
@@ -350,14 +359,14 @@ let infoFormConstruction = ref({
       label: amLabels.value.email_colon,
       placeholder: amLabels.value.enter_email,
       class: 'am-elfci__item',
-      disabled: computed(() => {
-        return !!(store.getters['customerInfo/getCustomerEmail'] && store.getters['customerInfo/getLoggedUser'])
-      })
     }
   },
   phone: {
-    countryPhoneIso: computed({
-      get: () => store.getters['customerInfo/getCustomerCountryPhoneIso'],
+    countryCode: computed({
+      get: () => {
+        const iso = store.getters['customerInfo/getCustomerCountryPhoneIso']
+        return iso ? iso.toUpperCase() : ''
+      },
       set: (val) => {
         store.commit('customerInfo/setCustomerCountryPhoneIso', val ? val.toLowerCase() : '')
       }
@@ -367,17 +376,24 @@ let infoFormConstruction = ref({
       itemName: 'phone',
       label: amLabels.value.phone_colon,
       placeholder: amLabels.value.enter_phone,
-      defaultCode: amSettings.general.phoneDefaultCountryCode === 'auto' ? '' : amSettings.general.phoneDefaultCountryCode.toLowerCase(),
-      phoneError: false,
+      phoneError: computed(() => phoneError.value && !isPhoneValid.value),
+      errorMessage: computed(() => phoneError.value && !isPhoneValid.value && infoFormData.value.phone ? amLabels.value.enter_valid_phone_warning : ''),
       whatsAppLabel: amLabels.value.whatsapp_opt_in_text,
-      isWhatsApp: amSettings.notifications.whatsAppEnabled
-        && amSettings.notifications.whatsAppAccessToken
-        && amSettings.notifications.whatsAppBusinessID
-        && amSettings.notifications.whatsAppPhoneID,
+      isWhatsApp: computed(() => amSettings.notifications.whatsAppEnabled && !(phoneError.value && !isPhoneValid.value)),
       class: 'am-elfci__item',
-      disabled: computed(() => {
-        return !!(store.getters['customerInfo/getCustomerPhone'] && store.getters['customerInfo/getLoggedUser'])
-      })
+      noResultsLabel: amLabels.value.no_results_found,
+      refreshTrigger: computed(() => refreshPhoneComponent.value),
+    },
+    handlers: {
+      handlePhoneData: (phoneData) => {
+        if (phoneData && !phoneData.countryCode && !store.getters['customerInfo/getCustomerCountryPhoneIso'] && amSettings.general.phoneDefaultCountryCode !== 'auto') {
+          store.commit('customerInfo/setCustomerCountryPhoneIso', amSettings.general.phoneDefaultCountryCode.toLowerCase())
+        }
+
+        store.commit('customerInfo/setCustomerPhone', phoneData && typeof phoneData.formatNational === 'string' ? phoneData.formatNational.replace(/\s+/g, "") : "")
+
+        isPhoneValid.value = !!phoneData.isValid
+      }
     }
   },
 })
@@ -410,7 +426,7 @@ let infoFormRules = ref({
     {
       required: customizedOptions.value.phone.required,
       message: amLabels.value.enter_phone_warning,
-      trigger: 'submit',
+      trigger: ['blur', 'submit'],
     }
   ],
 })
@@ -561,6 +577,10 @@ onMounted(() => {
       }
     })
   }
+
+  if (useIvyMapping(store, shortcodeData, infoFormData)) {
+    refreshPhoneComponent.value++
+  }
 })
 
 // * Submit Form
@@ -583,7 +603,8 @@ function submitForm() {
   )
 
   infoFormRef.value.validate((valid) => {
-    if (valid) {
+    if (valid && (customizedOptions.value.phone.required ? isPhoneValid.value : true)) {
+      phoneError.value = false
       if (isWaitingAvailable.value) {
         store.commit('payment/setPaymentGateway', 'onSite')
 
@@ -607,15 +628,23 @@ function submitForm() {
       // store.commit('setLoading', false)
       let fieldElement
 
+      let phoneField = infoFormRef.value.fields.find(el => el.prop === 'phone')
+      let shouldFlagPhone = phoneField
+        && customizedOptions.value.phone.visibility
+        && (customizedOptions.value.phone.required || !!infoFormData.value.phone)
+        && !isPhoneValid.value
+
+      if (shouldFlagPhone) {
+        phoneField.validateState = 'error'
+      }
+      phoneError.value = !!(phoneField && phoneField.validateState === 'error')
+
       infoFormRef.value.fields.some(el => {
         if (el.validateState === 'error') {
           fieldElement = el.$el
           return el.validateState === 'error'
         }
       })
-
-      let phoneField = infoFormRef.value.fields.find(el => el.prop === 'phone')
-      infoFormConstruction.value.phone.props.phoneError = !!(phoneField && phoneField.validateState === 'error')
 
       // * Scroll to first error
       useScrollTo(infoFormWrapperRef.value, fieldElement, 0, 300)
@@ -718,6 +747,12 @@ function setDataFromSocialLogin(data) {
   infoFormData.value.firstName = data.firstName
   infoFormData.value.lastName = data.lastName
   infoFormData.value.email = data.email
+  if (data.phone) {
+    infoFormData.value.phone = data.phone
+    const normalizedIso = data.countryPhoneIso ? data.countryPhoneIso.trim().toLowerCase() : ''
+    store.commit('customerInfo/setCustomerCountryPhoneIso', normalizedIso)
+    refreshPhoneComponent.value++
+  }
 }
 </script>
 
@@ -882,7 +917,6 @@ export default {
             font-weight: 500;
             line-height: unset;
             margin-bottom: 4px;
-            padding: 0;
 
             &:before {
               color: var(--am-c-error);

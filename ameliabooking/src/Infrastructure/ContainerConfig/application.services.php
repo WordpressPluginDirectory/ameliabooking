@@ -10,12 +10,14 @@ use AmeliaBooking\Application\Services\Bookable\BookableApplicationService;
 use AmeliaBooking\Application\Services\Booking\AppointmentApplicationService;
 use AmeliaBooking\Application\Services\Booking\BookingApplicationService;
 use AmeliaBooking\Application\Services\Booking\EventApplicationService;
+use AmeliaBooking\Application\Services\Calendar\CalendarProviderService;
 use AmeliaBooking\Application\Services\Cache\CacheApplicationService;
 use AmeliaBooking\Application\Services\Entity\EntityApplicationService;
 use AmeliaBooking\Application\Services\Gallery\GalleryApplicationService;
 use AmeliaBooking\Application\Services\Payment\PaymentApplicationService;
 use AmeliaBooking\Application\Services\Reservation\ReservationService;
 use AmeliaBooking\Application\Services\TimeSlot\TimeSlotService;
+use AmeliaBooking\Application\Services\WaitingList\WaitingListService;
 use AmeliaBooking\Application\Services\User\CustomerApplicationService;
 use AmeliaBooking\Application\Services\User\ProviderApplicationService;
 use AmeliaBooking\Application\Services\User\UserApplicationService;
@@ -253,6 +255,28 @@ $entries['application.gallery.service'] = function ($c) {
  */
 $entries['application.timeSlot.service'] = function ($c) {
     return new AmeliaBooking\Application\Services\TimeSlot\TimeSlotService($c);
+};
+
+/**
+ * Calendar provider service
+ *
+ * @param Container $c
+ *
+ * @return CalendarProviderService
+ */
+$entries['application.calendar.provider.service'] = function ($c) {
+    return new AmeliaBooking\Application\Services\Calendar\CalendarProviderService($c);
+};
+
+/**
+ * Calendar service
+ *
+ * @param Container $c
+ *
+ * @return WaitingListService
+ */
+$entries['application.waitingList.service'] = function ($c) {
+    return new AmeliaBooking\Application\Services\WaitingList\WaitingListService($c);
 };
 
 /**

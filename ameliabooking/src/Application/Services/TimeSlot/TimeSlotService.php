@@ -5,6 +5,7 @@ namespace AmeliaBooking\Application\Services\TimeSlot;
 use AmeliaBooking\Application\Services\Booking\EventApplicationService;
 use AmeliaBooking\Application\Services\Location\AbstractLocationApplicationService;
 use AmeliaBooking\Application\Services\Resource\AbstractResourceApplicationService;
+use AmeliaBooking\Application\Services\User\ProviderApplicationService;
 use AmeliaBooking\Application\Services\User\UserApplicationService;
 use AmeliaBooking\Domain\Entity\Booking\Appointment\Appointment;
 use AmeliaBooking\Domain\Entity\Booking\SlotsEntities;
@@ -18,6 +19,7 @@ use AmeliaBooking\Domain\Entity\Bookable\Service\Service;
 use AmeliaBooking\Domain\Services\TimeSlot\TimeSlotService as DomainTimeSlotService;
 use AmeliaBooking\Domain\Services\DateTime\DateTimeService;
 use AmeliaBooking\Domain\Services\Settings\SettingsService;
+use AmeliaBooking\Domain\Services\User\ProviderService;
 use AmeliaBooking\Domain\ValueObjects\String\Status;
 use AmeliaBooking\Infrastructure\Common\Container;
 use AmeliaBooking\Infrastructure\Common\Exceptions\QueryExecutionException;
@@ -272,6 +274,9 @@ class TimeSlotService
         /** @var EventApplicationService $eventApplicationService */
         $eventApplicationService = $this->container->get('application.booking.event.service');
 
+        /** @var ProviderApplicationService $providerApplicationService */
+        $providerApplicationService = $this->container->get('application.user.provider.service');
+
         try {
             $googleCalendarService->removeSlotsFromGoogleCalendar(
                 $providers,
@@ -311,6 +316,14 @@ class TimeSlotService
                 DateTimeService::getCustomDateTimeObject($props['startDateTime']->format('Y-m-d H:i:s'))
                     ->modify('+2 years')
                     ->format('Y-m-d H:i:s')
+            ]
+        );
+
+        $providerApplicationService->removeSlotsFromBlockTime(
+            $providers,
+            [
+                $props['startDateTime']->format('Y-m-d H:i:s'),
+                $props['endDateTime']->format('Y-m-d H:i:s')
             ]
         );
     }
@@ -379,39 +392,39 @@ class TimeSlotService
 
         return [
             'allowAdminBookAtAnyTime'    =>
-                isset($customSettings['allowAdminBookAtAnyTime']) ? filter_var($customSettings['allowAdminBookAtAnyTime'], FILTER_VALIDATE_BOOLEAN) :
-                (!$isFrontEndBooking &&
-                $userApplicationService->isAdminAndAllowedToBookAtAnyTime()),
+            isset($customSettings['allowAdminBookAtAnyTime'])
+                ? filter_var($customSettings['allowAdminBookAtAnyTime'], FILTER_VALIDATE_BOOLEAN) :
+                (!$isFrontEndBooking && $userApplicationService->isAdminAndAllowedToBookAtAnyTime()),
             'allowAdminBookOverApp'      => isset($customSettings['allowAdminBookOverApp']) ?
-                filter_var($customSettings['allowAdminBookOverApp'], FILTER_VALIDATE_BOOLEAN) :
-                (
+                filter_var($customSettings['allowAdminBookOverApp'], FILTER_VALIDATE_BOOLEAN) : (
                     !$isFrontEndBooking &&
                     $userApplicationService->isAdminAndAllowedToBookOver()
                 ),
             'isGloballyBusySlot'         =>
-                $settingsDomainService->getSetting('appointments', 'isGloballyBusySlot') &&
+            $settingsDomainService->getSetting('appointments', 'isGloballyBusySlot') &&
                 !$slotsEntities->getResources()->length(),
             'allowBookingIfPending'      =>
-                isset($customSettings['allowBookingIfPending']) ? filter_var($customSettings['allowBookingIfPending'], FILTER_VALIDATE_BOOLEAN) :
+            isset($customSettings['allowBookingIfPending']) ? filter_var($customSettings['allowBookingIfPending'], FILTER_VALIDATE_BOOLEAN) :
                 $settingsDomainService->getSetting('appointments', 'allowBookingIfPending'),
             'allowBookingIfNotMin'       =>
-                isset($customSettings['allowBookingIfNotMin']) ? filter_var($customSettings['allowBookingIfNotMin'], FILTER_VALIDATE_BOOLEAN) :
+            isset($customSettings['allowBookingIfNotMin']) ? filter_var($customSettings['allowBookingIfNotMin'], FILTER_VALIDATE_BOOLEAN) :
                 $settingsDomainService->getSetting('appointments', 'allowBookingIfNotMin'),
             'openedBookingAfterMin'      =>
-                $settingsDomainService->getSetting('appointments', 'openedBookingAfterMin'),
+            $settingsDomainService->getSetting('appointments', 'openedBookingAfterMin'),
             'timeSlotLength'             => isset($customSettings['timeSlotLength']) ? (int)$customSettings['timeSlotLength'] :
                 $settingsDomainService->getSetting('general', 'timeSlotLength'),
             'serviceDurationAsSlot'      =>
-                isset($customSettings['serviceDurationAsSlot']) ? filter_var($customSettings['serviceDurationAsSlot'], FILTER_VALIDATE_BOOLEAN) :
+            isset($customSettings['serviceDurationAsSlot']) ? filter_var($customSettings['serviceDurationAsSlot'], FILTER_VALIDATE_BOOLEAN) :
                 $settingsDomainService->getSetting('general', 'serviceDurationAsSlot'),
             'bufferTimeInSlot'           =>
-                isset($customSettings['bufferTimeInSlot']) ? filter_var($customSettings['bufferTimeInSlot'], FILTER_VALIDATE_BOOLEAN) :
+            isset($customSettings['bufferTimeInSlot']) ? filter_var($customSettings['bufferTimeInSlot'], FILTER_VALIDATE_BOOLEAN) :
                 $settingsDomainService->getSetting('general', 'bufferTimeInSlot'),
             'globalDaysOff'              => $settingsApplicationService->getGlobalDaysOff(),
             'adminServiceDurationAsSlot' => !$isFrontEndBooking &&
                 $userApplicationService->isAdminAndAllowedToBookAtAnyTime() &&
                 $settingsDomainService->getSetting('roles', 'adminServiceDurationAsSlot'),
             'limitPerEmployee' => $settingsDomainService->getSetting('roles', 'limitPerEmployee'),
+            'timezonesFeatureEnabled' => $settingsDomainService->getSetting('featuresIntegrations', 'timezones')['enabled'],
         ];
     }
 
@@ -424,6 +437,9 @@ class TimeSlotService
      */
     public function getSlotsEntities($props)
     {
+        /** @var SettingsService $settingsDS */
+        $settingsDS = $this->container->get('domain.settings.service');
+
         /** @var ServiceRepository $serviceRepository */
         $serviceRepository = $this->container->get('domain.bookable.service.repository');
 
@@ -459,7 +475,9 @@ class TimeSlotService
         $locations = $locationAS->getAllIndexedById();
 
         /** @var Collection $resources */
-        $resources = $resourceApplicationService->getAll(['status' => Status::VISIBLE]);
+        $resources = $settingsDS->isFeatureEnabled('resources')
+            ? $resourceApplicationService->getAll(['status' => Status::VISIBLE])
+            : new Collection();
 
         /** @var SlotsEntities $slotEntities */
         $slotEntities = SlotsEntitiesFactory::create();

@@ -76,19 +76,6 @@
         </el-form-item>
 
         <el-form-item
-          :prop="'monthDate'"
-          class="am-capei-recurr__form-item"
-        >
-          <AmDatePicker
-            v-model="recurringFormData.monthDate"
-            :disabled="recurringFormData.monthlyRepeat === 'on' || props.recurringUntil !== null"
-            :format="momentDateFormat()"
-            :lang="localLanguage"
-            :placeholder="amLabels.select_date"
-          />
-        </el-form-item>
-
-        <el-form-item
           :prop="'on'"
           class="am-capei-recurr__form-item"
         >

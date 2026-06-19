@@ -82,7 +82,15 @@ class UpdateNotificationCommandHandler extends CommandHandler
         $content = $command->getField('content');
 
         if ($command->getField('type') === 'email') {
-            $content = preg_replace("/\r|\n/", "", $content);
+            // If content has paragraph tags, only remove newlines between HTML tags (formatting)
+            // Otherwise convert newlines to <br> tags for plain text content
+            if (strpos($content, '<p>') !== false || strpos($content, '<P>') !== false) {
+                // WYSIWYG mode: strip line breaks/indentation between tags only; keep spaces (e.g. between inline elements)
+                $content = preg_replace('/>(?:\s*\R\s*)+</', '><', $content);
+            } else {
+                // Plain text/HTML mode: convert newlines to <br> tags
+                $content = nl2br($content);
+            }
         }
 
         if ($command->getField('type') !== 'whatsapp') {
@@ -91,7 +99,7 @@ class UpdateNotificationCommandHandler extends CommandHandler
             $content       = $contentRes[1];
         }
 
-        $isCustom = $command->getField('customName') !== null ;
+        $isCustom = $command->getField('customName') !== null;
 
         $notificationData['id']      = $notificationId;
         $notificationData['name']    = $isCustom ? $command->getField('name') : $currentNotification->getName()->getValue();
@@ -151,6 +159,6 @@ class UpdateNotificationCommandHandler extends CommandHandler
 
         do_action('amelia_after_notification_updated', $notification->toArray());
 
-        return $result;
+         return $result;
     }
 }

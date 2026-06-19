@@ -7,7 +7,7 @@ use AmeliaBooking\Application\Commands\User\LogoutCabinetCommand;
 use AmeliaBooking\Application\Controller\Controller;
 use AmeliaBooking\Domain\Events\DomainEventBus;
 use RuntimeException;
-use Slim\Http\Request;
+use AmeliaVendor\Psr\Http\Message\ServerRequestInterface as Request;
 
 /**
  * Class LogoutCabinetController
@@ -44,5 +44,22 @@ class LogoutCabinetController extends Controller
      */
     protected function emitSuccessEvent(DomainEventBus $eventBus, CommandResult $result)
     {
+        if ($result->getResult() !== CommandResult::RESULT_SUCCESS || headers_sent()) {
+            return;
+        }
+
+        foreach (['ameliaToken', 'ameliaUserEmail'] as $cookieName) {
+            setcookie(
+                $cookieName,
+                '',
+                [
+                    'expires'  => time() - 3600,
+                    'path'     => '/',
+                    'secure'   => is_ssl(),
+                    'httponly' => false,
+                    'samesite' => 'Lax',
+                ]
+            );
+        }
     }
 }

@@ -13,9 +13,14 @@ use AmeliaBooking\Infrastructure\Common\Exceptions\QueryExecutionException;
 use AmeliaBooking\Infrastructure\Connection;
 use AmeliaBooking\Infrastructure\Repository\AbstractRepository;
 use AmeliaBooking\Domain\Factory\Location\LocationFactory;
+use AmeliaBooking\Infrastructure\WP\InstallActions\DB\Bookable\CategoriesTable;
 use AmeliaBooking\Infrastructure\WP\InstallActions\DB\Bookable\ServicesTable;
 use AmeliaBooking\Infrastructure\WP\InstallActions\DB\Booking\AppointmentsTable;
+use AmeliaBooking\Infrastructure\WP\InstallActions\DB\Booking\EventsPeriodsTable;
+use AmeliaBooking\Infrastructure\WP\InstallActions\DB\Booking\EventsTable;
 use AmeliaBooking\Infrastructure\WP\InstallActions\DB\User\Provider\ProvidersLocationTable;
+use AmeliaBooking\Infrastructure\WP\InstallActions\DB\User\Provider\ProvidersPeriodLocationTable;
+use AmeliaBooking\Infrastructure\WP\InstallActions\DB\User\Provider\ProvidersPeriodTable;
 use AmeliaBooking\Infrastructure\WP\InstallActions\DB\User\Provider\ProvidersServiceTable;
 use AmeliaBooking\Infrastructure\WP\InstallActions\DB\User\UsersTable;
 
@@ -68,7 +73,7 @@ class LocationRepository extends AbstractRepository implements LocationRepositor
     /**
      * @param Location $location
      *
-     * @return bool
+     * @return int
      * @throws QueryExecutionException
      */
     public function add($location)
@@ -86,7 +91,8 @@ class LocationRepository extends AbstractRepository implements LocationRepositor
             ':pictureFullPath'  => $data['pictureFullPath'],
             ':pictureThumbPath' => $data['pictureThumbPath'],
             ':pin'              => $data['pin'],
-            ':translations'     => $data['translations']
+            ':translations'     => $data['translations'],
+            ':countryPhoneIso'  => isset($data['countryPhoneIso']) ? $data['countryPhoneIso'] : null
         ];
 
         try {
@@ -103,7 +109,8 @@ class LocationRepository extends AbstractRepository implements LocationRepositor
                 `pictureFullPath`,
                 `pictureThumbPath`,
                 `pin`,
-                `translations`
+                `translations`,
+                `countryPhoneIso`
                 )
                  VALUES (
                  :status,
@@ -116,16 +123,14 @@ class LocationRepository extends AbstractRepository implements LocationRepositor
                  :pictureFullPath,
                  :pictureThumbPath,
                  :pin,
-                 :translations
+                 :translations,
+                 :countryPhoneIso
                  )"
             );
 
-            $res = $statement->execute($params);
-            if (!$res) {
-                throw new QueryExecutionException('Unable to add data in ' . __CLASS__);
-            }
+            $statement->execute($params);
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to add data in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to add data in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return $this->connection->lastInsertId();
@@ -154,7 +159,8 @@ class LocationRepository extends AbstractRepository implements LocationRepositor
             ':pictureThumbPath' => $data['pictureThumbPath'],
             ':pin'              => $data['pin'],
             ':translations'     => $data['translations'],
-            ':id'               => $id
+            ':id'               => $id,
+            ':countryPhoneIso'  => isset($data['countryPhoneIso']) ? $data['countryPhoneIso'] : null
         ];
 
         try {
@@ -163,52 +169,15 @@ class LocationRepository extends AbstractRepository implements LocationRepositor
                 SET `status` = :status, `name` = :name, `description` = :description, `address` = :address,
                 `phone` = :phone, `latitude` = :latitude, `longitude` = :longitude,
                 `pictureFullPath` = :pictureFullPath, `pictureThumbPath` = :pictureThumbPath,
-                `pin` = :pin, `translations` = :translations
+                `pin` = :pin, `translations` = :translations, `countryPhoneIso` = :countryPhoneIso
                 WHERE id = :id"
             );
 
-            $res = $statement->execute($params);
-            if (!$res) {
-                throw new QueryExecutionException('Unable to save data in ' . __CLASS__);
-            }
+            $statement->execute($params);
 
-            return $res;
+            return true;
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to save data in ' . __CLASS__, $e->getCode(), $e);
-        }
-    }
-
-    /**
-     * @param int    $id
-     * @param string $status
-     *
-     * @return mixed
-     * @throws QueryExecutionException
-     */
-    public function updateStatusById($id, $status)
-    {
-        $params = [
-            ':id'     => $id,
-            ':status' => $status
-        ];
-
-        try {
-            $statement = $this->connection->prepare(
-                "UPDATE {$this->table}
-                SET
-                `status` = :status
-                WHERE id = :id"
-            );
-
-            $res = $statement->execute($params);
-
-            if (!$res) {
-                throw new QueryExecutionException('Unable to save data in ' . __CLASS__);
-            }
-
-            return $res;
-        } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to save data in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to save data in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
     }
 
@@ -226,7 +195,7 @@ class LocationRepository extends AbstractRepository implements LocationRepositor
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to get data from ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to get data from ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         $items = new Collection();
@@ -251,16 +220,30 @@ class LocationRepository extends AbstractRepository implements LocationRepositor
 
         $order = '';
         if (!empty($criteria['sort'])) {
-            $orderColumn    = $criteria['sort'][0] === '-' ? substr($criteria['sort'], 1) : $criteria['sort'];
-            $orderDirection = $criteria['sort'][0] === '-' ? 'DESC' : 'ASC';
-            $order          = "ORDER BY {$orderColumn} {$orderDirection}";
+            $orderColumn = $criteria['sort']['field'];
+            $orderDirection = $criteria['sort']['order'];
+            $order = "ORDER BY {$orderColumn} {$orderDirection}";
         }
 
         $search = '';
         if (!empty($criteria['search'])) {
-            $params[':search1'] = $params[':search2'] = "%{$criteria['search']}%";
+            $terms = preg_split('/\s+/', trim($criteria['search']));
+            $termIndex = 0;
+            $where = [];
 
-            $search = ' AND (l.name LIKE :search1 OR l.address LIKE :search2)';
+            foreach ($terms as $term) {
+                $param = ":search{$termIndex}";
+                $params[$param] = "%{$term}%";
+
+                $where[] = "(
+                        l.name LIKE {$param}
+                        OR l.address LIKE {$param}
+                        OR l.id LIKE {$param}
+                    )";
+
+                $termIndex++;
+            }
+            $search = ' AND (' . implode(' AND ', $where) . ')';
         }
 
         $services = '';
@@ -272,6 +255,12 @@ class LocationRepository extends AbstractRepository implements LocationRepositor
             }
 
             $services = ' AND s.id IN (' . rtrim($services, ', ') . ')';
+        }
+
+        $status = '';
+        if (isset($criteria['status'])) {
+            $status = ' AND l.status = :status';
+            $params[':status'] = $criteria['status'];
         }
 
         $limit = $this->getLimit(
@@ -293,12 +282,13 @@ class LocationRepository extends AbstractRepository implements LocationRepositor
                   l.pictureFullPath,
                   l.pictureThumbPath,
                   l.pin,
-                  l.translations
+                  l.translations,
+                  l.countryPhoneIso
                 FROM {$this->table} l
                 LEFT JOIN {$this->providerLocationTable} pl ON pl.locationId = l.id
                 LEFT JOIN {$this->providerServicesTable}  ps ON ps.userId = pl.userId
                 LEFT JOIN {$this->servicesTable} s ON s.id = ps.serviceId
-                WHERE 1 = 1 $search $services
+                WHERE 1 = 1 $search $services $status
                 GROUP BY l.id
                 {$order}
                 {$limit}"
@@ -308,7 +298,7 @@ class LocationRepository extends AbstractRepository implements LocationRepositor
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to get data from ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to get data from ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         $items = [];
@@ -336,9 +326,23 @@ class LocationRepository extends AbstractRepository implements LocationRepositor
 
         $search = '';
         if (!empty($criteria['search'])) {
-            $params[':search1'] = $params[':search2'] = "%{$criteria['search']}%";
+            $terms = preg_split('/\s+/', trim($criteria['search']));
+            $termIndex = 0;
+            $where = [];
 
-            $search = ' AND (l.name LIKE :search1 OR l.address LIKE :search2)';
+            foreach ($terms as $term) {
+                $param = ":search{$termIndex}";
+                $params[$param] = "%{$term}%";
+
+                $where[] = "(
+                        l.name LIKE {$param}
+                        OR l.address LIKE {$param}
+                        OR l.id LIKE {$param}
+                    )";
+
+                $termIndex++;
+            }
+            $search = ' AND (' . implode(' AND ', $where) . ')';
         }
 
         $services = '';
@@ -374,7 +378,7 @@ class LocationRepository extends AbstractRepository implements LocationRepositor
 
             $rows = $statement->fetch()['count'];
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to get data from ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to get data from ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return $rows;
@@ -409,7 +413,7 @@ class LocationRepository extends AbstractRepository implements LocationRepositor
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to get data from ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to get data from ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         $items = [];
@@ -469,7 +473,7 @@ class LocationRepository extends AbstractRepository implements LocationRepositor
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to get data from ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to get data from ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         $result = [];
@@ -528,7 +532,7 @@ class LocationRepository extends AbstractRepository implements LocationRepositor
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to get data from ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to get data from ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         $result = [];
@@ -543,7 +547,7 @@ class LocationRepository extends AbstractRepository implements LocationRepositor
     /**
      * @param $locationId
      *
-     * @return string
+     * @return boolean
      * @throws QueryExecutionException
      */
     public function addViewStats($locationId)
@@ -585,13 +589,9 @@ class LocationRepository extends AbstractRepository implements LocationRepositor
                 );
             }
 
-            $response = $statement->execute($params);
+            $statement->execute($params);
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to add data in ' . __CLASS__, $e->getCode(), $e);
-        }
-
-        if (!$response) {
-            throw new QueryExecutionException('Unable to add data in ' . __CLASS__);
+            throw new QueryExecutionException('Unable to add data in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return true;
@@ -614,9 +614,97 @@ class LocationRepository extends AbstractRepository implements LocationRepositor
                 "DELETE FROM {$this->locationViewsTable} WHERE locationId = :locationId"
             );
 
-            return $statement->execute($params);
+            $statement->execute($params);
+            return true;
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to delete data from ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to delete data from ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
+    }
+
+
+    /**
+     * @param $id
+     *
+     * @return Collection
+     * @throws InvalidArgumentException
+     * @throws QueryExecutionException
+     */
+    public function getByIdWithEntities($id)
+    {
+        $usersTable = UsersTable::getTableName();
+        $providerPeriodsTable = ProvidersPeriodTable::getTableName();
+        $providerPeriodsLocations = ProvidersPeriodLocationTable::getTableName();
+        $eventsTable = EventsTable::getTableName();
+        $categoriesTable = CategoriesTable::getTableName();
+        $eventPeriodsTable = EventsPeriodsTable::getTableName();
+
+        $params = [
+            ':id' => $id,
+            ':eventLocationId' => $id
+        ];
+
+        try {
+            $statement = $this->connection->prepare("
+              SELECT 
+                  l.id AS location_id,
+                  l.status AS location_status,
+                  l.name AS location_name,
+                  l.description AS location_description,
+                  l.address AS location_address,
+                  l.phone AS location_phone,
+                  l.latitude AS location_latitude,
+                  l.longitude AS location_longitude,
+                  l.pictureFullPath AS location_pictureFullPath,
+                  l.pictureThumbPath AS location_pictureThumbPath,
+                  l.pin AS location_pin,
+                  l.translations AS location_translations,
+                  
+                  pu.id AS provider_id,
+                  pu.firstName AS provider_firstName,
+                  pu.lastName AS provider_lastName,
+                  pu.email AS provider_email,
+                  pu.phone AS provider_phone,
+                  pu.pictureThumbPath AS provider_pictureThumbPath,
+                  pu.pictureFullPath AS provider_pictureFullPath,
+
+                  s.id AS service_id,
+                  s.name AS service_name,
+                  s.color AS service_color,
+                  
+                  c.id AS category_id,
+                  c.name AS category_name,
+                  
+                  e.id AS event_id,
+                  e.name AS event_name,
+                  e.color AS event_color,
+                  
+                  ep.id AS event_periodId,
+                  ep.periodStart AS event_periodStart,
+                  ep.periodEnd AS event_periodEnd,
+                  ep.zoomMeeting AS event_periodZoomMeeting,
+                  ep.lessonSpace AS event_periodLessonSpace,
+                  ep.googleMeetUrl AS event_googleMeetUrl
+            
+              FROM {$this->table} l
+              LEFT JOIN {$this->providerLocationTable} pl ON pl.locationId = l.id
+              LEFT JOIN {$providerPeriodsTable} pp ON pp.locationId = l.id
+              LEFT JOIN {$providerPeriodsLocations} ppl ON ppl.locationId = l.id
+              LEFT JOIN {$usersTable} pu ON pu.id = pl.userId
+              LEFT JOIN {$this->providerServicesTable} ps ON ps.userId = pl.userId
+              LEFT JOIN (SELECT * FROM {$this->servicesTable} LIMIT 11) s ON s.id = ps.serviceId
+              LEFT JOIN {$categoriesTable} c ON c.id = s.categoryId
+              LEFT JOIN (SELECT * FROM {$eventsTable} WHERE locationId = :eventLocationId LIMIT 11 ) e ON e.locationId = l.id
+              LEFT JOIN {$eventPeriodsTable} ep ON ep.eventId = e.id
+              WHERE l.id = :id 
+              ");
+
+            $statement->execute($params);
+
+            $rows = $statement->fetchAll();
+        } catch (\Exception $e) {
+            throw new QueryExecutionException('Unable to get data from ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
+        }
+
+        return call_user_func([static::FACTORY, 'createCollection'], $rows);
     }
 }

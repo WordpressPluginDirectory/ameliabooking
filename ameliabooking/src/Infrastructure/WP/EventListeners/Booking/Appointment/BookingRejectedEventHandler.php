@@ -1,7 +1,7 @@
 <?php
 
 /**
- * @copyright © TMS-Plugins. All rights reserved.
+ * @copyright © Melograno Ventures. All rights reserved.
  * @licence   See LICENCE.md for license details.
  */
 
@@ -67,7 +67,13 @@ class BookingRejectedEventHandler
         /** @var BookingApplicationService $bookingApplicationService */
         $bookingApplicationService = $container->get('application.booking.booking.service');
 
-        $appointment = $commandResult->getData()[$commandResult->getData()['type']];
+        $data = $commandResult->getData();
+
+        if (empty($data)) {
+            return;
+        }
+
+        $appointment = $data[$data['type']];
 
         if ($commandResult->getData()['type'] === Entities::APPOINTMENT) {
             $reservationObject = AppointmentFactory::create($appointment);

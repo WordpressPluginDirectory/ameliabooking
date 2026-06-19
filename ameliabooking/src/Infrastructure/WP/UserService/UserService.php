@@ -9,8 +9,9 @@ use AmeliaBooking\Domain\ValueObjects\String\Password;
 use AmeliaBooking\Infrastructure\Common\Exceptions\NotFoundException;
 use AmeliaBooking\Infrastructure\Common\Exceptions\QueryExecutionException;
 use AmeliaBooking\Infrastructure\Repository\User\UserRepository;
+use AmeliaBooking\Infrastructure\WP\HelperService\HelperService;
 use AmeliaBooking\Infrastructure\WP\UserRoles\UserRoles;
-use Slim\Container;
+use AmeliaBooking\Infrastructure\Common\Container;
 use WP_Error;
 
 /**
@@ -30,7 +31,6 @@ class UserService
      *
      * @param Container $container
      *
-     * @throws \Interop\Container\Exception\ContainerException
      */
     public function __construct($container)
     {
@@ -53,7 +53,9 @@ class UserService
             return null;
         }
 
-        $userType = UserRoles::getUserAmeliaRole($wpUser = wp_get_current_user()) ?: 'customer';
+        $wpUserType = UserRoles::getUserAmeliaRole($wpUser = wp_get_current_user());
+
+        $userType = $wpUserType ?: 'customer';
 
         try {
             // First try to get from repository
@@ -61,6 +63,7 @@ class UserService
 
             if (
                 !($currentUserEntity instanceof AbstractUser) ||
+                $userType !== $currentUserEntity->getType() ||
                 (
                     $userType === 'manager' &&
                     ($currentUserEntity->getType() === 'provider' || $currentUserEntity->getType() === 'customer')
@@ -82,7 +85,7 @@ class UserService
                         ? $wpUser->get('last_name')
                         : $wpUser->get('user_nicename'),
                     'email'      => $wpUser->get('user_email') ?: 'guest@example.com',
-                    'externalId' => $wpUser->ID
+                    'externalId' => $userType === AbstractUser::USER_ROLE_CUSTOMER ? $wpUser->ID : null,
                 ]
             ) : null;
         }
@@ -157,6 +160,16 @@ class UserService
             return null;
         }
 
+        if (
+            in_array(
+                UserRoles::getUserAmeliaRole($wpUser),
+                [AbstractUser::USER_ROLE_ADMIN, AbstractUser::USER_ROLE_MANAGER],
+                true
+            )
+        ) {
+            return $this->getWpUserById($wpUser->ID);
+        }
+
         $currentUserEntity = $this->usersRepository->findByExternalId($wpUser->ID);
 
         if (!($currentUserEntity instanceof AbstractUser)) {
@@ -209,10 +222,21 @@ class UserService
      */
     public static function logoutAmeliaUser()
     {
-        if (!empty($_COOKIE['ameliaToken'])) {
-            setcookie('ameliaToken', '', time() - 3600, '/');
-            setcookie('ameliaUserEmail', '', time() - 3600, '/');
-        }
+        $secureCookie = HelperService::isSSL();
+
+        setcookie('ameliaToken', '', [
+            'path' => '/',
+            'secure' => $secureCookie,
+            'httponly' => true,
+            'expires' => time() - 3600
+        ]);
+
+        setcookie('ameliaUserEmail', '', [
+            'path' => '/',
+            'secure' => $secureCookie,
+            'httponly' => true,
+            'expires' => time() - 3600
+        ]);
     }
 
     /**
@@ -236,7 +260,7 @@ class UserService
 
         $user = $userRepository->getByEntityId($userId, 'externalId');
 
-        if (!$user || $user->length() === 0) {
+        if ($user->length() === 0) {
             return;
         }
 

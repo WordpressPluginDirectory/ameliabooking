@@ -41,7 +41,7 @@ abstract class AbstractGoogleCalendarService
      *
      * @param $authCode
      * @param $redirectUri
-     * @return string
+     * @return array|string
      */
     abstract public function fetchAccessTokenWithAuthCode($authCode, $redirectUri);
 
@@ -136,4 +136,15 @@ abstract class AbstractGoogleCalendarService
         $startDateTime,
         $endDateTime
     );
+
+
+    /**
+     * Get calendar lists for multiple Google accounts
+     *
+     * @param array $accounts
+     * @param Provider $provider
+     *
+     * @return array
+     */
+    abstract public function getCalendarListsForAccounts(array $accounts, Provider $provider): array;
 }

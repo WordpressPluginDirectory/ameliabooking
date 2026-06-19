@@ -26,7 +26,7 @@ class NotificationRepository extends AbstractRepository implements NotificationR
     /**
      * @param Notification $entity
      *
-     * @return bool
+     * @return int
      * @throws QueryExecutionException
      */
     public function add($entity)
@@ -60,14 +60,11 @@ class NotificationRepository extends AbstractRepository implements NotificationR
                         :timeAfter, :subject, :content, :translations, :sendOnlyMe, :whatsAppTemplate, :minimumTimeBeforeBooking)"
             );
 
-            $res = $statement->execute($params);
-            if (!$res) {
-                throw new QueryExecutionException('Unable to add data in ' . __CLASS__);
-            }
+            $statement->execute($params);
 
             return $this->connection->lastInsertId();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to add data in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to add data in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
     }
 
@@ -116,33 +113,31 @@ class NotificationRepository extends AbstractRepository implements NotificationR
                 WHERE id = :id"
             );
 
-            $res = $statement->execute($params);
+            $statement->execute($params);
 
-            if (!$res) {
-                throw new QueryExecutionException('Unable to save data in ' . __CLASS__);
-            }
-
-            return $res;
+            return true;
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to save data in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to save data in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
     }
 
     /**
+     * @param bool $includeCustom Whether to include custom notifications
      * @return Collection
      * @throws QueryExecutionException
      * @throws InvalidArgumentException
      */
-    public function getAll()
+    public function getAll($includeCustom = true)
     {
-        $custom = !self::CUSTOM ? ' WHERE customName IS NULL' : '';
+        // Only include custom notifications if both self::CUSTOM is true AND $includeCustom parameter is true
+        $custom = (!self::CUSTOM || !$includeCustom) ? ' WHERE customName IS NULL' : '';
 
         try {
             $statement = $this->connection->query($this->selectQuery() . $custom);
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to get data from ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to get data from ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         $items = [];
@@ -156,14 +151,16 @@ class NotificationRepository extends AbstractRepository implements NotificationR
     /**
      * @param $name
      * @param $type
+     * @param bool $includeCustom Whether to include custom notifications (default: true for backward compatibility)
      *
      * @return Collection
      * @throws QueryExecutionException
      * @throws InvalidArgumentException
      */
-    public function getByNameAndType($name, $type)
+    public function getByNameAndType($name, $type, $includeCustom = true)
     {
-        $custom = !self::CUSTOM ? 'customName IS NULL AND ' : '';
+        // Only include custom notifications if both self::CUSTOM is true AND $includeCustom parameter is true
+        $custom = (!self::CUSTOM || !$includeCustom) ? 'customName IS NULL AND ' : '';
 
         try {
             $statement = $this->connection->prepare(
@@ -179,7 +176,7 @@ class NotificationRepository extends AbstractRepository implements NotificationR
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find by name and type in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find by name and type in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         $items = new Collection();
@@ -209,15 +206,15 @@ class NotificationRepository extends AbstractRepository implements NotificationR
             $statement = $this->connection->prepare(
                 "DELETE FROM {$this->table} WHERE id = :id"
             );
-            $success1  = $statement->execute($params);
+            $statement->execute($params);
             $statement = $this->connection->prepare(
                 "DELETE FROM {$notificationsToEntities} WHERE notificationId = :id"
             );
-            $success2  = $statement->execute($params);
+            $statement->execute($params);
 
-            return $success1 && $success2;
+            return true;
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to delete data from ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to delete data from ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
     }
 }

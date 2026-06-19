@@ -1,7 +1,7 @@
 <?php
 
 /**
- * @copyright © TMS-Plugins. All rights reserved.
+ * @copyright © Melograno Ventures. All rights reserved.
  * @licence   See LICENCE.md for license details.
  */
 
@@ -91,6 +91,7 @@ class AppointmentPlaceholderService extends PlaceholderService
             'appointment_date_time'   => $appointment_date_time,
             'appointment_start_time'  => $appointment_start_time,
             'appointment_end_time'    => $appointment_end_time,
+            'assigned_employee_name'  => 'Richard Roe',
             'appointment_notes'       => 'Appointment note',
             'appointment_price'       => $helperService->getFormattedPrice(100),
             'payment_due_amount'      => $helperService->getFormattedPrice(80),
@@ -98,18 +99,15 @@ class AppointmentPlaceholderService extends PlaceholderService
             'appointment_approve_url' => 'http://approve_url.com',
             'appointment_reject_url'  => 'http://reject_url.com',
             'zoom_join_url'           => $type === 'email' ?
-                '<a href="#">' . BackendStrings::getCommonStrings()['zoom_click_to_join'] . '</a>' : 'https://join_zoom_link.com',
+                '<a href="#">' . BackendStrings::get('zoom_click_to_join') . '</a>' : 'https://join_zoom_link.com',
             'zoom_host_url'           => $type === 'email' ?
-                '<a href="#">' . BackendStrings::getCommonStrings()['zoom_click_to_start'] . '</a>' : 'https://start_zoom_link.com',
-            'google_meet_url'         => $type === 'email' ?
-                '<a href="#">' . BackendStrings::getCommonStrings()['google_meet_join'] . '</a>' : 'https://join_google_meet_link.com',
-            'lesson_space_url'        => $type === 'email' ?
-                '<a href="#">' . BackendStrings::getCommonStrings()['lesson_space_join'] . '</a>' : 'https://lessonspace.com/room-id',
-            'microsoft_teams_url'     => $type === 'email' ?
-                '<a href="#">' . BackendStrings::getCommonStrings()['microsoft_teams_join'] . '</a>' : 'https://join_microsoft_teams_link.com',
+                '<a href="#">' . BackendStrings::get('zoom_click_to_start') . '</a>' : 'https://start_zoom_link.com',
+            'google_meet_url'         => 'https://join_google_meet_link.com',
+            'lesson_space_url'        => 'https://lessonspace.com/room-id',
+            'microsoft_teams_url'     => 'https://join_microsoft_teams_link.com',
             'appointment_duration'    => $helperService->secondsToNiceDuration(1800),
             'appointment_deposit_payment'     => $helperService->getFormattedPrice(20),
-            'appointment_status'      => BackendStrings::getCommonStrings()['approved'],
+            'appointment_status'      => BackendStrings::get('approved'),
             'category_name'           => 'Category Name',
             'service_description'     => 'Service Description',
             'reservation_description' => 'Service Description',
@@ -120,7 +118,7 @@ class AppointmentPlaceholderService extends PlaceholderService
             'service_price'           => $helperService->getFormattedPrice(100),
             'service_extras'          => 'Extra1, Extra2, Extra3',
             'service_extras_details'  => '<p>Extra1: ($1.00 x 1) x 3</p><p>Extra2: ($2.00 x 2)</p><p>Extra3: ($3.00 x 3)</p>' .
-                '<p>-------------------------</p>' . '<p>' . BackendStrings::getCommonStrings()['extras_total_price'] . ' $16.00</p>'
+                '<p>-------------------------</p>' . '<p>' . BackendStrings::get('extras_total_price') . ' $16.00</p>'
 
         ];
     }
@@ -243,7 +241,7 @@ class AppointmentPlaceholderService extends PlaceholderService
     {
         $type = 'email';
 
-        $data = ['customer_custom_fields' => []];
+        $data = ['customer_custom_fields' => [], 'invoice_dates' => [], 'invoice_dates_xml' => []];
 
         $appointment = $reservationData['appointment'];
         $bookingKey  = array_search($reservationData['booking']['id'], array_column($appointment['bookings'], 'id'));
@@ -261,9 +259,12 @@ class AppointmentPlaceholderService extends PlaceholderService
             $placeholders = $this->getAppointmentPlaceholderData($appointment, $bookingKey, $type, null, true);
             $invoiceItem  = $placeholders['invoice_items_booking'][0];
 
-            $data['invoice_number'] = $placeholders['payment_invoice_number'];
+            if (empty($data['invoice_number'])) {
+                $data['invoice_number'] = $placeholders['payment_invoice_number'];
+            }
             $data['invoice_method'] = !empty($placeholders['payment_gateway_title']) ? $placeholders['payment_gateway_title'] : $placeholders['payment_type'];
             $data['invoice_issued'] = $placeholders['payment_created'];
+            $data['invoice_issued_xml'] = $placeholders['payment_created_xml'];
 
             $index = "service_{$appointment['serviceId']}_{$recurringAppointment['booking']['price']}";
             if (!empty($data['items'][$index])) {
@@ -278,6 +279,8 @@ class AppointmentPlaceholderService extends PlaceholderService
                 $data['items'][$index] = $invoiceItem;
                 $data['items'][$index]['item_name'] = $placeholders['service_name'];
             }
+            $data['invoice_dates'][] = $placeholders['appointment_date'];
+            $data['invoice_dates_xml'][] = $placeholders['appointment_date_xml'];
 
             $extraItems      = $placeholders['invoice_items_extras'];
             $extraItemsTaxes = $invoiceItem['invoice_extras_items'];
@@ -462,9 +465,7 @@ class AppointmentPlaceholderService extends PlaceholderService
 
         $lessonSpaceLink = '';
         if (array_key_exists('lessonSpace', $appointment) && $appointment['lessonSpace']) {
-            $lessonSpaceLink = $type === 'email' ?
-                '<a href="' . $appointment['lessonSpace'] . '">' . BackendStrings::getCommonStrings()['lesson_space_join'] . '</a>'
-                : $appointment['lessonSpace'];
+            $lessonSpaceLink = $appointment['lessonSpace'];
         }
 
         if (isset($appointment['zoomMeeting']['joinUrl'], $appointment['zoomMeeting']['startUrl'])) {
@@ -474,23 +475,20 @@ class AppointmentPlaceholderService extends PlaceholderService
 
         $googleMeetUrl = '';
         if (array_key_exists('googleMeetUrl', $appointment) && $appointment['googleMeetUrl']) {
-            $googleMeetUrl = $type === 'email' ?
-                '<a href="' . $appointment['googleMeetUrl'] . '">' . BackendStrings::getCommonStrings()['google_meet_join'] . '</a>'
-                : $appointment['googleMeetUrl'];
+            $googleMeetUrl = $appointment['googleMeetUrl'];
         }
 
         $microsoftTeamsUrl = '';
         if (array_key_exists('microsoftTeamsUrl', $appointment) && $appointment['microsoftTeamsUrl']) {
-            $microsoftTeamsUrl = $type === 'email' ?
-                '<a href="' . $appointment['microsoftTeamsUrl'] . '">' . BackendStrings::getCommonStrings()['microsoft_teams_join'] . '</a>'
-                : $appointment['microsoftTeamsUrl'];
+            $microsoftTeamsUrl = $appointment['microsoftTeamsUrl'];
         }
 
         return [
             'appointment_id'         => !empty($appointment['id']) ? $appointment['id'] : '',
-            'appointment_status'     => BackendStrings::getCommonStrings()[$appointment['status']],
+            'appointment_status'     => BackendStrings::get($appointment['status']),
             'appointment_notes'      => !empty($appointment['internalNotes']) ? $appointment['internalNotes'] : '',
             'appointment_date'       => date_i18n($dateFormat, $bookingStart->getTimestamp()),
+            'appointment_date_xml'   => date_i18n('Y-m-d', $bookingStart->getTimestamp()),
             'appointment_date_time'  => date_i18n($dateFormat . ' ' . $timeFormat, $bookingStart->getTimestamp()),
             'appointment_start_time' => date_i18n($timeFormat, $bookingStart->getTimestamp()),
             'appointment_end_time'   => date_i18n($timeFormat, $bookingEnd->getTimestamp()),
@@ -500,10 +498,10 @@ class AppointmentPlaceholderService extends PlaceholderService
             'initial_appointment_end_time' => !empty($oldBookingEnd) ? date_i18n($timeFormat, $oldBookingEnd->getTimestamp()) : '',
             'lesson_space_url'       => $lessonSpaceLink,
             'zoom_host_url'          => $zoomStartUrl && $type === 'email' ?
-                '<a href="' . $zoomStartUrl . '">' . BackendStrings::getCommonStrings()['zoom_click_to_start'] . '</a>'
+                '<a href="' . $zoomStartUrl . '">' . BackendStrings::get('zoom_click_to_start') . '</a>'
                 : $zoomStartUrl,
             'zoom_join_url'          => $zoomJoinUrl && $type === 'email' ?
-                '<a href="' . $zoomJoinUrl . '">' . BackendStrings::getCommonStrings()['zoom_click_to_join'] . '</a>'
+                '<a href="' . $zoomJoinUrl . '">' . BackendStrings::get('zoom_click_to_join') . '</a>'
                 : $zoomJoinUrl,
             'google_meet_url'        => $googleMeetUrl,
             'microsoft_teams_url'    => $microsoftTeamsUrl,
@@ -791,7 +789,7 @@ class AppointmentPlaceholderService extends PlaceholderService
 
         $data["service_extras_details"] = $allExtraDetails ? ($allExtraDetails . ($type !== 'whatsapp' ?
             ($type === 'email' ? '<p>' : $break) . "-------------------------" . ($type === 'email' ? '</p>' : $break) : '') .
-            ($type === 'email' ? '<p>' : '') . BackendStrings::getCommonStrings()['extras_total_price'] .
+            ($type === 'email' ? '<p>' : '') . BackendStrings::get('extras_total_price') .
             " {$helperService->getFormattedPrice($allExtraSum)}" . ($type === 'email' ? '</p>' : '')) : "";
 
         return $data;
@@ -871,13 +869,36 @@ class AppointmentPlaceholderService extends PlaceholderService
             'description'
         ) ?: ($user->getDescription() ? $user->getDescription()->getValue() : '');
 
+        $assignedProviderId = !empty($appointment['assignedEmployeeId'])
+            ? (int)$appointment['assignedEmployeeId']
+            : $appointment['providerId'];
+
+        /** @var Provider $assignedUser */
+        $assignedUser = $assignedProviderId === $appointment['providerId']
+            ? $user
+            : $userRepository->getById($assignedProviderId);
+
+        $assignedFirstName = $helperService->getBookingTranslation(
+            $bookingKey !== null ? $locale : null,
+            $assignedUser->getTranslations() ? $assignedUser->getTranslations()->getValue() : null,
+            'firstName'
+        ) ?: $assignedUser->getFirstName()->getValue();
+
+        $assignedLastName = $helperService->getBookingTranslation(
+            $bookingKey !== null ? $locale : null,
+            $assignedUser->getTranslations() ? $assignedUser->getTranslations()->getValue() : null,
+            'lastName'
+        ) ?: $assignedUser->getLastName()->getValue();
+
         return [
             'employee_id'          => $user->getId()->getValue(),
             'employee_email'       => $user->getEmail()->getValue(),
             'employee_first_name'  => $firstName,
             'employee_last_name'   => $lastName,
             'employee_full_name'   => $firstName . ' ' . $lastName,
+            'assigned_employee_name' => $assignedFirstName . ' ' . $assignedLastName,
             'employee_phone'       => $user->getPhone()->getValue(),
+            'employee_phone_country' => $user->getCountryPhoneIso() ? $user->getCountryPhoneIso()->getValue() : null,
             'employee_note'        => $user->getNote() ? $user->getNote()->getValue() : '',
             'employee_description' => $userDescription,
             'employee_panel_url'  => trim(
@@ -941,11 +962,22 @@ class AppointmentPlaceholderService extends PlaceholderService
 
             if ($isForCustomer) {
                 foreach ($recurringData['appointment']['bookings'] as $key => $recurringBooking) {
+                    $customerId = $bookingKey !== null &&
+                    (
+                        !empty($appointment['bookings'][$bookingKey]['customer']['id']) ||
+                        !empty($appointment['bookings'][$bookingKey]['customerId'])
+                    ) ? (
+                            !empty($appointment['bookings'][$bookingKey]['customer']['id'])
+                                ? $appointment['bookings'][$bookingKey]['customer']['id']
+                                : $appointment['bookings'][$bookingKey]['customerId']
+                          )
+                        : null;
+
                     if (isset($recurringData['booking']['id'])) {
                         if ($recurringBooking['id'] === $recurringData['booking']['id']) {
                             $recurringBookingKey = $key;
                         }
-                    } elseif ($recurringBooking['customerId'] === $appointment['bookings'][$bookingKey]['customerId']) {
+                    } elseif ($bookingKey !== null && $recurringBooking['customerId'] === $customerId) {
                         $recurringBookingKey = $key;
                     }
                 }
@@ -1159,12 +1191,27 @@ class AppointmentPlaceholderService extends PlaceholderService
         /** @var ReservationServiceInterface $reservationService */
         $reservationService = $this->container->get('application.reservation.service')->get(Entities::APPOINTMENT);
 
-        if (!empty($bookingArray['couponId']) && empty($bookingArray['coupon'])) {
+        $couponIdToFetch = !empty($bookingArray['couponId'])
+            ? $bookingArray['couponId']
+            : (!empty($bookingArray['coupon']['id']) ? $bookingArray['coupon']['id'] : null);
+
+        if ($couponIdToFetch) {
+            $bookingArray['couponId'] = $couponIdToFetch;
+        }
+
+        $couponIsIncomplete = $couponIdToFetch && (
+            empty($bookingArray['coupon'])
+            || empty($bookingArray['coupon']['code'])
+            || !isset($bookingArray['coupon']['discount'])
+            || !isset($bookingArray['coupon']['deduction'])
+        );
+
+        if ($couponIsIncomplete) {
             /** @var CouponRepository $couponRepository */
             $couponRepository = $this->container->get('domain.coupon.repository');
 
             /** @var Coupon $coupon */
-            $coupon = $couponRepository->getById($bookingArray['couponId']);
+            $coupon = $couponRepository->getById($couponIdToFetch);
 
             $bookingArray['coupon'] = $coupon ? $coupon->toArray() : null;
         }

@@ -3,19 +3,18 @@
     ref="paymentStepRef"
     :class="props.globalClass"
     :style="cssVars"
-    tabindex="0"
   >
+    <div v-if="paymentError" class="am-fs__payments-error">
+      <AmAlert
+        type="error"
+        :title="paymentError"
+        :show-icon="true"
+        :closable="false"
+      >
+      </AmAlert>
+    </div>
     <div v-show="ready && !loading" class="am-fs__payments">
       <div class="am-fs__payments-heading">
-        <div v-if="paymentError" class="am-fs__payments-error">
-          <AmAlert
-            type="error"
-            :title="paymentError"
-            :show-icon="true"
-            :closable="false"
-          >
-          </AmAlert>
-        </div>
         <span class="am-fs__payments-heading-main">
           {{ amLabels.summary }}
         </span>
@@ -31,6 +30,7 @@
         class="am-fs__payments-full"
         :label="amLabels.full_amount_consent"
         :class="{'am-fs__payments-full-checked': paymentDeposit}"
+        @keydown.enter="paymentDeposit = !paymentDeposit"
       >
       </AmCheckbox>
 
@@ -47,7 +47,9 @@
               v-if="available && Object.keys(availablePayments).filter(item => availablePayments[item]).length > 1"
               :key="gateway"
               :class="'am-fs__payments-main-button' + (paymentGateway === gateway ? ' am-fs__payments-main-button_selected' : '') + ' am-fs__payments-main-button-' + gateway"
+              tabindex="0"
               @click="setPaymentGateway(gateway)"
+              @keydown.enter="setPaymentGateway(gateway)"
             >
               <img
                 v-if="available"
@@ -143,7 +145,7 @@ let langDetection = computed(() => settings.general.usedLanguages.includes(local
 let amLabels = computed(() => {
   let computedLabels = reactive({...globalLabels})
 
-  if (settings.customizedData && settings.customizedData.sbsNew && settings.customizedData.sbsNew.paymentStep.translations) {
+  if (settings.customizedData?.sbsNew?.paymentStep?.translations) {
     let customizedLabels = settings.customizedData.sbsNew.paymentStep.translations
     Object.keys(customizedLabels).forEach(labelKey => {
       if (customizedLabels[labelKey][localLanguage.value] && langDetection.value) {
@@ -245,21 +247,35 @@ let hasDeposit = computed(() => {
 provide('hasDeposit', hasDeposit)
 
 let fullAmount = computed(() => {
-  let fullAmountPayment = false
+  switch (store.getters['booking/getBookableType']) {
+    case ('appointment'): {
+      let fullAmountPayment = false
 
-  useCart(store).filter(i => 'services' in i && Object.keys(i.services).length).forEach((item) => {
-    let service = store.getters['entities/getCategories'].find(
-      i => i.serviceList.filter(j => j.id === item.serviceId).length
-    ).serviceList.find(
-      i => i.id === item.serviceId
-    )
+      useCart(store).filter(i => 'services' in i && Object.keys(i.services).length).forEach((item) => {
+        let service = store.getters['entities/getCategories'].find(
+          i => i.serviceList.filter(j => j.id === item.serviceId).length
+        ).serviceList.find(
+          i => i.id === item.serviceId
+        )
 
-    if (service.fullPayment) {
-      fullAmountPayment = true
+        if (service.fullPayment) {
+          fullAmountPayment = true
+        }
+      })
+
+      return ready.value ? fullAmountPayment : false
     }
-  })
 
-  return ready.value && fullAmountPayment
+    case ('package'): {
+      let item = useCartItem(store)
+
+      let pack = store.getters['entities/getPackage'](item.packageId)
+
+      return ready.value ? pack.fullPayment : false
+    }
+  }
+
+  return false
 })
 
 // true = pay full amount
@@ -283,6 +299,10 @@ function callPaymentError (msg) {
     refOnSitePayment.value.continueWithBooking()
   }
   usePaymentError(store, msg)
+
+  if (paymentStepRef.value) {
+    paymentStepRef.value.focus()
+  }
 }
 
 function callPaymentAbandoned () {
@@ -405,7 +425,22 @@ function setOnSitePayment (isMandatory) {
 }
 
 onMounted(() => {
-  usePaymentError(store, '')
+  if (paymentStepRef.value) {
+    paymentStepRef.value.focus()
+  }
+
+  const isPaymentStatusError = paymentError.value && (
+    paymentError.value === globalLabels.payment_canceled ||
+    paymentError.value === globalLabels.payment_error ||
+    paymentError.value === globalLabels.payment_error_default
+  )
+
+  // If it's a payment status error (canceled/failed) delay clear for 3s
+  if (!isPaymentStatusError) {
+    usePaymentError(store, '')
+  } else {
+    setTimeout(() => {usePaymentError(store, '')}, 3000)
+  }
 
   if (usePrepaidPrice(store) === 0) {
     if (settings.payments.wc.enabled === true && !settings.payments.wc.onSiteIfFree) {
@@ -453,8 +488,10 @@ function getPaymentBtn (key) {
       return {text: amLabels.value['stripe'], name: 'stripe.svg'}
     case 'razorpay':
       return {text: amLabels.value['razorpay'], name: 'razorpay.svg'}
-    case 'mollie': case 'wc':
-      return {text: amLabels.value['on_line'], name: 'stripe.svg'}
+    case 'mollie':
+      return {text: amLabels.value['mollie'], name: 'mollie.svg'}
+    case 'wc':
+      return {text: amLabels.value['on_line'], name: 'online.svg'}
     case 'square':
       return {text: amLabels.value['square'], name: 'square.svg'}
     case 'barion':
@@ -604,6 +641,11 @@ export default {
         flex-direction: column;
         justify-items: center;
         height: fit-content;
+
+        &:focus {
+          border: 1px solid var(--am-c-ps-primary);
+          box-shadow: 0 1px 1px var(--am-c-ps-primary-op06);
+        }
 
         img {
           height: 24px;

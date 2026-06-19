@@ -8,7 +8,7 @@
     @update:visibility="(value) => emits('update:visibility', value)"
   >
     <template #header>
-      <div class="am-fs-iipu__header">
+      <div class="am-fs-iipu__header" :aria-label="props.heading">
         {{ props.heading }}
       </div>
     </template>
@@ -102,11 +102,8 @@
       <!-- DESCRIPTION -->
       <div
         v-if="useDescriptionVisibility(props.item.description)"
-        class="am-fs-iipu__description"
-        :class="{
-          'ql-description':
-            props.item.description.includes('<!-- Content -->'),
-        }"
+        class="am-fs-iipu__description ql-description"
+        :style="props.plainText ? 'white-space: pre-wrap' : ''"
         v-html="props.item.description"
       />
       <!-- /DESCRIPTION -->
@@ -162,6 +159,10 @@ const props = defineProps({
   locationsData: {
     type: Array,
     default: () => [],
+  },
+  plainText: {
+    type: Boolean,
+    default: false,
   },
 })
 

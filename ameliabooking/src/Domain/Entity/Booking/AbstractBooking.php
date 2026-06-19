@@ -1,7 +1,7 @@
 <?php
 
 /**
- * @copyright © TMS-Plugins. All rights reserved.
+ * @copyright © Melograno Ventures. All rights reserved.
  * @licence   See LICENCE.md for license details.
  */
 
@@ -19,10 +19,10 @@ use AmeliaBooking\Domain\ValueObjects\String\Description;
  */
 abstract class AbstractBooking
 {
-    /** @var Id */
+    /** @var Id|null */
     private $id;
 
-    /** @var  Collection */
+    /** @var Collection|null */
     protected $bookings;
 
     /** @var bool */
@@ -31,7 +31,7 @@ abstract class AbstractBooking
     /** @var Description */
     protected $internalNotes;
 
-    /** @var BookingStatus */
+    /** @var BookingStatus|null */
     protected $status;
 
     /**
@@ -45,7 +45,7 @@ abstract class AbstractBooking
     }
 
     /**
-     * @return Id
+     * @return Id|null
      */
     public function getId()
     {
@@ -61,7 +61,7 @@ abstract class AbstractBooking
     }
 
     /**
-     * @return Collection
+     * @return Collection|null
      */
     public function getBookings()
     {
@@ -93,9 +93,9 @@ abstract class AbstractBooking
     }
 
     /**
-     * @return Description
+     * @return ?Description
      */
-    public function getInternalNotes()
+    public function getInternalNotes(): ?Description
     {
         return $this->internalNotes;
     }
@@ -109,7 +109,7 @@ abstract class AbstractBooking
     }
 
     /**
-     * @return BookingStatus
+     * @return BookingStatus|null
      */
     public function getStatus()
     {

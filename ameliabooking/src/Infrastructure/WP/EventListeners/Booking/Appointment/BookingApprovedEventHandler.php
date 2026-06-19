@@ -1,7 +1,7 @@
 <?php
 
 /**
- * @copyright © TMS-Plugins. All rights reserved.
+ * @copyright © Melograno Ventures. All rights reserved.
  * @licence   See LICENCE.md for license details.
  */
 
@@ -9,6 +9,7 @@ namespace AmeliaBooking\Infrastructure\WP\EventListeners\Booking\Appointment;
 
 use AmeliaBooking\Application\Commands\CommandResult;
 use AmeliaBooking\Application\Services\Booking\BookingApplicationService;
+use AmeliaBooking\Application\Services\Booking\IcsApplicationService;
 use AmeliaBooking\Application\Services\Integration\ApplicationIntegrationService;
 use AmeliaBooking\Application\Services\Notification\EmailNotificationService;
 use AmeliaBooking\Application\Services\Notification\SMSNotificationService;
@@ -67,7 +68,13 @@ class BookingApprovedEventHandler
         /** @var BookingApplicationService $bookingApplicationService */
         $bookingApplicationService = $container->get('application.booking.booking.service');
 
-        $appointment = $commandResult->getData()[$commandResult->getData()['type']];
+        $data = $commandResult->getData();
+
+        if (empty($data)) {
+            return;
+        }
+
+        $appointment = $data[$data['type']];
 
         if ($commandResult->getData()['type'] === Entities::APPOINTMENT) {
             $reservationObject = AppointmentFactory::create($appointment);
@@ -86,6 +93,20 @@ class BookingApprovedEventHandler
 
         $booking = $commandResult->getData()[Entities::BOOKING];
 
+        $bookingKey = array_search($booking['id'], array_column($appointment['bookings'], 'id'), true);
+
+        if ($bookingKey !== false) {
+            /** @var IcsApplicationService $icsService */
+            $icsService = $container->get('application.ics.service');
+
+            $appointment['bookings'][$bookingKey]['icsFiles'] = $icsService->getIcsData(
+                Entities::APPOINTMENT,
+                $booking['id'],
+                [],
+                true
+            );
+        }
+
         $payments = $appointment['bookings'][0]['payments'];
         if ($payments && count($payments)) {
             $booking['payments'] = $payments;
@@ -103,9 +124,7 @@ class BookingApprovedEventHandler
 
         $appStatusChanged = $commandResult->getData()['appointmentStatusChanged'];
 
-        if ($appStatusChanged === true) {
-            $bookingKey = array_search($booking['id'], array_column($appointment['bookings'], 'id'), true);
-
+        if ($appStatusChanged === true && $bookingKey !== false) {
             $appointment['bookings'][$bookingKey]['isChangedStatus'] = true;
 
             $appointment['notifyParticipants'] = false;

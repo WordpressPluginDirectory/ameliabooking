@@ -1,7 +1,7 @@
 <?php
 
 /**
- * @copyright © TMS-Plugins. All rights reserved.
+ * @copyright © Melograno Ventures. All rights reserved.
  * @licence   See LICENCE.md for license details.
  */
 
@@ -15,8 +15,10 @@ use AmeliaBooking\Domain\Factory\Booking\Event\EventFactory;
 use AmeliaBooking\Domain\Factory\Tax\TaxFactory;
 use AmeliaBooking\Infrastructure\Common\Exceptions\NotFoundException;
 use AmeliaBooking\Infrastructure\Connection;
-use AmeliaBooking\Infrastructure\Repository\AbstractStatusRepository;
 use AmeliaBooking\Infrastructure\Common\Exceptions\QueryExecutionException;
+use AmeliaBooking\Infrastructure\Repository\AbstractRepository;
+use AmeliaBooking\Infrastructure\WP\InstallActions\DB\Bookable\PackagesTable;
+use AmeliaBooking\Infrastructure\WP\InstallActions\DB\Bookable\ServicesTable;
 use AmeliaBooking\Infrastructure\WP\InstallActions\DB\Booking\EventsTable;
 use AmeliaBooking\Infrastructure\WP\InstallActions\DB\Tax\TaxesToEntitiesTable;
 
@@ -25,7 +27,7 @@ use AmeliaBooking\Infrastructure\WP\InstallActions\DB\Tax\TaxesToEntitiesTable;
  *
  * @package AmeliaBooking\Infrastructure\Repository\Tax
  */
-class TaxRepository extends AbstractStatusRepository
+class TaxRepository extends AbstractRepository
 {
     public const FACTORY = TaxFactory::class;
 
@@ -49,7 +51,7 @@ class TaxRepository extends AbstractStatusRepository
     /**
      * @param Tax $entity
      *
-     * @return string|false
+     * @return int
      * @throws QueryExecutionException
      */
     public function add($entity)
@@ -79,13 +81,9 @@ class TaxRepository extends AbstractStatusRepository
             );
 
 
-            $response = $statement->execute($params);
+            $statement->execute($params);
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to add data in ' . __CLASS__, $e->getCode(), $e);
-        }
-
-        if (!$response) {
-            throw new QueryExecutionException('Unable to add data in ' . __CLASS__);
+            throw new QueryExecutionException('Unable to add data in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return $this->connection->lastInsertId();
@@ -130,16 +128,12 @@ class TaxRepository extends AbstractStatusRepository
                 id = :id"
             );
 
-            $response = $statement->execute($params);
+            $statement->execute($params);
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to save data in ' . __CLASS__ . $e->getMessage());
+            throw new QueryExecutionException('Unable to save data in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
-        if (!$response) {
-            throw new QueryExecutionException('Unable to save data in ' . __CLASS__);
-        }
-
-        return $response;
+        return true;
     }
 
     /**
@@ -177,7 +171,7 @@ class TaxRepository extends AbstractStatusRepository
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         if (!$rows) {
@@ -224,6 +218,17 @@ class TaxRepository extends AbstractStatusRepository
     {
         $where = !empty($criteria['ids']) ? "WHERE t.id IN (" . implode(', ', $criteria['ids']) . ")" : '';
 
+        $allowedSortFields = ['id', 'name', 'type'];
+        $field             = 'id';
+        $direction         = 'ASC';
+        if (!empty($criteria['sort'])) {
+            $candidateField     = (string)($criteria['sort']['field'] ?? '');
+            $candidateDirection = strtoupper((string)($criteria['sort']['order'] ?? 'ASC'));
+            $field              = in_array($candidateField, $allowedSortFields, true) ? $candidateField : 'id';
+            $direction          = $candidateDirection === 'DESC' ? 'DESC' : 'ASC';
+        }
+        $order = "ORDER BY t.`{$field}` {$direction}, t.id ASC";
+
         try {
             $statement = $this->connection->prepare(
                 "SELECT
@@ -241,14 +246,14 @@ class TaxRepository extends AbstractStatusRepository
                     FROM {$this->table} t
                     LEFT JOIN {$this->taxesToEntitiesTable} te ON te.taxId = t.id
                     {$where}
-                    ORDER BY t.id"
+                    {$order}"
             );
 
             $statement->execute();
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to get data from ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to get data from ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         /** @var Collection $taxes */
@@ -328,10 +333,10 @@ class TaxRepository extends AbstractStatusRepository
                 $params[$param] = $value;
             }
 
-            $where[] = "t.id IN (
+            $where[] = "(t.id IN (
                     SELECT taxId FROM {$this->taxesToEntitiesTable} 
                     WHERE entityId IN (" . implode(', ', $queryServices) . ") AND entityType = 'service'
-                )";
+                ) OR t.allServices = 1)";
         }
 
         if (!empty($criteria['extras'])) {
@@ -345,10 +350,10 @@ class TaxRepository extends AbstractStatusRepository
                 $params[$param] = $value;
             }
 
-            $where[] = "t.id IN (
+            $where[] = "(t.id IN (
                     SELECT taxId FROM {$this->taxesToEntitiesTable} 
                     WHERE entityId IN (" . implode(', ', $queryExtras) . ") AND entityType = 'extra'
-                )";
+                ) OR t.allExtras = 1)";
         }
 
         if (!empty($criteria['events'])) {
@@ -362,10 +367,10 @@ class TaxRepository extends AbstractStatusRepository
                 $params[$param] = $value;
             }
 
-            $where[] = "t.id IN (
+            $where[] = "(t.id IN (
                     SELECT taxId FROM {$this->taxesToEntitiesTable} 
                     WHERE entityId IN (" . implode(', ', $queryEvents) . ") AND entityType = 'event'
-                )";
+                ) OR t.allEvents = 1)";
         }
 
         if (!empty($criteria['packages'])) {
@@ -379,10 +384,10 @@ class TaxRepository extends AbstractStatusRepository
                 $params[$param] = $value;
             }
 
-            $where[] = "t.id IN (
+            $where[] = "(t.id IN (
                     SELECT taxId FROM {$this->taxesToEntitiesTable} 
                     WHERE entityId IN (" . implode(', ', $queryPackages) . ") AND entityType = 'package'
-                )";
+                ) OR t.allPackages = 1)";
         }
 
 
@@ -392,6 +397,17 @@ class TaxRepository extends AbstractStatusRepository
             !empty($criteria['page']) ? (int)$criteria['page'] : 0,
             (int)$itemsPerPage
         );
+
+        $allowedSortFieldsFiltered = ['id', 'name', 'type'];
+        $filteredField             = 'id';
+        $filteredDirection         = 'ASC';
+        if (!empty($criteria['sort'])) {
+            $candidateField     = (string)($criteria['sort']['field'] ?? '');
+            $candidateDirection = strtoupper((string)($criteria['sort']['order'] ?? 'ASC'));
+            $filteredField      = in_array($candidateField, $allowedSortFieldsFiltered, true) ? $candidateField : 'id';
+            $filteredDirection  = $candidateDirection === 'DESC' ? 'DESC' : 'ASC';
+        }
+        $order = "ORDER BY t.`{$filteredField}` {$filteredDirection}, t.id ASC";
 
         try {
             $statement = $this->connection->prepare(
@@ -407,6 +423,7 @@ class TaxRepository extends AbstractStatusRepository
                     t.allExtras AS tax_allExtras
                 FROM {$this->table} t
                 {$where}
+                {$order}
                 {$limit}"
             );
 
@@ -414,7 +431,7 @@ class TaxRepository extends AbstractStatusRepository
 
             $rows = $statement->fetchAll();
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to get data from ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to get data from ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return call_user_func([static::FACTORY, 'createCollection'], $rows);
@@ -449,10 +466,27 @@ class TaxRepository extends AbstractStatusRepository
                 $params[$param] = $value;
             }
 
-            $where[] = "t.id IN (
+            $where[] = "(t.id IN (
                 SELECT taxId FROM {$this->taxesToEntitiesTable} 
                 WHERE entityId IN (" . implode(', ', $queryServices) . ") AND entityType = 'service'
-            )";
+            ) OR t.allServices = 1)";
+        }
+
+        if (!empty($criteria['extras'])) {
+            $queryExtras = [];
+
+            foreach ($criteria['extras'] as $index => $value) {
+                $param = ':extra' . $index;
+
+                $queryExtras[] = $param;
+
+                $params[$param] = $value;
+            }
+
+            $where[] = "(t.id IN (
+                SELECT taxId FROM {$this->taxesToEntitiesTable} 
+                WHERE entityId IN (" . implode(', ', $queryExtras) . ") AND entityType = 'extra'
+            ) OR t.allExtras = 1)";
         }
 
         if (!empty($criteria['events'])) {
@@ -466,10 +500,10 @@ class TaxRepository extends AbstractStatusRepository
                 $params[$param] = $value;
             }
 
-            $where[] = "t.id IN (
+            $where[] = "(t.id IN (
                 SELECT taxId FROM {$this->taxesToEntitiesTable} 
                 WHERE entityId IN (" . implode(', ', $queryEvents) . ") AND entityType = 'event'
-            )";
+            ) OR t.allEvents = 1)";
         }
 
         if (!empty($criteria['packages'])) {
@@ -483,10 +517,10 @@ class TaxRepository extends AbstractStatusRepository
                 $params[$param] = $value;
             }
 
-            $where[] = "t.id IN (
+            $where[] = "(t.id IN (
                 SELECT taxId FROM {$this->taxesToEntitiesTable} 
                 WHERE entityId IN (" . implode(', ', $queryPackages) . ") AND entityType = 'package'
-            )";
+            ) OR t.allPackages = 1)";
         }
 
         $where = $where ? ' WHERE ' . implode(' AND ', $where) : '';
@@ -502,7 +536,7 @@ class TaxRepository extends AbstractStatusRepository
 
             $row = $statement->fetch()['count'];
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to get data from ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to get data from ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return $row;

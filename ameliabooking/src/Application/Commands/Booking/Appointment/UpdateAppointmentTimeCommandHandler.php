@@ -31,7 +31,6 @@ use AmeliaBooking\Infrastructure\Repository\Booking\Appointment\AppointmentRepos
 use AmeliaBooking\Infrastructure\Repository\Booking\Appointment\CustomerBookingRepository;
 use AmeliaBooking\Infrastructure\Repository\User\UserRepository;
 use AmeliaBooking\Infrastructure\WP\Translations\FrontendStrings;
-use Interop\Container\Exception\ContainerException;
 
 /**
  * Class UpdateAppointmentTimeCommandHandler
@@ -56,7 +55,6 @@ class UpdateAppointmentTimeCommandHandler extends CommandHandler
      * @throws InvalidArgumentException
      * @throws QueryExecutionException
      * @throws NotFoundException
-     * @throws ContainerException
      */
     public function handle(UpdateAppointmentTimeCommand $command)
     {
@@ -105,6 +103,8 @@ class UpdateAppointmentTimeCommandHandler extends CommandHandler
         /** @var Appointment $appointment */
         $appointment = $appointmentRepo->getById((int)$command->getArg('id'));
 
+        $oldAppointment = clone $appointment;
+
         $initialBookingStart = $appointment->getBookingStart()->getValue();
         $initialBookingEnd   = $appointment->getBookingEnd()->getValue();
 
@@ -114,39 +114,57 @@ class UpdateAppointmentTimeCommandHandler extends CommandHandler
             $appointment->getProviderId()->getValue()
         );
 
+        $isUserWithOnlyOneBooking = true;
+
         /** @var CustomerBooking $booking */
         foreach ($appointment->getBookings()->getItems() as $booking) {
             if (
                 $userAS->isAmeliaUser($user) &&
                 $userAS->isCustomer($user) &&
                 $bookingAS->isBookingApprovedOrPending($booking->getStatus()->getValue()) &&
-                ($service->getMinCapacity()->getValue() !== 1 || $service->getMaxCapacity()->getValue() !== 1) &&
+                ($user->getId() && $booking->getCustomerId()->getValue() !== $user->getId()->getValue())
+            ) {
+                $isUserWithOnlyOneBooking = false;
+
+                break;
+            }
+        }
+
+        /** @var CustomerBooking $booking */
+        foreach ($appointment->getBookings()->getItems() as $booking) {
+            if (
+                $userAS->isAmeliaUser($user) &&
+                $userAS->isCustomer($user) &&
+                $bookingAS->isBookingApprovedOrPending($booking->getStatus()->getValue()) &&
+                ($service->getMinCapacity()->getValue() !== 1 || $service->getMaxCapacity()->getValue() !== 1 || !$isUserWithOnlyOneBooking) &&
                 ($user->getId() && $booking->getCustomerId()->getValue() !== $user->getId()->getValue())
             ) {
                 throw new AccessDeniedException('You are not allowed to update appointment');
             }
         }
 
-        $minimumRescheduleTimeInSeconds = $settingsDS
-            ->getEntitySettings($service->getSettings())
-            ->getGeneralSettings()
-            ->getMinimumTimeRequirementPriorToRescheduling();
+        if ($userAS->isCustomer($user)) {
+            $minimumRescheduleTimeInSeconds = $settingsDS
+                ->getEntitySettings($service->getSettings())
+                ->getGeneralSettings()
+                ->getMinimumTimeRequirementPriorToRescheduling();
 
-        try {
-            $reservationService->inspectMinimumCancellationTime(
-                $appointment->getBookingStart()->getValue(),
-                $minimumRescheduleTimeInSeconds
-            );
-        } catch (BookingCancellationException $e) {
-            $result->setResult(CommandResult::RESULT_ERROR);
-            $result->setMessage('You are not allowed to update booking');
-            $result->setData(
-                [
-                    'rescheduleBookingUnavailable' => true
-                ]
-            );
+            try {
+                $reservationService->inspectMinimumCancellationTime(
+                    $appointment->getBookingStart()->getValue(),
+                    $minimumRescheduleTimeInSeconds
+                );
+            } catch (BookingCancellationException $e) {
+                $result->setResult(CommandResult::RESULT_ERROR);
+                $result->setMessage('You are not allowed to update booking');
+                $result->setData(
+                    [
+                        'rescheduleBookingUnavailable' => true
+                    ]
+                );
 
-            return $result;
+                return $result;
+            }
         }
 
         $bookingStart = $command->getField('bookingStart');
@@ -196,7 +214,7 @@ class UpdateAppointmentTimeCommandHandler extends CommandHandler
             return $result;
         }
 
-        do_action('amelia_before_booking_rescheduled', $appointment->toArray());
+        do_action('amelia_before_booking_rescheduled', $oldAppointment->toArray(), null, $bookingStart);
 
         $appointmentRepo->update((int)$command->getArg('id'), $appointment);
 
@@ -229,6 +247,14 @@ class UpdateAppointmentTimeCommandHandler extends CommandHandler
 
         $appointment->setRescheduled(new BooleanValueObject(true));
 
+        $appointment->setInitialBookingStart(
+            new DateTimeValue($initialBookingStart)
+        );
+
+        $appointment->setInitialBookingEnd(
+            new DateTimeValue($initialBookingEnd)
+        );
+
         $bookingAS->bookingRescheduled(
             $appointment->getId()->getValue(),
             Entities::APPOINTMENT,
@@ -244,17 +270,13 @@ class UpdateAppointmentTimeCommandHandler extends CommandHandler
         );
 
 
-        do_action('amelia_after_booking_rescheduled', $appointment->toArray());
+        do_action('amelia_after_booking_rescheduled', $oldAppointment->toArray(), null, $bookingStart);
 
         $result->setResult(CommandResult::RESULT_SUCCESS);
         $result->setMessage('Successfully updated appointment time');
         $result->setData(
             [
-                Entities::APPOINTMENT        => $appointment->toArray(),
-                'initialAppointmentDateTime' => [
-                    'bookingStart' => $initialBookingStart->format('Y-m-d H:i:s'),
-                    'bookingEnd'   => $initialBookingEnd->format('Y-m-d H:i:s'),
-                ],
+                Entities::APPOINTMENT => $appointment->toArray(),
             ]
         );
 

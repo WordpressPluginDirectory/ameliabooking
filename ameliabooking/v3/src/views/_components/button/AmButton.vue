@@ -30,7 +30,7 @@
     <!-- Icon slot -->
     <slot v-if="(icon || Object.keys(icon).length) && iconOnly && !loading" name="icon">
       <component :is="icon" v-if="typeof icon === 'object'"></component>
-      <span v-if="typeof icon === 'string'" :class="`am-icon-${icon}`"></span>
+      <span v-if="typeof icon === 'string'" :class="`am-icon am-icon-${icon}`"></span>
     </slot>
 
     <!-- Prefix slot -->
@@ -47,7 +47,7 @@
     <!-- Suffix slot -->
     <slot v-if="(suffix || Object.keys(suffix).length) && !iconOnly && !loading" name="suffix">
       <component :is="suffix" v-if="typeof suffix === 'object'"></component>
-      <span v-if="typeof suffix === 'string'" :class="`am-icon-${suffix}`"></span>
+      <span v-if="typeof suffix === 'string'" :class="`am-icon am-icon-${suffix}`"></span>
     </slot>
   </button>
 </template>
@@ -461,6 +461,7 @@ const cssVars = computed(() => {
       // Disabled
       &.is-disabled {
         opacity: 0.7;
+        cursor: not-allowed;
       }
 
       &--waiting-list { // TODO
@@ -619,6 +620,16 @@ const cssVars = computed(() => {
 
 // Modal - Dialog
 .am-dialog-popup {
+  @include am-button-block;
+}
+
+// Dropdown that is used in select component and select options
+.am-select-popper {
+  @include am-button-block;
+}
+
+// Menu dropdown that is used in customer and employee panel
+.am-cc__popper {
   @include am-button-block;
 }
 

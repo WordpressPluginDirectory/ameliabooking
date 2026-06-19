@@ -7,7 +7,7 @@ use AmeliaBooking\Application\Commands\CommandResult;
 use AmeliaBooking\Application\Controller\Controller;
 use AmeliaBooking\Domain\Events\DomainEventBus;
 use RuntimeException;
-use Slim\Http\Request;
+use AmeliaVendor\Psr\Http\Message\ServerRequestInterface as Request;
 
 /**
  * Class AddEventController
@@ -41,6 +41,8 @@ class AddEventController extends Controller
         'gallery',
         'color',
         'show',
+        'pictureFullPath',
+        'pictureThumbPath',
         'locationId',
         'settings',
         'customLocation',

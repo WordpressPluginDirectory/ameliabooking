@@ -1,7 +1,7 @@
 <?php
 
 /**
- * @copyright © TMS-Plugins. All rights reserved.
+ * @copyright © Melograno Ventures. All rights reserved.
  * @licence   See LICENCE.md for license details.
  */
 
@@ -92,6 +92,7 @@ class PackageCustomerServiceFactory
                             'lastName'  => $row['customer_lastName'],
                             'email'     => $row['customer_email'],
                             'phone'     => $row['customer_phone'],
+                            'countryPhoneIso' => !empty($row['customer_countryPhoneIso']) ? $row['customer_countryPhoneIso'] : null,
                             'status'    => !empty($row['customer_status']) ? $row['customer_status'] : null,
                         ],
                         'packageId'  => $row['package_customer_packageId'],
@@ -105,6 +106,10 @@ class PackageCustomerServiceFactory
                         'status'        => $row['package_customer_status'],
                         'bookingsCount' => $row['package_customer_bookingsCount'],
                         'couponId'      => $row['package_customer_couponId'],
+                        'package'       => [
+                            'name' => $row['package_name']
+                        ],
+                        'ivyEntryId'    => $row['package_customer_ivyEntryId'],
                     ]
                 ];
             }

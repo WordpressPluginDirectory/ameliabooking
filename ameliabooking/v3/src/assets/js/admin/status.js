@@ -37,8 +37,8 @@ function useStatuses () {
     {
       value: 'no-show',
       label: globalLabels['no-show'],
-      icon: 'clock',
-      color: 'var(--am-c-warning)',
+      icon: 'no-show',
+      color: '#808A90',
     },
   ]
 }

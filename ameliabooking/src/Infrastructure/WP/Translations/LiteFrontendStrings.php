@@ -6,20 +6,13 @@ use AmeliaBooking\Domain\Services\Settings\SettingsService;
 use AmeliaBooking\Infrastructure\WP\SettingsService\SettingsStorage;
 
 /**
- * Class LiteFrontendStrings
- *
- * @package AmeliaBooking\Infrastructure\WP\Translations
- *
  * @phpcs:disable
  */
 class LiteFrontendStrings
 {
-    /** @var SettingsService $settings */
-    private static $settings;
+    private static ?SettingsService $settings = null;
 
     /**
-     * Set Settings
-     *
      * @return array|mixed
      */
     public static function getLabelsFromSettings()
@@ -40,10 +33,8 @@ class LiteFrontendStrings
 
     /**
      * Return all strings for frontend
-     *
-     * @return array
      */
-    public static function getAllStrings()
+    public static function getAllStrings(): array
     {
         return array_merge(
             self::getCommonStrings(),
@@ -59,25 +50,21 @@ class LiteFrontendStrings
 
     /**
      * Returns the array for the bookable strings
-     *
-     * @return array
      */
-    public static function getBookableStrings()
+    public static function getBookableStrings(): array
     {
-        return [
-        ];
+        return [];
     }
 
     /**
      * Returns the array of the common frontend strings
-     *
-     * @return array
      */
-    public static function getCommonStrings()
+    public static function getCommonStrings(): array
     {
         return [
             'add_to_calendar'              => __('Add to Calendar', 'ameliabooking'),
             'amount'                       => __('Amount', 'ameliabooking'),
+            'and'                          => __('and', 'ameliabooking'),
             'all_services'                 => __('All Services', 'ameliabooking'),
             'all_locations'                => __('All Locations', 'ameliabooking'),
             'no_services_employees'        => __('It seems like there are no employees or services created, or no  employees are assigned to the service, at this moment.'),
@@ -86,6 +73,7 @@ class LiteFrontendStrings
             'add_employees_url'            => __('employees.'),
             'back'                         => __('Back', 'ameliabooking'),
             'base_price_colon'             => __('Base Price:', 'ameliabooking'),
+            'booking_canceled'             => __('Your booking has been canceled.', 'ameliabooking'),
             'booking_completed_approved'   => __('Thank you! Your booking is completed.', 'ameliabooking'),
             'bookings_limit_reached'       => __('Maximum bookings reached', 'ameliabooking'),
             'cancel'                       => __('Cancel', 'ameliabooking'),
@@ -93,6 +81,7 @@ class LiteFrontendStrings
             'capacity_colon'               => __('Capacity:', 'ameliabooking'),
             'closed'                       => __('Closed', 'ameliabooking'),
             'content_mode_tooltip'         => __('Don\'t use Text mode option if you already have HTML code in the description, since once this option is enabled the existing HTML tags could be lost.', 'ameliabooking'),
+            'created_on'                   => __('Created on', 'ameliabooking'),
             'enable_google_meet'           => __('Enable Google Meet', 'ameliabooking'),
             'enable_microsoft_teams'       => __('Enable Microsoft Teams', 'ameliabooking'),
             'full'                         => __('Full', 'ameliabooking'),
@@ -112,7 +101,7 @@ class LiteFrontendStrings
             'enter_last_name_warning'      => __('Please enter last name', 'ameliabooking'),
             'enter_phone_warning'          => __('Please enter phone number', 'ameliabooking'),
             'enter_valid_email_warning'    => __('Please enter a valid email address', 'ameliabooking'),
-            'enter_valid_phone_warning'    => __('Please enter a valid phone number', 'ameliabooking'),
+            'enter_valid_phone_warning'    => __('Please enter a valid phone number.', 'ameliabooking'), // Used in Redesign | Updated
             'event_info'                   => __('Event Info', 'ameliabooking'),
             'finish_appointment'           => __('Finish', 'ameliabooking'),
             'first_name_colon'             => __('First Name:', 'ameliabooking'),
@@ -130,10 +119,17 @@ class LiteFrontendStrings
             'oops'                         => __('Oops...'),
             'payment_btn_square'           => __('Square', 'ameliabooking'),
             'open'                         => __('Open', 'ameliabooking'),
+            'opens_in_new_tab'             => __('opens in new tab', 'ameliabooking'),
+            'on_line'                      => __('Online', 'ameliabooking'),
+            'pay_pal'                      => __('PayPal', 'ameliabooking'),
+            'previous_step'                => __('Previous step', 'ameliabooking'),
+            'loading'                      => __('Loading', 'ameliabooking'),
+            'loading_header'               => __('Loading header', 'ameliabooking'),
             'phone_colon'                  => __('Phone:', 'ameliabooking'),
             'phone_exist_error'            => __('Phone already exists with different name. Please check your name.', 'ameliabooking'),
             'price_colon'                  => __('Price:', 'ameliabooking'),
             'service'                      => __('service', 'ameliabooking'),
+            'show'                         => __('Show', 'ameliabooking'),
             'select_calendar'              => __('Select Calendar', 'ameliabooking'),
             'services_lower'               => __('services', 'ameliabooking'),
             'square'                       => __('Square', 'ameliabooking'),
@@ -144,33 +140,40 @@ class LiteFrontendStrings
             'view'                         => __('View', 'ameliabooking'),
             'select'                       => __('Select', 'ameliabooking'),
             'free'                         => __('Free', 'ameliabooking'),
+            'error_use_diff_email_or_phone' => __('Please use a different email or phone number to complete the booking.', 'ameliabooking'),
+            'image'                        => __('Image', 'ameliabooking'),
+            'image_navigation'             => __('Image navigation', 'ameliabooking'),
+            'next_image'                   => __('Next image', 'ameliabooking'),
+            'previous_image'               => __('Previous image', 'ameliabooking'),
+            'of'                           => __('of', 'ameliabooking'),
+            'people_waiting'               => __('people waiting', 'ameliabooking'),
+            'person_waiting'               => __('person waiting', 'ameliabooking'),
+            'minimum'                      => __('Minimum', 'ameliabooking'),
+            'maximum'                      => __('Maximum', 'ameliabooking'),
         ];
     }
 
     /**
      * Returns the array of the frontend strings for the search shortcode
-     *
-     * @return array
      */
-    public static function getSearchStrings()
+    public static function getSearchStrings(): array
     {
-        return [
-        ];
+        return [];
     }
 
     /**
      * Returns the array of the frontend strings for the booking shortcode
-     *
-     * @return array
      */
-    public static function getBookingStrings()
+    public static function getBookingStrings(): array
     {
         return [
             'continue'                     => __('Continue', 'ameliabooking'),
             'email_address_colon'          => __('Email Address', 'ameliabooking'),
             'get_in_touch'                 => __('Get in Touch', 'ameliabooking'),
+            'ivyforms_validation_failed'   => __('IvyForms validation failed.', 'ameliabooking'),
             'collapse_menu'                => __('Collapse menu', 'ameliabooking'),
             'payment_onsite_sentence'      => __('The payment will be done on-site.', 'ameliabooking'),
+            'payment_or_pay_with_card'     => __('Or pay with card', 'ameliabooking'),
             'phone_number_colon'           => __('Phone Number', 'ameliabooking'),
             'pick_date_and_time_colon'     => __('Pick date & time:', 'ameliabooking'),
             'please_select'                => __('Please select', 'ameliabooking'),
@@ -205,18 +208,26 @@ class LiteFrontendStrings
             'congrats_employee'            => __('Employee', 'ameliabooking'),
             'show_more'                    => __('Show more', 'ameliabooking'),
             'show_less'                    => __('Show less', 'ameliabooking'),
+            'disable_popup_blocker'        => __('Popup Blocker is enabled! To add your appointment to your calendar, please allow popups and add this site to your exception list.', 'ameliabooking'),
+            'full_amount_consent'          => __('I want to pay full amount', 'ameliabooking'),
             'learn_more'                   => __('Learn More', 'ameliabooking'),
             'view_in_package'              => __('View in Package', 'ameliabooking'),
             'service_information'          => __('Service information', 'ameliabooking'),
+            'payment_wc_mollie_sentence'   => __('You will be redirected to the payment checkout.', 'ameliabooking'),
+            'payment_button'               => __('payment button', 'ameliabooking'),
+            'total_tax_colon'              => __('VAT', 'ameliabooking'),
+            'incl_tax'                     => __('Incl. VAT', 'ameliabooking'),
+            'recurring_unavailable_slots'  => __('Unavailable Time Slots', 'ameliabooking'),
+            'recurring_chose_date'         => __('Choose Date and Time', 'ameliabooking'),
+            'recurring_delete'             => __('Delete', 'ameliabooking'),
+            'recurring_slots_selected'     => __('All slots are selected', 'ameliabooking'),
         ];
     }
 
     /**
      * Returns the array of the frontend strings for the event shortcode
-     *
-     * @return array
      */
-    public static function getEventStrings()
+    public static function getEventStrings(): array
     {
         return [
             'event_book_event'          => __('Book event', 'ameliabooking'),
@@ -239,20 +250,31 @@ class LiteFrontendStrings
             'event_learn_more'          => __('Learn more', 'ameliabooking'),
             'event_read_more'           => __('Read more', 'ameliabooking'),
             'event_timetable'           => __('Timetable', 'ameliabooking'),
+            'event_type'                => __('Event type', 'ameliabooking'),
+            'event_page'                => __('Page', 'ameliabooking'),
+            'gallery'                   => __('Gallery', 'ameliabooking'),
             'event_bringing'            => __('How many attendees do you want to book event for?', 'ameliabooking'),
+            'bringing_anyone'           => __('Bringing anyone with you?', 'ameliabooking'),
+            'loading_event_information' => __('Loading event information', 'ameliabooking'),
+            'events'                    => __('Events', 'ameliabooking'),
+            'events_pagination'         => __('Events pagination', 'ameliabooking'),
+            'event_booking'             => __('Event booking', 'ameliabooking'),
+            'event_image_gallery'       => __('Event image gallery', 'ameliabooking'),
+            'event_tickets_context'     => __('Select the number of tickets that you want to book for each ticket type', 'ameliabooking'),
+            'event_tickets_left'        => __('tickets left', 'ameliabooking'),
+            'event_ticket_left'         => __('ticket left', 'ameliabooking'),
             'event_show_less'           => __('Show less', 'ameliabooking'),
             'event_show_more'           => __('Show more', 'ameliabooking'),
             'event_location'            => __('Event Location', 'ameliabooking'),
             'no_events'                 => __('No results found...', 'ameliabooking'),
+            'date_picker_placeholder'   => __('Date Picker', 'ameliabooking'),
         ];
     }
 
     /**
      * Returns the array of the frontend strings for the catalog shortcode
-     *
-     * @return array
      */
-    public static function getCatalogStrings()
+    public static function getCatalogStrings(): array
     {
         return [
             'categories'                         => __('Categories', 'ameliabooking'),
@@ -269,15 +291,14 @@ class LiteFrontendStrings
             'heading_service'                    => __('Service', 'ameliabooking'),
             'heading_services'                   => __('Services', 'ameliabooking'),
             'no_search_data'                     => __('No results', 'ameliabooking'),
+            'filter_all'                         => __('All', 'ameliabooking'),
         ];
     }
 
     /**
      * Returns the array of the frontend strings for the event shortcode
-     *
-     * @return array
      */
-    public static function getCabinetStrings()
+    public static function getCabinetStrings(): array
     {
         return [
             'available'                              => __('Available', 'ameliabooking'),

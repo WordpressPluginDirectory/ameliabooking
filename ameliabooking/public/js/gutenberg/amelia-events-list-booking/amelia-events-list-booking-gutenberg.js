@@ -3,13 +3,12 @@
 
   var el = wp.element.createElement
   var components = wp.components
-  var blockControls = wp.editor.BlockControls
-  var inspectorControls = wp.editor.InspectorControls
+  var blockControls = wp.blockEditor.BlockControls
+  var inspectorControls = wp.blockEditor.InspectorControls
+  var useBlockProps = wp.blockEditor.useBlockProps
+  var useEffect = wp.element.useEffect
+  var useRef = wp.element.useRef
   var data = wpAmeliaLabels.data
-
-  var blockStyle = {
-    color: 'red'
-  }
 
   var entityNames = ['events', 'tags', 'locations']
   var entities = {}
@@ -30,23 +29,10 @@
 
   // Registering the Block for events shortcode
   wp.blocks.registerBlockType('amelia/events-list-booking-gutenberg-block', {
+    apiVersion: 3,
     title: wpAmeliaLabels.events_list_booking_gutenberg_block.title,
     description: wpAmeliaLabels.events_list_booking_gutenberg_block.description,
-    icon: el('svg', {width: '25', height: '27', viewBox: '0 0 25 27'},
-      el('path', {
-        style: {fill: '#1A84EE'},
-        d: 'M11.4937358,10.7089033 L11.4937358,2.00347742 C11.4937358,0.463573647 9.83438046,-0.498899048 8.50694847,0.271096622 L0.995613218,4.6279253 C0.379532759,4.98520749 1.74329502e-05,5.64565414 1.74329502e-05,6.36030609 L1.74329502e-05,15.0243117 C1.74329502e-05,16.5606252 1.65222529,17.5235357 2.97965728,16.7608958 L10.4910797,12.4454874 C11.1110826,12.0891685 11.4937358,11.4265326 11.4937358,10.7089033'
-      }),
-      el('path', {
-        style: {fill: '#005AEE'},
-        d: 'M13.4849535,2.00346866 L13.4849535,10.7088945 C13.4849535,11.4265238 13.8676068,12.0891597 14.4876097,12.4453911 L21.9991193,16.7608871 C23.3265512,17.5235269 24.9787591,16.5606164 24.9787591,15.024303 L24.9787591,6.36029734 C24.9787591,5.64564538 24.5992438,4.98519874 23.9831633,4.62791654 L16.4717409,0.271000296 C15.1443089,-0.498907805 13.4849535,0.46356489 13.4849535,2.00346866'
-      }),
-      el('path', {
-        style: {fill: '#3BA6FF'},
-        transform: 'translate(2.876437, 13.843371)',
-        d: 'M8.62445527,0.32630898 L1.0701478,4.66641195 C-0.263647222,5.43264214 -0.267569636,7.36354223 1.06300029,8.13537686 L8.61730776,12.5170752 C9.23338822,12.8744449 9.99241887,12.8744449 10.6084993,12.5170752 L18.162894,8.13537686 C19.4934639,7.36354223 19.4895415,5.43264214 18.1557465,4.66641195 L10.601439,0.32630898 C9.98893228,-0.0256314947 9.23687481,-0.0256314947 8.62445527,0.32630898'
-      })
-    ),
+    icon: window.ameliaBlockIcon,
     category: 'amelia-blocks',
     keywords: [
       'amelia',
@@ -56,22 +42,10 @@
       customClassName: false,
       html: false
     },
-    attributes: {
+    attributes: Object.assign({
       short_code: {
         type: 'string',
         default: '[ameliaeventslistbooking]'
-      },
-      trigger: {
-        type: 'string',
-        default: ''
-      },
-      trigger_type: {
-        type: 'string',
-        default: 'id'
-      },
-      in_dialog: {
-        type: 'boolean',
-        default: false
       },
       event: {
         type: 'array',
@@ -96,11 +70,139 @@
       parametars: {
         type: 'boolean',
         default: false
+      },
+      event_to_show: {
+        type: 'string',
+        default: 'all'
+      },
+      start_date: {
+        type: 'string',
+        default: ''
+      },
+      end_date: {
+        type: 'string',
+        default: ''
       }
-    },
+    }, window.ameliaGutenbergShared.getSharedShortcodeAttributes()),
     edit: function (props) {
       var inspectorElements = []
       var attributes = props.attributes
+      var startDatePickerRef = useRef(null)
+      var endDatePickerRef = useRef(null)
+
+      useEffect(function () {
+        var hasCustomRangeControls = attributes.parametars &&
+          attributes.event_to_show === 'custom' &&
+          (!attributes.event || !attributes.event.length || attributes.event[0] === '')
+
+        if (!hasCustomRangeControls) {
+          return undefined
+        }
+
+        function applyWeekdayLabelStyles (container) {
+          if (!container) {
+            return
+          }
+
+          var datePickerRoot = container.querySelector('.components-datetime__date')
+
+          if (!datePickerRoot) {
+            return
+          }
+
+          var calendar = Array.from(datePickerRoot.children)
+            .find(function (child) {
+              return child.querySelector('button.components-datetime__date__day')
+            })
+
+          if (!calendar) {
+            return
+          }
+
+          Array.from(calendar.children)
+            .filter(function (child) {
+              return child.tagName === 'DIV'
+            })
+            .forEach(function (child) {
+              child.style.maxWidth = '26px'
+              child.style.overflow = 'hidden'
+              child.style.textOverflow = 'ellipsis'
+              child.style.whiteSpace = 'nowrap'
+            })
+        }
+
+        function observeDatePicker (container) {
+          if (!container) {
+            return null
+          }
+
+          applyWeekdayLabelStyles(container)
+
+          var observer = new MutationObserver(function () {
+            applyWeekdayLabelStyles(container)
+          })
+
+          observer.observe(container, {
+            childList: true,
+            subtree: true
+          })
+
+          return observer
+        }
+
+        function setupDatePickerObservers () {
+          var dateControls = [startDatePickerRef.current, endDatePickerRef.current].filter(Boolean)
+
+          var observers = []
+          dateControls.forEach(function (control) {
+            var observer = observeDatePicker(control)
+            if (observer) {
+              observers.push(observer)
+            }
+          })
+
+          return observers
+        }
+
+        // First try immediately
+        var observers = setupDatePickerObservers()
+
+        // If not found, watch for DOM changes to detect when elements are added
+        if (!observers || observers.length === 0) {
+
+          var domObserver = new MutationObserver(function (mutations) {
+            var dateControls = document.querySelectorAll('.amelia-date-control')
+            if (dateControls.length > 0) {
+              domObserver.disconnect()
+
+              observers = setupDatePickerObservers()
+            }
+          })
+
+          // Watch the entire document for changes
+          domObserver.observe(document.body, {
+            childList: true,
+            subtree: true
+          })
+
+          return function () {
+            domObserver.disconnect()
+            if (observers) {
+              observers.forEach(function (observer) {
+                observer.disconnect()
+              })
+            }
+          }
+        }
+
+        return function () {
+          if (observers) {
+            observers.forEach(function (observer) {
+              observer.disconnect()
+            })
+          }
+        }
+      }, [attributes.event_to_show, attributes.parametars, attributes.event])
 
       var options = {
         events: [{value: '', label: wpAmeliaLabels.show_all_events}],
@@ -113,6 +215,12 @@
         trigger_type: [
           {value: 'id', label: wpAmeliaLabels.trigger_type_id},
           {value: 'class', label: wpAmeliaLabels.trigger_type_class}
+        ],
+        event_to_show: [
+          {value: 'all', label: wpAmeliaLabels.all_events},
+          {value: 'future', label: wpAmeliaLabels.future_events},
+          {value: 'past', label: wpAmeliaLabels.past_events},
+          {value: 'custom', label: wpAmeliaLabels.custom_range}
         ]
       }
 
@@ -161,6 +269,23 @@
             }
           }
 
+          // Add event_to_show range logic (only if no specific event is selected)
+          if ((!attributes.event || !attributes.event.length || attributes.event[0] === '') &&
+              attributes.event_to_show && attributes.event_to_show !== 'all') {
+            if (attributes.event_to_show === 'custom') {
+              // Get _d's date in Y-m-d format
+              const _d = new Date()
+              const todayFormatted = _d.getFullYear() + '-' + String(_d.getMonth() + 1).padStart(2, '0') + '-' + String(_d.getDate()).padStart(2, '0')
+
+              const startDate = attributes.start_date || todayFormatted
+              const endDate = attributes.end_date || todayFormatted
+
+              shortCodeString += ' range="' + startDate + ' - ' + endDate + '"'
+            } else {
+              shortCodeString += ' range="' + attributes.event_to_show + '"'
+            }
+          }
+
           if (entities.tags.length !== 0) {
             if (attributes.tag && attributes.tag.length && attributes.tag[0] !== '') {
               shortCodeString += ' tag="'
@@ -181,17 +306,7 @@
 
           shortCode += '[ameliaeventslistbooking' + shortCodeString
 
-          if (attributes.trigger) {
-            shortCode += ' trigger=' + attributes.trigger + ''
-          }
-
-          if (attributes.trigger && attributes.trigger_type) {
-            shortCode += ' trigger_type=' + attributes.trigger_type + ''
-          }
-
-          if (attributes.trigger && attributes.in_dialog) {
-            shortCode += ' in_dialog=1'
-          }
+          shortCode += window.ameliaGutenbergShared.getSharedShortcodeString(attributes)
 
           shortCode += ']'
         } else {
@@ -202,6 +317,8 @@
 
         return shortCode
       }
+
+      var blockProps = useBlockProps()
 
       if (entities.events.length !== 0) {
         inspectorElements.push(el(components.PanelRow,
@@ -216,10 +333,78 @@
           })
         ))
 
-        inspectorElements.push(el('div', {style: {'margin-bottom': '1em'}}, ''))
+        inspectorElements.push(el('div', {style: {marginBottom: '1em'}}, ''))
 
         if (attributes.parametars) {
-          inspectorElements.push(el('div', {class: 'amelia-gutenberg-multi-select-note'}, wpAmeliaLabels.multiselect_note))
+          inspectorElements.push(el('div', {className: 'amelia-gutenberg-multi-select-note'}, wpAmeliaLabels.multiselect_note))
+
+          if (!attributes.event.length || attributes.event[0] === '') {
+            // Add Event Time Scope dropdown
+            inspectorElements.push(el(components.SelectControl, {
+              id: 'amelia-js-select-event-to-show',
+              label: wpAmeliaLabels.event_time_scope || 'Event Time Scope',
+              value: attributes.event_to_show,
+              options: options.event_to_show,
+              onChange: function (selectControl) {
+                return props.setAttributes({event_to_show: selectControl})
+              }
+            }))
+
+            // Add custom date range fields when 'custom' is selected
+            if (attributes.event_to_show === 'custom') {
+              inspectorElements.push(el(components.BaseControl,
+                {
+                  id: 'amelia-js-start-date',
+                  className: 'amelia-date-control',
+                  label: wpAmeliaLabels.red_start_date || 'Start Date'
+                },
+                el('div', {ref: startDatePickerRef},
+                  el(components.DatePicker, {
+                    currentDate: attributes.start_date,
+                    onChange: function (date) {
+                      // Format date as Y-m-d
+                      const formattedDate = date ? date.split('T')[0] : ''
+                      return props.setAttributes({
+                        start_date: formattedDate,
+                        end_date: !formattedDate
+                          ? attributes.end_date
+                          : (!attributes.end_date || attributes.end_date < formattedDate
+                            ? formattedDate
+                            : attributes.end_date)
+                      })
+                    },
+                    is12Hour: false
+                  })
+                )
+              ))
+
+              inspectorElements.push(el(components.BaseControl,
+                {
+                  id: 'amelia-js-end-date',
+                  className: 'amelia-date-control',
+                  label: wpAmeliaLabels.red_end_date || 'End Date'
+                },
+                el('div', {ref: endDatePickerRef},
+                  el(components.DatePicker, {
+                    currentDate: attributes.end_date,
+                    onChange: function (date) {
+                      // Format date as Y-m-d
+                      const formattedDate = date ? date.split('T')[0] : ''
+                      return props.setAttributes({
+                        start_date: !attributes.start_date && formattedDate
+                          ? formattedDate
+                          : attributes.start_date,
+                        end_date: attributes.start_date && formattedDate && formattedDate < attributes.start_date
+                          ? attributes.start_date
+                          : formattedDate
+                      })
+                    },
+                    is12Hour: false
+                  })
+                )
+              ))
+            }
+          }
 
           if (entities.tags.length) {
             inspectorElements.push(el(components.SelectControl, {
@@ -248,7 +433,7 @@
               }
             }))
 
-            inspectorElements.push(el('div', {style: {'margin-bottom': '1em'}}, ''))
+            inspectorElements.push(el('div', {style: {marginBottom: '1em'}}, ''))
 
             inspectorElements.push(el(components.PanelRow,
               {},
@@ -277,82 +462,74 @@
             }))
           }
 
-          inspectorElements.push(el('div', {style: {'margin-bottom': '1em'}}, ''))
-
-          inspectorElements.push(el(components.TextControl, {
-            id: 'amelia-js-trigger',
-            label: wpAmeliaLabels.manually_loading,
-            value: attributes.trigger,
-            help: wpAmeliaLabels.manually_loading_description,
-            onChange: function (TextControl) {
-              return props.setAttributes({trigger: TextControl})
-            }
-          }))
-
-          inspectorElements.push(el(components.SelectControl, {
-            id: 'amelia-js-trigger_type',
-            label: wpAmeliaLabels.trigger_type,
-            value: attributes.trigger_type,
-            options: options.trigger_type,
-            help: wpAmeliaLabels.trigger_type_tooltip,
-            onChange: function (selectControl) {
-              return props.setAttributes({trigger_type: selectControl})
-            }
-          }))
-
-          inspectorElements.push(el(components.PanelRow,
-            {},
-            el('label', {htmlFor: 'amelia-js-in-dialog'}, wpAmeliaLabels.in_dialog),
-            el(components.FormToggle, {
-              id: 'amelia-js-in-dialog',
-              checked: attributes.in_dialog,
-              onChange: function () {
-                return props.setAttributes({in_dialog: !props.attributes.in_dialog})
-              }
-            })
-          ))
+          inspectorElements.push(el('div', {style: {marginBottom: '1em'}}, ''))
         } else {
           attributes.event = ''
           attributes.tag = ''
         }
 
-        return [
-          el(blockControls, {key: 'controls'}),
-          el(inspectorControls, {key: 'inspector'},
-            el(components.PanelBody, {initialOpen: true},
-              inspectorElements
-            )
-          ),
-          el('div', {},
-            getShortCode(props, props.attributes)
-          )
-        ]
-      } else {
-        inspectorElements.push(el('p', {style: {'margin-bottom': '1em'}}, 'Please create event first. You can find instructions in our documentation on link below.'))
-        inspectorElements.push(el('a', {href: 'https://wpamelia.com/quickstart/', target: '_blank', style: {'margin-bottom': '1em'}}, 'Start working with Amelia WordPress Appointment Booking plugin'))
+        window.ameliaGutenbergShared.setSharedShortcodeElements(inspectorElements, components, attributes, props, options, data)
 
-        return [
+        return el('div', blockProps,
           el(blockControls, {key: 'controls'}),
           el(inspectorControls, {key: 'inspector'},
             el(components.PanelBody, {initialOpen: true},
               inspectorElements
             )
           ),
-          el('div',
-            {style: blockStyle},
-            getShortCode(props, props.attributes)
+          el('div', {className: 'amelia-gutenberg-placeholder'},
+            el('div', {className: 'amelia-gutenberg-placeholder__header'},
+              el('div', {className: 'amelia-gutenberg-placeholder__icon'}, window.ameliaBlockIcon || ''),
+              el('div', {className: 'amelia-gutenberg-placeholder__title'}, 'Amelia - Events List Booking')
+            ),
+            el('div', {className: 'amelia-gutenberg-placeholder__shortcode'},
+              getShortCode(props, props.attributes)
+            )
           )
-        ]
+        )
+      } else {
+        inspectorElements.push(el('p', {style: {marginBottom: '1em'}}, 'Please create event first. You can find instructions in our documentation on link below.'))
+        inspectorElements.push(el('a', {href: 'https://wpamelia.com/documentation/service-quick-start/', target: '_blank', style: {marginBottom: '1em'}}, 'Start working with Amelia WordPress Appointment Booking plugin'))
+
+        return el('div', blockProps,
+          el(blockControls, {key: 'controls'}),
+          el(inspectorControls, {key: 'inspector'},
+            el(components.PanelBody, {initialOpen: true},
+              inspectorElements
+            )
+          ),
+          el('div', {className: 'amelia-gutenberg-placeholder'},
+            el('div', {className: 'amelia-gutenberg-placeholder__header'},
+              el('div', {className: 'amelia-gutenberg-placeholder__icon'}, window.ameliaBlockIcon || ''),
+              el('div', {className: 'amelia-gutenberg-placeholder__title'}, 'Amelia - Events List Booking')
+            ),
+            el('div', {className: 'amelia-gutenberg-placeholder__shortcode'},
+              getShortCode(props, props.attributes)
+            )
+          )
+        )
       }
     },
 
-    save: function (props) {
-      return (
-        el('div', {},
-          props.attributes.short_code
-        )
-      )
-    }
+    save: function () {
+      return null
+    },
+    deprecated: [
+      {
+        attributes: Object.assign({
+          short_code: {type: 'string', default: '[ameliaeventslistbooking]'},
+          event: {type: 'array', default: []},
+          recurring: {type: 'boolean', default: false},
+          tag: {type: 'array', default: []},
+          location: {type: 'array', default: []},
+          eventOptions: {type: 'string', default: ''},
+          parametars: {type: 'boolean', default: false}
+        }, window.ameliaGutenbergShared.getSharedShortcodeDepricatedAttributes()),
+        save: function (props) {
+          return el('div', {}, props.attributes.short_code)
+        }
+      }
+    ]
   })
 })(
   window.wp

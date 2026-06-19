@@ -33,8 +33,8 @@
                 </div>
                 <div>
                   <p>1</p>
-                  <p>{{ `${moment().add(5 ,'days').format('HH')}:45` }}</p>
-                  <p>{{ moment().add(5 ,'days').format('DD. MM YYYY.') }}</p>
+                  <p>{{ `${moment().add(5, 'days').format('HH')}:45` }}</p>
+                  <p>{{ moment().add(5, 'days').format('DD. MM YYYY.') }}</p>
                   <p>John Doe</p>
                   <p>Location 1</p>
                   <p></p>
@@ -49,20 +49,21 @@
 </template>
 
 <script setup>
-import moment from 'moment';
-import { computed, inject, ref } from "vue";
-import IconCheck from "../../../../_components/icons/IconCheck.vue";
-import PackageInfo from "../parts/PackageInfo.vue";
-import AmCollapseItem from "../../../../_components/collapse/AmCollapseItem.vue";
-import AmCollapse from "../../../../_components/collapse/AmCollapse.vue";
-import { usePictureLoad } from "../../../../../assets/js/common/image";
-import { useColorTransparency } from "../../../../../assets/js/common/colorManipulation.js";
+import moment from 'moment'
+import { computed, inject, ref } from 'vue'
+import IconCheck from '../../../../_components/icons/IconCheck'
+import PackageInfo from '../parts/PackageInfo'
+import AmCollapseItem from '../../../../_components/collapse/AmCollapseItem'
+import AmCollapse from '../../../../_components/collapse/AmCollapse'
+import { usePictureLoad } from '../../../../../assets/js/common/image'
+import { useColorTransparency } from '../../../../../assets/js/common/colorManipulation.js'
+import { useReactiveCustomize } from '../../../../../assets/js/admin/useReactiveCustomize.js'
 
 let props = defineProps({
   globalClass: {
     type: String,
-    default: ''
-  }
+    default: '',
+  },
 })
 const baseUrls = inject('baseUrls')
 let packageAppointments = ref([
@@ -71,143 +72,153 @@ let packageAppointments = ref([
     service: {
       name: 'Service 1',
     },
-    quantity: 3
+    quantity: 3,
   },
   {
     id: 2,
     service: {
       name: 'Service 2',
     },
-    quantity: 4
+    quantity: 4,
   },
   {
     id: 3,
     service: {
       name: 'Service 3',
     },
-    quantity: 5
-  }
+    quantity: 5,
+  },
 ])
 let pack = ref({
   name: 'Package 1',
-  description: 'Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.',
+  description:
+    "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.",
   bookable: [
     {
       id: 1,
       service: {
         name: 'Service 1',
-        description: 'Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.'
+        description:
+          "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.",
       },
       quantity: 5,
       employees: [
         {
           id: 1,
           firstName: 'Jon',
-          lastName: 'Doe'
+          lastName: 'Doe',
         },
         {
           id: 2,
           firstName: 'Jane',
-          lastName: 'Doe'
-        }
-      ]
+          lastName: 'Doe',
+        },
+      ],
     },
     {
       id: 2,
       service: {
         name: 'Service 2',
-        description: 'Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.'
+        description:
+          "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.",
       },
       quantity: 3,
       employees: [
         {
           id: 1,
           firstName: 'Jon',
-          lastName: 'Doe'
+          lastName: 'Doe',
         },
         {
           id: 2,
           firstName: 'Jane',
-          lastName: 'Doe'
-        }
-      ]
+          lastName: 'Doe',
+        },
+      ],
     },
     {
       id: 2,
       service: {
         name: 'Service 3',
-        description: 'Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.'
+        description:
+          "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.",
       },
       quantity: 9,
       employees: [
         {
           id: 1,
           firstName: 'Jon',
-          lastName: 'Doe'
+          lastName: 'Doe',
         },
         {
           id: 2,
           firstName: 'Jane',
-          lastName: 'Doe'
-        }
-      ]
+          lastName: 'Doe',
+        },
+      ],
     },
     {
       id: 3,
       service: {
         name: 'Service 4',
-        description: 'Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.'
+        description:
+          "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.",
       },
       quantity: 9,
       employees: [
         {
           id: 1,
           firstName: 'Jon',
-          lastName: 'Doe'
+          lastName: 'Doe',
         },
         {
           id: 2,
           firstName: 'Jane',
-          lastName: 'Doe'
-        }
-      ]
+          lastName: 'Doe',
+        },
+      ],
     },
     {
       id: 4,
       service: {
         name: 'Service 5',
-        description: 'Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.'
+        description:
+          "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.",
       },
       quantity: 1,
       employees: [
         {
           id: 1,
           firstName: 'Jon',
-          lastName: 'Doe'
+          lastName: 'Doe',
         },
         {
           id: 2,
           firstName: 'Jane',
-          lastName: 'Doe'
-        }
-      ]
-    }
-  ]
+          lastName: 'Doe',
+        },
+      ],
+    },
+  ],
 })
 
 let langKey = inject('langKey')
 let amLabels = inject('labels')
 
 let pageRenderKey = inject('pageRenderKey')
-let amCustomize = inject('customize')
+const { amCustomize } = useReactiveCustomize()
 
 // * Label computed function
-function labelsDisplay (label) {
+function labelsDisplay(label) {
   let computedLabel = computed(() => {
-    return amCustomize.value[pageRenderKey.value].packageAppointmentsListStep.translations
-    && amCustomize.value[pageRenderKey.value].packageAppointmentsListStep.translations[label]
-    && amCustomize.value[pageRenderKey.value].packageAppointmentsListStep.translations[label][langKey.value]
-      ? amCustomize.value[pageRenderKey.value].packageAppointmentsListStep.translations[label][langKey.value]
+    return amCustomize.value[pageRenderKey.value].packageAppointmentsListStep
+      .translations &&
+      amCustomize.value[pageRenderKey.value].packageAppointmentsListStep
+        .translations[label] &&
+      amCustomize.value[pageRenderKey.value].packageAppointmentsListStep
+        .translations[label][langKey.value]
+      ? amCustomize.value[pageRenderKey.value].packageAppointmentsListStep
+          .translations[label][langKey.value]
       : amLabels[label]
   })
 
@@ -218,10 +229,22 @@ function labelsDisplay (label) {
 let amColors = inject('amColors')
 let cssVars = computed(() => {
   return {
-    '--am-c-pso-text-op50': useColorTransparency(amColors.value.colorMainText, 0.5),
-    '--am-c-pso-success-op10': useColorTransparency(amColors.value.colorSuccess, 0.10),
-    '--am-c-pso-success-op60': useColorTransparency(amColors.value.colorSuccess, 0.6),
-    '--am-c-pso-primary-op10': useColorTransparency(amColors.value.colorPrimary, 0.1)
+    '--am-c-pso-text-op50': useColorTransparency(
+      amColors.value.colorMainText,
+      0.5
+    ),
+    '--am-c-pso-success-op10': useColorTransparency(
+      amColors.value.colorSuccess,
+      0.1
+    ),
+    '--am-c-pso-success-op60': useColorTransparency(
+      amColors.value.colorSuccess,
+      0.6
+    ),
+    '--am-c-pso-primary-op10': useColorTransparency(
+      amColors.value.colorPrimary,
+      0.1
+    ),
   }
 })
 </script>
@@ -237,7 +260,7 @@ export default {
     finished: false,
     selected: false,
     type: 'PackageAppointmentListStep',
-  }
+  },
 }
 </script>
 
@@ -248,7 +271,6 @@ export default {
 #amelia-app-backend-new #amelia-container {
   // Amelia Form Steps
   .am-fs {
-
     &__ps-overview {
       --am-c-pso-text: var(--am-c-main-text);
       --am-c-pso-bgr: var(--am-c-main-bgr);
@@ -259,7 +281,11 @@ export default {
         $count: 5;
         @for $i from 0 through $count {
           &:nth-child(#{$i + 1}) {
-            animation: 600ms cubic-bezier(.45,1,.4,1.2) #{$i*100}ms am-animation-slide-up;
+            animation: 600ms
+              cubic-bezier(0.45, 1, 0.4, 1.2)
+              #{$i *
+              100}ms
+              am-animation-slide-up;
             animation-fill-mode: both;
           }
         }
@@ -309,7 +335,7 @@ export default {
             --am-combo-collapse-border: 1px solid var(--am-c-pso-primary);
             box-shadow: 0 1px 1px var(--am-c-pso-primary-op10);
 
-            transition: border ease-in-out .5s;
+            transition: border ease-in-out 0.5s;
           }
         }
 
@@ -360,7 +386,7 @@ export default {
               line-height: 1.384615;
               /* $shade-400 */
               color: var(--am-c-pso-text-op50);
-              padding:4px;
+              padding: 4px;
 
               &:first-child {
                 width: 8%;
@@ -373,7 +399,7 @@ export default {
             }
           }
 
-          & > div:not(:first-child)  {
+          & > div:not(:first-child) {
             /* $shade-900 */
             color: var(--am-c-pso-text);
             display: table-row;
@@ -391,7 +417,7 @@ export default {
               display: table-cell;
               width: 23%;
               vertical-align: middle;
-              padding:4px;
+              padding: 4px;
               &:first-child {
                 width: 8%;
                 padding-left: 16px;
@@ -409,13 +435,17 @@ export default {
         $count: 20;
         @for $i from 0 through $count {
           &:nth-child(#{$i + 1}) {
-            animation: 600ms cubic-bezier(.45, 1, .4, 1.2) #{$i*100}ms am-animation-slide-up;
+            animation: 600ms
+              cubic-bezier(0.45, 1, 0.4, 1.2)
+              #{$i *
+              100}ms
+              am-animation-slide-up;
             animation-fill-mode: both;
           }
         }
 
         &__heading {
-          transition-delay: .5s;
+          transition-delay: 0.5s;
 
           &-side {
             transition-delay: 0s;

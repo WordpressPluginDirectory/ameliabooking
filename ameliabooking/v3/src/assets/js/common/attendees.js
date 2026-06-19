@@ -142,8 +142,8 @@ function useAttendeeStatuses() {
     {
       label: globalLabels['no-show'],
       value: 'no-show',
-      icon: 'clock',
-      color: 'var(--am-c-warning)',
+      icon: 'no-show',
+      color: '#808A90',
     },
   ]
 }

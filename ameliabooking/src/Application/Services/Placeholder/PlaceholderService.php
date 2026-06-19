@@ -1,7 +1,7 @@
 <?php
 
 /**
- * @copyright © TMS-Plugins. All rights reserved.
+ * @copyright © Melograno Ventures. All rights reserved.
  * @licence   See LICENCE.md for license details.
  */
 
@@ -82,10 +82,12 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
         unset($data['invoice_items_booking']);
         unset($data['invoice_items_extras']);
         unset($data['invoice_items_event']);
+        unset($data['invoice_dates']);
+        unset($data['invoice_dates_xml']);
         unset($data['items']);
         unset($data['qr_code_tickets']);
 
-        $data = array_filter($data, function($key) {
+        $data = array_filter($data, function ($key) {
             return strpos($key, 'invoice_custom_field') !== 0;
         }, ARRAY_FILTER_USE_KEY);
 
@@ -144,15 +146,15 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
             [
             'booked_customer'     =>
                 $paragraphStart .
-                BackendStrings::getNotificationsStrings()['ph_customer_full_name'] .
+                BackendStrings::get('ph_customer_full_name') .
                 ': John Micheal Doe ' .
                 $paragraphEnd .
                 $paragraphStart .
-                BackendStrings::getNotificationsStrings()['ph_customer_phone'] .
+                BackendStrings::get('ph_customer_phone') .
                 ': 193-951-2600 ' .
                 $paragraphEnd .
                 $paragraphStart .
-                BackendStrings::getNotificationsStrings()['ph_customer_email'] .
+                BackendStrings::get('ph_customer_email') .
                 ': customer@domain.com ' .
                 $paragraphEnd,
             'company_address'     => $companySettings['address'],
@@ -289,6 +291,12 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
                     $expirationDate = $customerBooking['coupon']['expirationDate'];
                 }
 
+                $startDate = null;
+
+                if (!empty($customerBooking['coupon']['startDate'])) {
+                    $startDate = $customerBooking['coupon']['startDate'];
+                }
+
                 if (($amountData['discount'] || $amountData['deduction']) && !empty($customerBooking['info'])) {
                     $customerData = json_decode($customerBooking['info'], true);
 
@@ -300,15 +308,17 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
                     }
 
                     $couponsUsed[] =
-                        BackendStrings::getCommonStrings()['customer'] . ': ' .
+                        BackendStrings::get('customer') . ': ' .
                         $customerData['firstName'] . ' ' . $customerData['lastName'] . ' ' . $break .
-                        BackendStrings::getFinanceStrings()['code'] . ': ' .
+                        BackendStrings::get('code') . ': ' .
                         $customerBooking['coupon']['code'] . ' ' . $break .
-                        ($amountData['discount'] ? BackendStrings::getPaymentStrings()['discount_amount'] . ': ' .
+                        ($amountData['discount'] ? BackendStrings::get('discount_amount') . ': ' .
                             $helperService->getFormattedPrice($amountData['discount']) . ' ' . $break : '') .
-                        ($amountData['deduction'] ? BackendStrings::getPaymentStrings()['deduction'] . ': ' .
+                        ($amountData['deduction'] ? BackendStrings::get('deduction') . ': ' .
                             $helperService->getFormattedPrice($amountData['deduction']) . ' ' . $break : '') .
-                        ($expirationDate ? BackendStrings::getPaymentStrings()['expiration_date'] . ': ' .
+                        ($startDate ? BackendStrings::get('start_date') . ': ' .
+                            $startDate . ' ' . $break : '') .
+                        ($expirationDate ? BackendStrings::get('expiration_date') . ': ' .
                             $expirationDate : '');
                 }
 
@@ -322,7 +332,7 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
 
             foreach ($numberOfPersonsData[AbstractUser::USER_ROLE_PROVIDER] as $key => $value) {
                 if ($value) {
-                    $numberOfPersons[] = BackendStrings::getCommonStrings()[$key] . ': ' . $value;
+                    $numberOfPersons[] = BackendStrings::get($key) . ': ' . $value;
                 }
             }
 
@@ -340,14 +350,22 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
                 $expirationDate = $appointment['bookings'][$bookingKey]['coupon']['expirationDate'];
             }
 
+            $startDate = null;
+
+            if (!empty($appointment['bookings'][$bookingKey]['coupon']['startDate'])) {
+                $startDate = $appointment['bookings'][$bookingKey]['coupon']['startDate'];
+            }
+
             if (!empty($appointment['bookings'][$bookingKey]['coupon']['code'])) {
                 $couponsUsed[] =
                     $appointment['bookings'][$bookingKey]['coupon']['code'] . ' ' . $break .
-                    ($amountData['discount'] ? BackendStrings::getPaymentStrings()['discount_amount'] . ': ' .
+                    ($amountData['discount'] ? BackendStrings::get('discount_amount') . ': ' .
                         $helperService->getFormattedPrice($amountData['discount']) . ' ' . $break : '') .
-                    ($amountData['deduction'] ? BackendStrings::getPaymentStrings()['deduction'] . ': ' .
+                    ($amountData['deduction'] ? BackendStrings::get('deduction') . ': ' .
                         $helperService->getFormattedPrice($amountData['deduction']) . ' ' . $break : '') .
-                    ($expirationDate ? BackendStrings::getPaymentStrings()['expiration_date'] . ': ' .
+                    ($startDate ? BackendStrings::get('start_date') . ': ' .
+                        $startDate . ' ' . $break : '') .
+                    ($expirationDate ? BackendStrings::get('expiration_date') . ': ' .
                         $expirationDate : '');
             }
 
@@ -399,16 +417,16 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
         if ($payment) {
             switch ($payment['gateway']) {
                 case 'onSite':
-                    $paymentType = BackendStrings::getCommonStrings()['on_site'];
+                    $paymentType = BackendStrings::get('on_site');
                     break;
                 case 'wc':
-                    $paymentType = BackendStrings::getSettingsStrings()['wc_name'];
+                    $paymentType = BackendStrings::get('wc_name');
                     break;
                 case 'square':
-                    $paymentType = BackendStrings::getSettingsStrings()['square'];
+                    $paymentType = BackendStrings::get('square');
                     break;
                 default:
-                    $paymentType = BackendStrings::getSettingsStrings()[$payment['gateway']];
+                    $paymentType = BackendStrings::get($payment['gateway']);
                     break;
             }
         }
@@ -433,6 +451,8 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
 
         $dateFormat = $settingsService->getSetting('wordpress', 'dateFormat');
 
+        $customerWaiting = $bookingKey !== null && $appointment['bookings'][$bookingKey]['status'] === BookingStatus::WAITING;
+
         return array_merge(
             $paymentLinks,
             [
@@ -443,7 +463,8 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
                         AMELIA_ACTION_URL . '/bookings/cancel/' . $appointment['bookings'][$bookingKey]['id'] .
                         ($token ? '&token=' . $token : '') . "&type={$appointment['type']}" : '',
                 'appointment_approve_url' =>
-                    $bookingKeyForEmployee !== null ? (AMELIA_ACTION_URL . '/bookings/success/' . $bookingKeyForEmployee .
+                    ($bookingKeyForEmployee !== null || $customerWaiting) ? (AMELIA_ACTION_URL . '/bookings/success/' .
+                        ($customerWaiting ? $appointment['bookings'][$bookingKey]['id'] : $bookingKeyForEmployee) .
                         '&token=' . $token) : '',
                 'appointment_reject_url' =>
                     $bookingKeyForEmployee !== null ? (AMELIA_ACTION_URL . '/bookings/reject/' . $bookingKeyForEmployee .
@@ -455,6 +476,9 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
                 'payment_created'                   => $payment && !empty($payment['created'])
                     ? date_i18n($dateFormat, strtotime($payment['created']))
                     : '',
+                'payment_created_xml'               => $payment && !empty($payment['created'])
+                   ? date_i18n('Y-m-d', strtotime($payment['created']))
+                   : '',
                 'payment_invoice_number'            => $payment ? $payment['invoiceNumber'] : '',
                 'payment_gateway_title'             => $payment ? $payment['gatewayTitle'] : '',
                 "payment_due_amount"                => $paymentDueAmount,
@@ -552,15 +576,15 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
             }
 
             $bookedCustomer =
-                $paragraphStart . BackendStrings::getNotificationsStrings()['ph_customer_full_name'] . ': ' . $bookedCustomerFullName . $paragraphEnd;
+                $paragraphStart . BackendStrings::get('ph_customer_full_name') . ': ' . $bookedCustomerFullName . $paragraphEnd;
 
             $bookedCustomer .=
                 $bookedCustomerPhone ?
-                    $paragraphStart . BackendStrings::getNotificationsStrings()['ph_customer_phone'] . ': ' . $bookedCustomerPhone . $paragraphEnd :
+                    $paragraphStart . BackendStrings::get('ph_customer_phone') . ': ' . $bookedCustomerPhone . $paragraphEnd :
                     '';
             $bookedCustomer .=
                 $bookedCustomerEmail ?
-                    $paragraphStart . BackendStrings::getNotificationsStrings()['ph_customer_email'] . ': ' . $bookedCustomerEmail . $paragraphEnd :
+                    $paragraphStart . BackendStrings::get('ph_customer_email') . ': ' . $bookedCustomerEmail . $paragraphEnd :
                     '';
 
             return [
@@ -644,6 +668,7 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
             'customer_last_name'  => $info ? $info->lastName : $customer->getLastName()->getValue(),
             'customer_full_name'  => $info ? $info->firstName . ' ' . $info->lastName : $customer->getFullName(),
             'customer_phone'      => $phone,
+            'customer_phone_country' => $customer->getCountryPhoneIso() ? $customer->getCountryPhoneIso()->getValue() : null,
             'customer_phone_local' => !empty($phone) ? str_replace('+', '', $phone) : '',
             'customer_note'       => $customer->getNote() ? $customer->getNote()->getValue() : '',
             'customer_panel_url'  => $helperService->getCustomerCabinetUrl(
@@ -680,7 +705,8 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
         if ($bookingKey === null) {
             $sendAllCustomFields =
                 $settingsService->getSetting('notifications', 'sendAllCF') ||
-                (array_key_exists('sendCF', $appointment) && $appointment['sendCF']);
+                (array_key_exists('sendCF', $appointment) && $appointment['sendCF']) ||
+                (array_key_exists('sendForAllBookings', $appointment) && $appointment['sendForAllBookings']);
             foreach ($appointment['bookings'] as $booking) {
                 if (
                     (!$booking['isChangedStatus'] || (array_key_exists('isLastBooking', $booking) && !$booking['isLastBooking']))
@@ -698,7 +724,7 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
 
                 $bookingCustomFields = !empty($booking['customFields']) ? json_decode($booking['customFields'], true) : null;
 
-                if ($booking['customerId'] && !isset($booking['customer'])) {
+                if ($booking['customerId'] && (!isset($booking['customer']) || !isset($booking['customer']['customFields']))) {
                     /** @var UserRepository $userRepository */
                     $userRepository = $this->container->get('domain.users.repository');
 
@@ -806,7 +832,7 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
 
             if (
                 !empty($appointment['bookings'][$bookingKey]['customerId']) &&
-                !isset($appointment['bookings'][$bookingKey]['customer'])
+                (!isset($appointment['bookings'][$bookingKey]['customer']) || !isset($appointment['bookings'][$bookingKey]['customer']['customFields']))
             ) {
                 /** @var UserRepository $userRepository */
                 $userRepository = $this->container->get('domain.users.repository');
@@ -819,7 +845,7 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
                     json_decode($appointment['bookings'][$bookingKey]['customer']['customFields'], true) :
                     $appointment['bookings'][$bookingKey]['customer']['customFields'];
 
-                $bookingCustomFields += $customerCustomFields;
+                $bookingCustomFields += $customerCustomFields ?? [];
             }
 
             if ($bookingCustomFields) {
@@ -1086,21 +1112,24 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
                     );
 
                 try {
-                    if ($sendCoupon && $couponAS->inspectCoupon($coupon, $customerId, true)) {
+                    if ($sendCoupon && $couponAS->inspectCoupon($coupon, $customerId, true, true)) {
                         $couponsData["coupon_{$coupon->getId()->getValue()}"] =
                             FrontendStrings::getCommonStrings()['coupon_send_text'] . ' ' .
                             $coupon->getCode()->getValue() . ' ' . $break .
                             ($coupon->getDeduction() && $coupon->getDeduction()->getValue() ?
-                                BackendStrings::getFinanceStrings()['deduction'] . ' ' .
-                                $helperService->getFormattedPrice($coupon->getDeduction()->getValue()) . $break
+                                BackendStrings::get('deduction') . ' ' .
+                                $helperService->getFormattedPrice($coupon->getDeduction()->getValue()) . ' ' . $break
                                 : ''
                             ) .
                             ($coupon->getDiscount() && $coupon->getDiscount()->getValue() ?
-                                BackendStrings::getPaymentStrings()['discount_amount'] . ' ' .
+                                BackendStrings::get('discount_amount') . ' ' .
                                 $coupon->getDiscount()->getValue() . '% ' . $break
                                 : '') .
+                            ($coupon->getStartDate() && $coupon->getStartDate()->getValue() ?
+                                BackendStrings::get('start_date') . ': ' .
+                                date_i18n($coupon->getStartDate()->getValue()->format('Y-m-d')) . ' ' : '') .
                             ($coupon->getExpirationDate() && $coupon->getExpirationDate()->getValue() ?
-                                BackendStrings::getPaymentStrings()['expiration_date'] . ': ' .
+                                BackendStrings::get('expiration_date') . ': ' .
                                 date_i18n($coupon->getExpirationDate()->getValue()->format('Y-m-d')) : '');
                     } else {
                         $couponsData["coupon_{$coupon->getId()->getValue()}"] = '';
@@ -1142,7 +1171,7 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
      * @param array    $appointment
      * @param int|null $bookingKey
      *
-     * @return string
+     * @return string|null
      */
     protected function getLocale($appointment, $bookingKey)
     {
@@ -1224,7 +1253,7 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
     /**
      * @param array $appointment
      *
-     * @return int
+     * @return int|null
      */
     protected function getBookingKeyForEmployee($appointment)
     {
@@ -1263,9 +1292,11 @@ abstract class PlaceholderService implements PlaceholderServiceInterface
             return $value;
         }
 
-        $date = DateTime::createFromFormat('Y-m-d', $savedDate);
+        // Parse/format datepicker values in UTC to preserve the selected calendar date
+        // regardless of customer or site timezone offsets.
+        $date = DateTime::createFromFormat('!Y-m-d', $savedDate, new \DateTimeZone('UTC'));
         if ($date instanceof DateTime) {
-            return date_i18n($dateFormat, $date->getTimestamp());
+            return wp_date($dateFormat, $date->getTimestamp(), new \DateTimeZone('UTC'));
         }
 
         return $value;

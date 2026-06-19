@@ -6,7 +6,7 @@ use AmeliaBooking\Application\Commands\User\Provider\GetProvidersCommand;
 use AmeliaBooking\Application\Commands\CommandResult;
 use AmeliaBooking\Application\Controller\Controller;
 use AmeliaBooking\Domain\Events\DomainEventBus;
-use Slim\Http\Request;
+use AmeliaVendor\Psr\Http\Message\ServerRequestInterface as Request;
 
 /**
  * Class GetProvidersController
@@ -27,6 +27,8 @@ class GetProvidersController extends Controller
         $command = new GetProvidersCommand($args);
 
         $params = (array)$request->getQueryParams();
+
+        $this->setArrayParams($params);
 
         if (isset($params['services'])) {
             $params['services'] = array_map('intval', $params['services']);

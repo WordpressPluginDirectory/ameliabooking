@@ -1,9 +1,5 @@
 <template>
-  <div
-    class="am-fs__ro"
-    :class="props.globalClass"
-    :style="cssVars"
-  >
+  <div class="am-fs__ro" :class="props.globalClass" :style="cssVars">
     <div class="am-fs__ro-warning">
       <AmAlert
         type="warning"
@@ -16,11 +12,11 @@
     <AmCollapse>
       <AmCollapseItem
         v-for="(appointment, index) in serviceSelection.list"
-        :ref="el => recurringList[index] = el"
+        :ref="(el) => (recurringList[index] = el)"
         :key="index"
         :name="index.toString()"
         class="am-fs__ro-app-items"
-        :class="{'am-fs__ro-app-unavailable': appointment.isSubstitute}"
+        :class="{ 'am-fs__ro-app-unavailable': appointment.isSubstitute }"
         :side="true"
         :delay="500"
         :collapsable="false"
@@ -28,13 +24,22 @@
         <template #heading>
           <div class="am-fs__ro-app-heading">
             <span>
-              {{ (index + 1) + '. ' + (appointment.date && appointment.time ? appointment.date + ' ' + appointment.time : labelsDisplay('recurring_chose_date')) }}
+              {{
+                index +
+                1 +
+                '. ' +
+                (appointment.date && appointment.time
+                  ? appointment.date + ' ' + appointment.time
+                  : labelsDisplay('recurring_chose_date'))
+              }}
             </span>
           </div>
         </template>
 
         <template #icon-end>
-          <SideMenu :cancel-label="labelsDisplay('recurring_delete')"></SideMenu>
+          <SideMenu
+            :cancel-label="labelsDisplay('recurring_delete')"
+          ></SideMenu>
         </template>
 
         <template #default>
@@ -45,12 +50,15 @@
               :slots="calendarEvents"
               :calendar-minimum-date="moment().format('YYYY-MM-DD hh:mm')"
               :calendar-maximum-date="moment().add(1,'year').format('YYYY-MM-DD hh:mm')"
-              :time-zone="amCustomize[pageRenderKey].recurringSummary.options.timeZoneVisibility.visibility"
+              :time-zone="features.timeZones && amCustomize[pageRenderKey].recurringSummary.options.timeZoneVisibility.visibility"
               :show-estimated-pricing="amCustomize[pageRenderKey].recurringSummary.options.estimatedPricingVisibility.visibility"
               :show-indicator-pricing="amCustomize[pageRenderKey].recurringSummary.options.indicatorPricingVisibility.visibility"
               :show-slot-pricing="amCustomize[pageRenderKey].recurringSummary.options.slotPricingVisibility.visibility"
+              :show-people-waiting="false"
+              :show-calendar-date-busyness="amCustomize[pageRenderKey].recurringSummary.options.calendarDateBusynessVisibility?.visibility ?? true"
               :label-slots-selected="labelsDisplay('recurring_slots_selected')"
               :period-pricing="periodPricing"
+              :busyness="previewCalendarBusyness"
             ></AmAdvancedSlotCalendar>
           </div>
         </template>
@@ -60,24 +68,31 @@
 </template>
 
 <script setup>
-import { computed, inject, provide, ref, onMounted } from "vue";
-import moment from "moment";
-import AmAlert from "../../../../_components/alert/AmAlert.vue";
-import AmCollapse from "../../../../_components/collapse/AmCollapse.vue";
-import AmCollapseItem from "../../../../_components/collapse/AmCollapseItem.vue";
+import { computed, inject, provide, ref, onMounted } from 'vue'
+import moment from 'moment'
+import AmAlert from '../../../../_components/alert/AmAlert'
+import AmCollapse from '../../../../_components/collapse/AmCollapse'
+import AmCollapseItem from '../../../../_components/collapse/AmCollapseItem'
 import SideMenu from '../../../../public/StepForm/RecurringStep/parts/SideMenu.vue'
 import AmAdvancedSlotCalendar from '../../../../_components/advanced-slot-calendar/AmAdvancedSlotCalendar.vue'
-import { useColorTransparency } from "../../../../../assets/js/common/colorManipulation";
+import { useColorTransparency } from '../../../../../assets/js/common/colorManipulation'
+import { useReactiveCustomize } from '../../../../../assets/js/admin/useReactiveCustomize.js'
 
 let props = defineProps({
   globalClass: {
     type: String,
-    default: ''
-  }
+    default: '',
+  },
 })
 
 // Container Width
 let cWidth = inject('containerWidth', 0)
+
+// * Plugin Licence
+let licence = inject('licence')
+
+// * Features
+let features = inject('features')
 
 // * Languages
 let langKey = inject('langKey')
@@ -85,19 +100,35 @@ let langKey = inject('langKey')
 // * Global Labels
 let amLabels = inject('labels')
 
-// * Plugin Licence
-let licence = inject('licence')
-
 let pageRenderKey = inject('pageRenderKey')
-let amCustomize = inject('customize')
+const { amCustomize } = useReactiveCustomize()
+
+let previewCalendarBusyness = computed(() => {
+  const opts = amCustomize.value[pageRenderKey.value].recurringSummary.options
+  if (!(opts.calendarDateBusynessVisibility?.visibility ?? true)) {
+    return {}
+  }
+  const base = moment().startOf('day')
+  return {
+    [base.clone().add(6, 'days').format('YYYY-MM-DD')]: 40,
+    [base.clone().add(20, 'days').format('YYYY-MM-DD')]: 82,
+  }
+})
 
 // * Label computed function
-function labelsDisplay (label) {
+function labelsDisplay(label) {
   let computedLabel = computed(() => {
-    return amCustomize.value[pageRenderKey.value].recurringSummary.translations
-    && amCustomize.value[pageRenderKey.value].recurringSummary.translations[label]
-    && amCustomize.value[pageRenderKey.value].recurringSummary.translations[label][langKey.value]
-      ? amCustomize.value[pageRenderKey.value].recurringSummary.translations[label][langKey.value]
+    return amCustomize.value[pageRenderKey.value].recurringSummary
+      .translations &&
+      amCustomize.value[pageRenderKey.value].recurringSummary.translations[
+        label
+      ] &&
+      amCustomize.value[pageRenderKey.value].recurringSummary.translations[
+        label
+      ][langKey.value]
+      ? amCustomize.value[pageRenderKey.value].recurringSummary.translations[
+          label
+        ][langKey.value]
       : amLabels[label]
   })
 
@@ -106,11 +137,19 @@ function labelsDisplay (label) {
 
 let serviceSelection = ref({
   list: [
-    {date: moment().format('YYYY-MM-DD'), time: '13:05'},
-    {date: moment().add(3, 'days').format('YYYY-MM-DD'), time: '13:05', isSubstitute: false},
-    {date: '', time: '', isSubstitute: true},
-    {date: moment().add(9, 'days').format('YYYY-MM-DD'), time: '13:05', isSubstitute: true},
-  ]
+    { date: moment().format('YYYY-MM-DD'), time: '13:05' },
+    {
+      date: moment().add(3, 'days').format('YYYY-MM-DD'),
+      time: '13:05',
+      isSubstitute: false,
+    },
+    { date: '', time: '', isSubstitute: true },
+    {
+      date: moment().add(9, 'days').format('YYYY-MM-DD'),
+      time: '13:05',
+      isSubstitute: true,
+    },
+  ],
 })
 
 /*****************
@@ -195,14 +234,14 @@ let today = moment().format('YYYY-MM-DD')
 
 for (let i = 0; i <= 31; i++) {
   let block = {
-    display: "background",
+    display: 'background',
     extendedProps: {
-      slots: {'09:00': [7, 3]},
+      slots: { '09:00': [7, 3] },
       slotsAvailable: 1,
-      slotsTotal: 100
+      slotsTotal: 100,
     },
     start: moment(today).add(i, 'd').format('YYYY-MM-DD'),
-    title: "e"
+    title: 'e',
   }
   calendarEvents.value.push(block)
 }
@@ -211,6 +250,7 @@ let calendarEventSlots = ref([])
 let calendarEventSlot = ref('')
 let calendarStartDate = ref(moment().format('YYYY-MM-DD'))
 let calendarChangeSideBar = ref(true)
+let calendarWaitingListSlots = ref([])
 provide('calendarEvents', calendarEvents)
 provide('calendarEventDate', calendarEventDate)
 provide('calendarEventSlots', calendarEventSlots)
@@ -218,6 +258,7 @@ provide('calendarEventSlot', calendarEventSlot)
 provide('calendarStartDate', calendarStartDate)
 provide('calendarChangeSideBar', calendarChangeSideBar)
 provide('calendarServiceDuration', calendarServiceDuration)
+provide('calendarWaitingListSlots', calendarWaitingListSlots)
 
 /*********
  * Other *
@@ -240,8 +281,14 @@ let amColors = inject('amColors')
 
 let cssVars = computed(() => {
   return {
-    '--am-c-ro-warning-op10': useColorTransparency(amColors.value.colorWarning, 0.1),
-    '--am-c-ro-warning-op60': useColorTransparency(amColors.value.colorWarning, 0.6),
+    '--am-c-ro-warning-op10': useColorTransparency(
+      amColors.value.colorWarning,
+      0.1
+    ),
+    '--am-c-ro-warning-op60': useColorTransparency(
+      amColors.value.colorWarning,
+      0.6
+    ),
   }
 })
 </script>
@@ -256,7 +303,7 @@ export default {
     stepSelectedData: [],
     finished: false,
     selected: false,
-  }
+  },
 }
 </script>
 
@@ -279,7 +326,7 @@ export default {
 
       .am-collapse-item {
         &__heading {
-          transition-delay: .5s;
+          transition-delay: 0.5s;
 
           &-side {
             transition-delay: 0s;
@@ -311,7 +358,7 @@ export default {
             display: block;
           }
           .am-collapse-item__trigger {
-            padding: 0
+            padding: 0;
           }
         }
 
@@ -338,7 +385,7 @@ export default {
             color: var(--am-c-ro-success);
           }
           margin-right: 10px;
-          white-space: nowrap
+          white-space: nowrap;
         }
       }
     }

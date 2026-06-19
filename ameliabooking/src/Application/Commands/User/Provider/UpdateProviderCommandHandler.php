@@ -8,6 +8,7 @@ use AmeliaBooking\Application\Common\Exceptions\AccessDeniedException;
 use AmeliaBooking\Application\Services\Entity\EntityApplicationService;
 use AmeliaBooking\Application\Services\User\ProviderApplicationService;
 use AmeliaBooking\Application\Services\User\UserApplicationService;
+use AmeliaBooking\Domain\Collection\Collection;
 use AmeliaBooking\Domain\Common\Exceptions\InvalidArgumentException;
 use AmeliaBooking\Domain\Entity\Entities;
 use AmeliaBooking\Domain\Entity\User\AbstractUser;
@@ -18,8 +19,11 @@ use AmeliaBooking\Domain\ValueObjects\String\Password;
 use AmeliaBooking\Infrastructure\Common\Exceptions\QueryExecutionException;
 use AmeliaBooking\Infrastructure\Repository\User\ProviderRepository;
 use AmeliaBooking\Infrastructure\Services\Apple\AbstractAppleCalendarService;
+use Exception;
 use Interop\Container\Exception\ContainerException;
 use Slim\Exception\ContainerValueNotFoundException;
+use AmeliaBooking\Domain\ValueObjects\String\Name;
+use AmeliaBooking\Domain\ValueObjects\String\Phone;
 
 /**
  * Class UpdateProviderCommandHandler
@@ -37,6 +41,7 @@ class UpdateProviderCommandHandler extends CommandHandler
      * @throws InvalidArgumentException
      * @throws QueryExecutionException
      * @throws ContainerException
+     * @throws Exception
      */
     public function handle(UpdateProviderCommand $command)
     {
@@ -49,6 +54,9 @@ class UpdateProviderCommandHandler extends CommandHandler
 
         /** @var ProviderApplicationService $providerAS */
         $providerAS = $this->container->get('application.user.provider.service');
+
+        /** @var SettingsService $settingsDS */
+        $settingsDS = $this->container->get('domain.settings.service');
 
         $userId = (int)$command->getArg('id');
 
@@ -70,7 +78,10 @@ class UpdateProviderCommandHandler extends CommandHandler
         ) {
             $oldUser = $userAS->getAuthenticatedUser($command->getToken(), false, 'providerCabinet');
 
-            if ($oldUser === null) {
+            if (
+                $oldUser === null ||
+                ($command->getField('externalId') && (!$oldUser->getExternalId() || $oldUser->getExternalId()->getValue() !== $command->getField('externalId')))
+            ) {
                 $result->setResult(CommandResult::RESULT_ERROR);
                 $result->setMessage('Could not retrieve user');
                 $result->setData(
@@ -95,14 +106,22 @@ class UpdateProviderCommandHandler extends CommandHandler
             $providerData['stripeConnect'] = null;
         }
 
+        if (!isset($providerData['zoomUserId'])) {
+            $providerData['zoomUserId'] = null;
+        }
+
+        if (!isset($providerData['appleCalendarId'])) {
+            $providerData['appleCalendarId'] = null;
+        }
+
         if (!isset($providerData['employeeAppleCalendar'])) {
             $providerData['employeeAppleCalendar'] = null;
         } else {
             /** @var AbstractAppleCalendarService $appleCalendarService */
             $appleCalendarService = $this->container->get('infrastructure.apple.calendar.service');
 
-            $appleId       = $providerData['employeeAppleCalendar'] ['iCloudId'];
-            $applePassword = $providerData['employeeAppleCalendar'] ['appSpecificPassword'];
+            $appleId       = $providerData['employeeAppleCalendar']['iCloudId'];
+            $applePassword = $providerData['employeeAppleCalendar']['appSpecificPassword'];
 
             $credentials = $appleCalendarService->handleAppleCredentials($appleId, $applePassword);
 
@@ -120,6 +139,10 @@ class UpdateProviderCommandHandler extends CommandHandler
             $providerData['badgeId'] = null;
         }
 
+        if ($oldUser->getTimeZone() && $settingsDS->isFeatureEnabled('timezones') === false) {
+            $providerData['timeZone'] = $oldUser->getTimeZone()->getValue();
+        }
+
         $newUserData = array_merge($oldUser->toArray(), $providerData);
 
         $newUserData = apply_filters('amelia_before_provider_updated_filter', $newUserData, $oldUser->toArray());
@@ -127,17 +150,42 @@ class UpdateProviderCommandHandler extends CommandHandler
         /** @var Provider $newUser */
         $newUser = UserFactory::create($newUserData);
 
-        if (!($newUser instanceof AbstractUser)) {
+        $oldExternalId = $oldUser->getExternalId() ? $oldUser->getExternalId()->getValue() : null;
+        $newExternalId = $newUser->getExternalId() ? $newUser->getExternalId()->getValue() : null;
+
+        if ($oldExternalId !== $newExternalId && (!$currentUser || $currentUser->getType() !== AbstractUser::USER_ROLE_ADMIN)) {
             $result->setResult(CommandResult::RESULT_ERROR);
             $result->setMessage('Could not update user.');
-
             return $result;
         }
 
-        if ($command->getUserApplicationService()->checkProviderPermissions($currentUser, $command->getToken())) {
-            /** @var SettingsService $settingsDS */
-            $settingsDS = $this->container->get('domain.settings.service');
+        // If the phone is not set and the old phone is set, set the phone and country phone iso to null
+        if (empty($providerData['phone']) && $oldUser->getPhone() && $oldUser->getPhone()->getValue()) {
+            $newUser->setPhone(new Phone(null));
+            $newUser->setCountryPhoneIso(new Name(null));
+        }
 
+        $newUser->setDayOffList(
+            $providerAS->getModifiedDayList(
+                $newUser->getDayOffList(),
+                $oldUser->getDayOffList(),
+                !empty($newUserData['removedDayOffList'])
+                    ? UserFactory::createDayOffList($newUserData['removedDayOffList'])
+                    : new Collection()
+            )
+        );
+
+        $newUser->setSpecialDayList(
+            $providerAS->getModifiedDayList(
+                $newUser->getSpecialDayList(),
+                $oldUser->getSpecialDayList(),
+                !empty($newUserData['removedSpecialDayList'])
+                    ? UserFactory::createSpecialDayList($newUserData['removedSpecialDayList'])
+                    : new Collection()
+            )
+        );
+
+        if ($command->getUserApplicationService()->checkProviderPermissions($currentUser, $command->getToken())) {
             $rolesSettings = $settingsDS->getCategorySettings('roles');
 
             if (!$rolesSettings['allowConfigureServices']) {
@@ -185,16 +233,34 @@ class UpdateProviderCommandHandler extends CommandHandler
         do_action('amelia_before_provider_updated', $newUser ? $newUser->toArray() : null, $oldUser ? $oldUser->toArray() : null);
 
         try {
-            if (!$providerAS->update($oldUser, $newUser)) {
+            if (!$providerAS->update($oldUser, $newUser, $providerData)) {
                 $providerRepository->rollback();
                 return $result;
             }
+
+            if (isset($providerData['googleCalendar']['blockedCalendars'])) {
+                $providerAS->updateProviderGoogleCalendarBlockedCalendars(
+                    $userId,
+                    $providerData['googleCalendar']['blockedCalendars']
+                );
+            }
+
+            $providerData = $this->getGoogleCalendarProviderData($providerData, $providerAS, $userId);
+
+            if (isset($providerData['outlookCalendar']['blockedCalendars'])) {
+                $providerAS->updateProviderOutlookCalendarBlockedCalendars(
+                    $userId,
+                    $providerData['outlookCalendar']['blockedCalendars']
+                );
+            }
+
+            $providerData = $this->getOutlookCalendarProviderData($providerData, $providerAS, $userId);
 
             if ($command->getField('externalId') === 0) {
                 /** @var UserApplicationService $userAS */
                 $userAS = $this->getContainer()->get('application.user.service');
 
-                $userAS->setWpUserIdForNewUser($userId, $newUser, $command->getField('password'));
+                $userAS->setWpUserIdForNewUser($userId, $newUser, Entities::PROVIDER, $command->getField('password'));
             } elseif ($newUser->getExternalId() && $newUser->getExternalId()->getValue()) {
                 add_filter('amelia_user_profile_updated', '__return_true');
                 wp_update_user(
@@ -228,9 +294,10 @@ class UpdateProviderCommandHandler extends CommandHandler
         $result->setData(
             array_merge(
                 $result->getData(),
-                ['sendEmployeePanelAccessEmail' =>
-                     $command->getField('password') && $command->getField('sendEmployeePanelAccessEmail'),
-                 'password'                     => $command->getField('password')
+                [
+                    'sendEmployeePanelAccessEmail' =>
+                    $command->getField('password') && $command->getField('sendEmployeePanelAccessEmail'),
+                    'password'                     => $command->getField('password')
                 ]
             )
         );
@@ -240,5 +307,75 @@ class UpdateProviderCommandHandler extends CommandHandler
         do_action('amelia_after_provider_updated', $newUser ? $newUser->toArray() : null, $oldUser ? $oldUser->toArray() : null);
 
         return $result;
+    }
+
+    /**
+     * @param array $providerData
+     * @param ProviderApplicationService $providerAS
+     * @param $userId
+     * @return array
+     * @throws QueryExecutionException
+     */
+    public function getGoogleCalendarProviderData(array $providerData, ProviderApplicationService $providerAS, $userId): array
+    {
+        if (isset($providerData['googleCalendar'])) {
+            $googleCalendarSettings = [];
+
+            if (isset($providerData['googleCalendar']['insertPendingAppointments'])) {
+                $googleCalendarSettings['insertPendingAppointments'] = $providerData['googleCalendar']['insertPendingAppointments'];
+            }
+
+            if (isset($providerData['googleCalendar']['includeBufferTime'])) {
+                $googleCalendarSettings['includeBufferTime'] = $providerData['googleCalendar']['includeBufferTime'];
+            }
+
+            if (isset($providerData['googleCalendar']['title'])) {
+                $googleCalendarSettings['title'] = $providerData['googleCalendar']['title'];
+            }
+
+            if (isset($providerData['googleCalendar']['description'])) {
+                $googleCalendarSettings['description'] = $providerData['googleCalendar']['description'];
+            }
+
+            if (!empty($googleCalendarSettings)) {
+                $providerAS->updateProviderGoogleCalendarAccountSettings($userId, $googleCalendarSettings);
+            }
+        }
+        return $providerData;
+    }
+
+    /**
+     * @param array $providerData
+     * @param ProviderApplicationService $providerAS
+     * @param $userId
+     * @return array
+     * @throws QueryExecutionException
+     */
+    public function getOutlookCalendarProviderData(array $providerData, ProviderApplicationService $providerAS, $userId): array
+    {
+        if (isset($providerData['outlookCalendar'])) {
+            $outlookCalendarSettings = [];
+
+            if (isset($providerData['outlookCalendar']['insertPendingAppointments'])) {
+                $outlookCalendarSettings['insertPendingAppointments'] = $providerData['outlookCalendar']['insertPendingAppointments'];
+            }
+
+            if (isset($providerData['outlookCalendar']['includeBufferTime'])) {
+                $outlookCalendarSettings['includeBufferTime'] = $providerData['outlookCalendar']['includeBufferTime'];
+            }
+
+            if (isset($providerData['outlookCalendar']['title'])) {
+                $outlookCalendarSettings['title'] = $providerData['outlookCalendar']['title'];
+            }
+
+            if (isset($providerData['outlookCalendar']['description'])) {
+                $outlookCalendarSettings['description'] = $providerData['outlookCalendar']['description'];
+            }
+
+            if (!empty($outlookCalendarSettings)) {
+                $providerAS->updateProviderOutlookCalendarAccountSettings($userId, $outlookCalendarSettings);
+            }
+        }
+        return $providerData;
     }
 }

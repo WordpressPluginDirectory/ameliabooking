@@ -1,7 +1,7 @@
 <?php
 
 /**
- * @copyright © TMS-Plugins. All rights reserved.
+ * @copyright © Melograno Ventures. All rights reserved.
  * @licence   See LICENCE.md for license details.
  */
 
@@ -10,6 +10,10 @@ namespace AmeliaBooking\Infrastructure\WP\EventListeners\Booking\Appointment;
 use AmeliaBooking\Application\Commands\CommandResult;
 use AmeliaBooking\Application\Services\Booking\BookingApplicationService;
 use AmeliaBooking\Application\Services\Integration\ApplicationIntegrationService;
+use AmeliaBooking\Application\Services\Notification\ApplicationNotificationService;
+use AmeliaBooking\Application\Services\WaitingList\WaitingListService;
+use AmeliaBooking\Domain\ValueObjects\String\BookingStatus;
+use AmeliaBooking\Domain\Collection\Collection;
 use AmeliaBooking\Application\Services\Notification\EmailNotificationService;
 use AmeliaBooking\Application\Services\Notification\SMSNotificationService;
 use AmeliaBooking\Application\Services\Notification\AbstractWhatsAppNotificationService;
@@ -64,8 +68,13 @@ class BookingCanceledEventHandler
         /** @var BookingApplicationService $bookingApplicationService */
         $bookingApplicationService = $container->get('application.booking.booking.service');
 
+        $data = $commandResult->getData();
 
-        $appointment = $commandResult->getData()[$commandResult->getData()['type']];
+        if (empty($data)) {
+            return;
+        }
+
+        $appointment = $data[$data['type']];
 
         if ($commandResult->getData()['type'] === Entities::APPOINTMENT) {
             $reservationObject = AppointmentFactory::create($appointment);
@@ -80,6 +89,10 @@ class BookingCanceledEventHandler
                     ApplicationIntegrationService::SKIP_LESSON_SPACE => true,
                 ]
             );
+
+            /** @var WaitingListService $waitingListService */
+            $waitingListService = $container->get('application.waitingList.service');
+            $waitingListService->sendAvailableSpotNotifications($reservationObject);
         }
 
         $booking = $commandResult->getData()[Entities::BOOKING];
@@ -109,7 +122,7 @@ class BookingCanceledEventHandler
             $applicationIntegrationService->handleEvent(
                 $reservationObject,
                 $reservationObject->getPeriods(),
-                $reservation,
+                $appointment,
                 ApplicationIntegrationService::BOOKING_CANCELED,
                 [
                     ApplicationIntegrationService::SKIP_ZOOM_MEETING => true,

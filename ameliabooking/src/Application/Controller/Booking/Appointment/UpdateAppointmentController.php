@@ -7,7 +7,7 @@ use AmeliaBooking\Application\Commands\CommandResult;
 use AmeliaBooking\Application\Controller\Controller;
 use AmeliaBooking\Domain\Events\DomainEventBus;
 use RuntimeException;
-use Slim\Http\Request;
+use AmeliaVendor\Psr\Http\Message\ServerRequestInterface as Request;
 
 /**
  * Class UpdateAppointmentController
@@ -57,6 +57,10 @@ class UpdateAppointmentController extends Controller
         $command->setToken($request);
 
         $params = (array)$request->getQueryParams();
+
+        if (!empty($params)) {
+            $command->setField('params', $params);
+        }
 
         if (isset($params['source'])) {
             $command->setPage($params['source']);

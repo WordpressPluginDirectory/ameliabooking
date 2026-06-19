@@ -1,49 +1,51 @@
 <template>
-  <!-- :class="{'am-elf__main-heading-mobile': mobile}" -->
   <div
     v-if="props.ready && !props.loading && !props.loadingUpcoming"
     class="am-el__header-inner"
+    role="region"
+    :aria-label="displayLabels(stepsArray[stepIndex].label)"
+    :aria-busy="props.loading || props.loadingUpcoming"
     :style="cssVars"
   >
     <AmButton
       v-if="stepIndex < stepsArray.length - 1"
+      ref="backButtonRef"
       class="am-heading-prev"
       :icon="IconArrowLeft"
       :icon-only="true"
       size="micro"
       type="plain"
       category="secondary"
-      aria-label="Previous step"
+      :aria-label="amLabels.previous_step || 'Previous step'"
       :disabled="props.loading"
       @click="previousStep"
     ></AmButton>
-    <span class="am-el__header-inner__title">
+    <span class="am-el__header-inner__title" aria-live="polite" aria-atomic="true">
       {{ displayLabels(stepsArray[stepIndex].label) }}
     </span>
   </div>
   <span
     v-else
     class="am-el__skeleton"
+    role="status"
+    aria-live="polite"
+    :aria-label="amLabels.loading_header || 'Loading header'"
     :style="cssVars"
   >
-      <el-skeleton animated>
-        <template #template>
-          <el-skeleton-item />
-        </template>
-      </el-skeleton>
-    </span>
+    <el-skeleton animated>
+      <template #template>
+        <el-skeleton-item />
+      </template>
+    </el-skeleton>
+  </span>
 </template>
 
 <script setup>
 import AmButton from '../../../_components/button/AmButton.vue'
-import IconArrowLeft from "../../../_components/icons/IconArrowLeft";
+import IconArrowLeft from '../../../_components/icons/IconArrowLeft'
 
 // * Import from Vue
-import {
-  ref,
-  computed,
-  inject
-} from 'vue'
+import { ref, computed, inject, watch, nextTick, onBeforeUnmount } from 'vue'
 
 // * Composables
 import { useColorTransparency } from '../../../../assets/js/common/colorManipulation'
@@ -53,81 +55,135 @@ let props = defineProps({
     type: Object,
     default: () => {
       return {}
-    }
+    },
   },
   ready: {
     type: Boolean,
-    default: false
+    default: false,
   },
   loading: {
     type: Boolean,
-    default: false
+    default: false,
   },
   loadingUpcoming: {
     type: Boolean,
-    default: false
-  }
+    default: false,
+  },
 })
 
 // * Popup steps array
 let stepsArray = inject('stepsArray')
 
 // * Step Index
-const stepIndex = inject('stepIndex');
+const stepIndex = inject('stepIndex')
+const backButtonRef = ref(null)
+const focusFallbackIntervalRef = ref(null)
+
+function clearFocusFallbackInterval() {
+  if (focusFallbackIntervalRef.value) {
+    clearInterval(focusFallbackIntervalRef.value)
+    focusFallbackIntervalRef.value = null
+  }
+}
+
+function tryFocusBackButton() {
+  const backButtonElement = backButtonRef.value?.$el || backButtonRef.value
+  const focusTarget =
+    backButtonElement && typeof backButtonElement.querySelector === 'function'
+      ? backButtonElement.querySelector('button') || backButtonElement
+      : backButtonElement
+
+  if (focusTarget && typeof focusTarget.focus === 'function') {
+    focusTarget.focus()
+    return true
+  }
+
+  return false
+}
 
 // * Step Functions
 const { previousStep } = inject('changingStepsFunctions', {
-  previousStep: () => {}
+  previousStep: () => {},
 })
 
 // * Non modified labels
 let amLabels = inject('labels')
 
-function displayLabels (label) {
-  return Object.keys(props.customizedLabels).length && props.customizedLabels[label] ? props.customizedLabels[label] : amLabels[label]
+function displayLabels(label) {
+  return Object.keys(props.customizedLabels).length &&
+    props.customizedLabels[label]
+    ? props.customizedLabels[label]
+    : amLabels[label]
 }
 
-// * Container Width
-// let cWidth = inject('containerWidth', 0)
-// let checkScreen = computed(() => cWidth.value <= 560)
-// let sidebarVisibility = amCustomize
-// let mobile = computed(() => cWidth.value < 410)
-
 // * Colors
-let amColors = inject('amColors', ref({
-  colorPrimary: '#1246D6',
-  colorSuccess: '#019719',
-  colorError: '#B4190F',
-  colorWarning: '#CCA20C',
-  colorMainBgr: '#FFFFFF',
-  colorMainHeadingText: '#33434C',
-  colorMainText: '#1A2C37',
-  colorSbBgr: '#17295A',
-  colorSbText: '#FFFFFF',
-  colorInpBgr: '#FFFFFF',
-  colorInpBorder: '#D1D5D7',
-  colorInpText: '#1A2C37',
-  colorInpPlaceHolder: '#1A2C37',
-  colorDropBgr: '#FFFFFF',
-  colorDropBorder: '#D1D5D7',
-  colorDropText: '#0E1920',
-  colorBtnPrim: '#265CF2',
-  colorBtnPrimText: '#FFFFFF',
-  colorBtnSec: '#1A2C37',
-  colorBtnSecText: '#FFFFFF',
-}))
+let amColors = inject(
+  'amColors',
+  ref({
+    colorPrimary: '#1246D6',
+    colorSuccess: '#019719',
+    colorError: '#B4190F',
+    colorWarning: '#CCA20C',
+    colorMainBgr: '#FFFFFF',
+    colorMainHeadingText: '#33434C',
+    colorMainText: '#1A2C37',
+    colorSbBgr: '#17295A',
+    colorSbText: '#FFFFFF',
+    colorInpBgr: '#FFFFFF',
+    colorInpBorder: '#D1D5D7',
+    colorInpText: '#1A2C37',
+    colorInpPlaceHolder: '#1A2C37',
+    colorDropBgr: '#FFFFFF',
+    colorDropBorder: '#D1D5D7',
+    colorDropText: '#0E1920',
+    colorBtnPrim: '#265CF2',
+    colorBtnPrimText: '#FFFFFF',
+    colorBtnSec: '#1A2C37',
+    colorBtnSecText: '#FFFFFF',
+  })
+)
 
 // * Css Vars
 let cssVars = computed(() => {
   return {
-    '--am-c-el-text-op15': useColorTransparency(amColors.value.colorMainText, 0.15),
+    '--am-c-el-text-op15': useColorTransparency(
+      amColors.value.colorMainText,
+      0.15
+    ),
   }
+})
+
+watch(
+  () => stepIndex.value,
+  async () => {
+    clearFocusFallbackInterval()
+
+    await nextTick()
+
+    if (tryFocusBackButton()) {
+      return
+    }
+
+    focusFallbackIntervalRef.value = setInterval(() => {
+      if (tryFocusBackButton() || (!props.loading && props.ready && !props.loadingUpcoming)) {
+        clearFocusFallbackInterval()
+      }
+    }, 250)
+  },
+  {
+    flush: 'post',
+    immediate: true,
+  }
+)
+
+onBeforeUnmount(() => {
+  clearFocusFallbackInterval()
 })
 </script>
 
 <script>
 export default {
-  name: "EventListHeader"
+  name: 'EventListHeader',
 }
 </script>
 
@@ -152,7 +208,8 @@ export default {
         margin: 0;
         white-space: nowrap;
 
-        &:before { // theme Twenty Nineteen
+        &:before {
+          // theme Twenty Nineteen
           display: none;
         }
       }
@@ -181,7 +238,7 @@ export default {
         padding: 0;
         &__item {
           width: 170px;
-          height: 28px
+          height: 28px;
         }
       }
     }

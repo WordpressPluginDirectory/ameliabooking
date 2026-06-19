@@ -1,7 +1,7 @@
 <?php
 
 /**
- * @copyright © TMS-Plugins. All rights reserved.
+ * @copyright © Melograno Ventures. All rights reserved.
  * @licence   See LICENCE.md for license details.
  */
 
@@ -28,7 +28,7 @@ class SquareMiddlewareService
     {
         $squareSettings         = $settingsService->getCategorySettings('payments')['square'];
         $this->middlewareApiUrl = $squareSettings['testMode'] ?
-            'https://middleware-dev.wpamelia.com/' : 'https://middleware.wpamelia.com/';
+            'https://middleware-dev.wpamelia.com/' : AMELIA_MIDDLEWARE_URL;
     }
 
     /**
@@ -66,8 +66,6 @@ class SquareMiddlewareService
         } else {
             $response = null;
         }
-
-        curl_close($ch);
 
         return $response['result'];
     }
@@ -113,8 +111,6 @@ class SquareMiddlewareService
 
         $response = curl_exec($ch);
 
-        curl_close($ch);
-
         return true;
     }
 
@@ -124,7 +120,7 @@ class SquareMiddlewareService
      * @param string $savedAccessToken
      * @param bool $testMode
      *
-     * @return boolean
+     * @return array|null
      *
      * @throws \Exception
      */
@@ -154,8 +150,6 @@ class SquareMiddlewareService
             $response = null;
         }
 
-        curl_close($ch);
-
         return $response;
     }
 
@@ -174,8 +168,6 @@ class SquareMiddlewareService
             $response = json_decode($response, true);
             $url      = $response['result'];
         }
-
-        curl_close($ch);
 
         return $url;
     }

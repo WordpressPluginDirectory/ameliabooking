@@ -3,18 +3,30 @@
 namespace AmeliaBooking\Infrastructure\Common;
 
 use AmeliaBooking\Domain\Repository\User\UserRepositoryInterface;
+use AmeliaBooking\Domain\Services\Logger\LoggerInterface;
 use AmeliaBooking\Infrastructure\Connection;
+use AmeliaVendor\Psr\Container\ContainerInterface;
+use Pimple\Container as PimpleContainer;
 
 /**
  * Class Container
  *
  * @package AmeliaBooking\Infrastructure\Common
  */
-final class Container extends \Slim\Container
+final class Container extends PimpleContainer implements ContainerInterface
 {
+    public function get(string $id)
+    {
+        return $this->offsetGet($id);
+    }
+
+    public function has(string $id): bool
+    {
+        return $this->offsetExists($id);
+    }
+
     /**
      * @return Connection
-     * @throws \Interop\Container\Exception\ContainerException
      */
     public function getDatabaseConnection()
     {
@@ -23,7 +35,6 @@ final class Container extends \Slim\Container
 
     /**
      * @return UserRepositoryInterface
-     * @throws \Interop\Container\Exception\ContainerException
      */
     public function getUserRepository()
     {
@@ -34,7 +45,6 @@ final class Container extends \Slim\Container
      * Get the command bus
      *
      * @return mixed
-     * @throws \Interop\Container\Exception\ContainerException
      */
     public function getCommandBus()
     {
@@ -45,7 +55,6 @@ final class Container extends \Slim\Container
      * Get the event bus
      *
      * @return mixed
-     * @throws \Interop\Container\Exception\ContainerException
      */
     public function getEventBus()
     {
@@ -55,7 +64,6 @@ final class Container extends \Slim\Container
     /**
      * Get the Permissions domain service
      *
-     * @throws \Interop\Container\Exception\ContainerException
      */
     public function getPermissionsService()
     {
@@ -65,7 +73,6 @@ final class Container extends \Slim\Container
     /**
      * Get the API Permissions domain service
      *
-     * @throws \Interop\Container\Exception\ContainerException
      */
     public function getApiPermissionsService()
     {
@@ -75,7 +82,6 @@ final class Container extends \Slim\Container
     /**
      * Get the API User application service
      *
-     * @throws \Interop\Container\Exception\ContainerException
      */
     public function getApiUserApplicationService()
     {
@@ -85,7 +91,6 @@ final class Container extends \Slim\Container
     /**
      * Get the User application service
      *
-     * @throws \Interop\Container\Exception\ContainerException
      */
     public function getUserApplicationService()
     {
@@ -93,8 +98,17 @@ final class Container extends \Slim\Container
     }
 
     /**
+     * Get the Logger service
+     *
+     * @return LoggerInterface
+     */
+    public function getLoggerService()
+    {
+        return $this->get('infrastructure.logger');
+    }
+
+    /**
      * @return mixed
-     * @throws \Interop\Container\Exception\ContainerException
      */
     public function getMailerService()
     {
@@ -103,7 +117,6 @@ final class Container extends \Slim\Container
 
     /**
      * @return mixed
-     * @throws \Interop\Container\Exception\ContainerException
      */
     public function getSettingsService()
     {

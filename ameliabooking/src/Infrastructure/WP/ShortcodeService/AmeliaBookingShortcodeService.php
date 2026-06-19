@@ -1,7 +1,7 @@
 <?php
 
 /**
- * @copyright © TMS-Plugins. All rights reserved.
+ * @copyright © Melograno Ventures. All rights reserved.
  * @licence   See LICENCE.md for license details.
  */
 
@@ -12,11 +12,13 @@ use AmeliaBooking\Application\Services\Stash\StashApplicationService;
 use AmeliaBooking\Domain\Common\Exceptions\InvalidArgumentException;
 use AmeliaBooking\Domain\Services\DateTime\DateTimeService;
 use AmeliaBooking\Domain\Services\Settings\SettingsService;
+use AmeliaBooking\Infrastructure\Common\Container;
 use AmeliaBooking\Infrastructure\Common\Exceptions\QueryExecutionException;
 use AmeliaBooking\Infrastructure\Repository\CustomField\CustomFieldRepository;
 use AmeliaBooking\Infrastructure\WP\SettingsService\SettingsStorage;
 use AmeliaBooking\Infrastructure\WP\Translations\FrontendStrings;
-use Interop\Container\Exception\ContainerException;
+use AmeliaBooking\Infrastructure\WP\Integrations\IvyForms\IvyFormsService;
+use AmeliaBooking\Infrastructure\WP\Integrations\PluginInstaller;
 
 /**
  * Class AmeliaBookingShortcodeService
@@ -27,14 +29,16 @@ class AmeliaBookingShortcodeService
 {
     public static $counter = 1000;
 
+    /** @var Container $container */
+    protected static $container = null;
+
     /**
      * Prepare scripts and styles
-     * @throws ContainerException
      * @throws InvalidArgumentException
      */
     public static function prepareScriptsAndStyles()
     {
-        $container = null;
+        self::$container = self::$container ?: require AMELIA_PATH . '/src/Infrastructure/ContainerConfig/container.php';
 
         self::$counter++;
 
@@ -42,11 +46,10 @@ class AmeliaBookingShortcodeService
             return;
         }
 
-        $settingsService = new SettingsService(new SettingsStorage());
+        /** @var SettingsService $settingsService */
+        $settingsService = self::$container->get('domain.settings.service');
 
-        if ($settingsService->getSetting('payments', 'payPal')['enabled'] === true) {
-            wp_enqueue_script('amelia_paypal_script', 'https://www.paypalobjects.com/api/checkout.js');
-        }
+        self::enqueuePaypalScript($settingsService);
 
         if ($settingsService->getSetting('payments', 'stripe')['enabled'] === true) {
             wp_enqueue_script('amelia_stripe_script', 'https://js.stripe.com/v3/');
@@ -74,10 +77,8 @@ class AmeliaBookingShortcodeService
         $gmapApiKey = $settingsService->getSetting('general', 'gMapApiKey');
 
         if ($gmapApiKey) {
-            $container = $container ?: require AMELIA_PATH . '/src/Infrastructure/ContainerConfig/container.php';
-
             /** @var CustomFieldRepository $customFieldRepository */
-            $customFieldRepository = $container->get('domain.customField.repository');
+            $customFieldRepository = self::$container->get('domain.customField.repository');
 
             $addressCustomFields = $customFieldRepository->getByFieldValue('type', 'address');
 
@@ -110,10 +111,19 @@ class AmeliaBookingShortcodeService
         } else {
             wp_enqueue_script(
                 $scriptId,
-                AMELIA_URL . 'v3/public/assets/public.144bfa0a.js',
+                AMELIA_URL . 'v3/public/assets/public.js',
                 [],
                 AMELIA_VERSION,
                 true
+            );
+
+            // Vite bundles all Vue/Element/Maz CSS into one file (cssCodeSplit: false).
+            // Dynamic chunk imports do not inject this stylesheet in WordPress; enqueue explicitly.
+            wp_enqueue_style(
+                'amelia_booking_v3_style',
+                AMELIA_URL . 'v3/public/assets/style.css',
+                [],
+                AMELIA_VERSION
             );
         }
 
@@ -169,10 +179,8 @@ class AmeliaBookingShortcodeService
         );
 
         if (!empty($_GET['ameliaCache']) || !empty($_GET['ameliaWcCache'])) {
-            $container = $container ?: require AMELIA_PATH . '/src/Infrastructure/ContainerConfig/container.php';
-
             /** @var CacheApplicationService $cacheAS */
-            $cacheAS = $container->get('application.cache.service');
+            $cacheAS = self::$container->get('application.cache.service');
 
             try {
                 $cacheData = !empty($_GET['ameliaCache']) ?
@@ -188,10 +196,8 @@ class AmeliaBookingShortcodeService
         }
 
         if ($settingsService->getSetting('activation', 'stash')) {
-            $container = $container ?: require AMELIA_PATH . '/src/Infrastructure/ContainerConfig/container.php';
-
             /** @var StashApplicationService $stashAS */
-            $stashAS = $container->get('application.stash.service');
+            $stashAS = self::$container->get('application.stash.service');
 
             wp_localize_script(
                 $scriptId,
@@ -199,6 +205,8 @@ class AmeliaBookingShortcodeService
                 $stashAS->getStash()
             );
         }
+
+        do_action('amelia_scripts_loaded');
     }
 
     /**
@@ -213,6 +221,9 @@ class AmeliaBookingShortcodeService
         switch ($handle) {
             case ('amelia_booking_scripts_dev_vite'):
             case ('amelia_booking_scripts_dev_main'):
+            case ('amelia_dev_vite_client'):
+            case ('amelia_dev_main_script'):
+            case ('amelia_prod_main_script'):
                 return "<script type='module' src='{$src}'></script>";
 
             case ('amelia_booking_script_index'):
@@ -255,12 +266,84 @@ class AmeliaBookingShortcodeService
     public static function prepareStyles($tag, $handle, $href)
     {
         switch ($handle) {
+            case ('amelia_booking_v3_style'):
             case ('amelia_booking_style_index'):
             case ('amelia_booking_style_vendor'):
+                $settingsService = new SettingsService(new SettingsStorage());
+
+                if ($settingsService->getSetting('activation', 'v3RelativePath')) {
+                    $customUrl = $settingsService->getSetting('activation', 'customUrl');
+
+                    $position = strpos($href, $customUrl['pluginPath'] . 'v3/public/assets/style.');
+
+                    if ($position !== false) {
+                        $href = substr($href, $position);
+                    }
+                }
+
                 return "<link rel='stylesheet' href='{$href}'>";
 
             default:
                 return $tag;
         }
+    }
+
+    /**
+     * Enqueue PayPal script
+     */
+    protected static function enqueuePaypalScript(SettingsService $settingsService): void
+    {
+        if ($settingsService->getSetting('payments', 'payPal')['enabled'] === true) {
+            $payPalSettings = $settingsService->getSetting('payments', 'payPal');
+            $payPalClientId  = $payPalSettings['sandboxMode']
+                ? ($payPalSettings['testApiClientId'] ?? '')
+                : ($payPalSettings['liveApiClientId'] ?? '');
+            $payPalCurrency  = $settingsService->getSetting('payments', 'currency') ?: 'USD';
+            wp_enqueue_script(
+                'amelia_paypal_script',
+                'https://www.paypal.com/sdk/js?client-id=' . urlencode($payPalClientId)
+                    . '&currency=' . urlencode($payPalCurrency)
+                    . '&components=buttons'
+                    . '&disable-funding=venmo,paylater,card,sepa,bancontact,blik,eps,giropay,ideal,mercadopago,mybank,p24,sofort',
+                [],
+                null,
+                false
+            );
+        }
+    }
+
+    /**
+     * @param string $viewPath
+     * @param array $params
+     * @return string
+     */
+    protected static function renderView(string $viewPath, array $params): string
+    {
+        if (!empty($_GET['ameliaWcCache']) || !empty($_GET['ameliaCache'])) {
+            $params['ivy'] = '';
+        }
+
+        self::prepareScriptsAndStyles();
+
+        /** @var SettingsService $settingsService */
+        $settingsService = self::$container->get('domain.settings.service');
+
+        $html = !empty($params['ivy']) && $settingsService->isFeatureEnabled('ivy') && PluginInstaller::isPluginActive('ivyforms')
+            ? IvyFormsService::shortcode($params['ivy'])
+            : '';
+
+        if (empty($html)) {
+            $params['ivy'] = '';
+        }
+
+        ob_start();
+
+        include AMELIA_PATH . '/view/frontend/' . $viewPath;
+
+        $html .= ob_get_contents();
+
+        ob_end_clean();
+
+        return $html;
     }
 }

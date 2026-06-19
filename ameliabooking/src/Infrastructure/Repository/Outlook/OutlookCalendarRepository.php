@@ -21,34 +21,65 @@ class OutlookCalendarRepository extends AbstractRepository
     /**
      * @param OutlookCalendar $outlookCalendar
      * @param int            $userId
+     * @param array|null     $additionalSettings
      *
-     * @return string
+     * @return int
      * @throws QueryExecutionException
      */
-    public function add($outlookCalendar, $userId)
+    public function add($outlookCalendar, $userId, $additionalSettings = null)
     {
         $data = $outlookCalendar->toArray();
 
         $params = [
             ':userId' => $userId,
-            ':token'  => $data['token']
+            ':token'  => $data['token'],
+            ':calendarId' => $data['calendarId']
         ];
+
+        $fields = ['userId', 'token', 'calendarId'];
+        $placeholders = [':userId', ':token', ':calendarId'];
+
+        if ($additionalSettings !== null) {
+            if (isset($additionalSettings['insertPendingAppointments'])) {
+                $fields[] = 'insertPendingAppointments';
+                $placeholders[] = ':insertPendingAppointments';
+                $params[':insertPendingAppointments'] = (int)$additionalSettings['insertPendingAppointments'];
+            }
+
+            if (isset($additionalSettings['includeBufferTime'])) {
+                $fields[] = 'includeBufferTime';
+                $placeholders[] = ':includeBufferTime';
+                $params[':includeBufferTime'] = (int)$additionalSettings['includeBufferTime'];
+            }
+
+            if (isset($additionalSettings['title'])) {
+                $fields[] = 'title';
+                $placeholders[] = ':title';
+                $params[':title'] = is_array($additionalSettings['title'])
+                    ? json_encode($additionalSettings['title'])
+                    : $additionalSettings['title'];
+            }
+
+            if (isset($additionalSettings['description'])) {
+                $fields[] = 'description';
+                $placeholders[] = ':description';
+                $params[':description'] = is_array($additionalSettings['description'])
+                    ? json_encode($additionalSettings['description'])
+                    : $additionalSettings['description'];
+            }
+        }
 
         try {
             $statement = $this->connection->prepare(
                 "INSERT INTO {$this->table}
-                (`userId`, `token`)
+                (`" . implode('`, `', $fields) . "`)
                 VALUES
-                (:userId, :token)"
+                (" . implode(', ', $placeholders) . ")"
             );
 
-            $res = $statement->execute($params);
-
-            if (!$res) {
-                throw new QueryExecutionException('Unable to add data in ' . __CLASS__);
-            }
+            $statement->execute($params);
         } catch (Exception $e) {
-            throw new QueryExecutionException('Unable to add data in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to add data in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return $this->connection->lastInsertId();
@@ -77,14 +108,11 @@ class OutlookCalendarRepository extends AbstractRepository
                 SET `token` = :token, `calendarId` = :calendarId WHERE id = :id"
             );
 
-            $res = $statement->execute($params);
-            if (!$res) {
-                throw new QueryExecutionException('Unable to save data in ' . __CLASS__);
-            }
+            $statement->execute($params);
 
-            return $res;
+            return true;
         } catch (Exception $e) {
-            throw new QueryExecutionException('Unable to save data in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to save data in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
     }
 
@@ -103,7 +131,7 @@ class OutlookCalendarRepository extends AbstractRepository
             $statement->execute();
             $row = $statement->fetch();
         } catch (Exception $e) {
-            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to find by id in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         if (!$row) {

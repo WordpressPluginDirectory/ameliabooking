@@ -4,7 +4,7 @@ namespace AmeliaBooking\Application\Controller\User\Customer;
 
 use AmeliaBooking\Application\Commands\User\Customer\GetCustomersCommand;
 use AmeliaBooking\Application\Controller\Controller;
-use Slim\Http\Request;
+use AmeliaVendor\Psr\Http\Message\ServerRequestInterface as Request;
 
 /**
  * Class GetCustomersController
@@ -28,7 +28,7 @@ class GetCustomersController extends Controller
 
         $params = (array)$request->getQueryParams();
 
-        $this->setArrayParams($params);
+        $this->setArrayParams($params, ['noShow', 'includeCustomers']);
 
         $command->setField('params', $params);
 

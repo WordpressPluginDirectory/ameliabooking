@@ -38,6 +38,23 @@ import {
 const globalLabels = reactive(window.wpAmeliaLabels)
 let errorMessage = ref()
 
+function normalizeDatepickerValue (value) {
+  if (!value) {
+    return null
+  }
+
+  if (typeof value === 'string') {
+    const matches = value.match(/^(\d{4}-\d{2}-\d{2})/)
+    if (matches) {
+      return matches[1]
+    }
+  }
+
+  const dateObject = value instanceof Date ? value : new Date(value)
+
+  return useStringFromDate(dateObject)
+}
+
 function usePaymentError (store, callback) {
   store.commit('booking/setLoading', false)
 
@@ -96,8 +113,7 @@ function useBookingData (store, formData, mandatoryJson = false, paymentData = {
       }
 
       if (availableCustomFields[id].type === 'datepicker') {
-        customFields[id].value = availableCustomFields[id].value ?
-          useStringFromDate(new Date(availableCustomFields[id].value)) : null
+        customFields[id].value = normalizeDatepickerValue(availableCustomFields[id].value)
       }
     }
   } else {
@@ -124,8 +140,8 @@ function useBookingData (store, formData, mandatoryJson = false, paymentData = {
       }
 
       if (availableCustomFields[key].type === 'datepicker') {
-        customFields[availableCustomFields[key].id].value = availableCustomFields[key].value ?
-          useStringFromDate(new Date(availableCustomFields[key].value)) : null
+        customFields[availableCustomFields[key].id].value =
+          normalizeDatepickerValue(availableCustomFields[key].value)
       }
     }
   }
@@ -210,6 +226,7 @@ function useBookingData (store, formData, mandatoryJson = false, paymentData = {
     urlParams: useUrlQueryParams(window.location.href),
     componentProps: componentProps,
     returnUrl: location.href,
+    ivy: store.getters['getIvy'],
   }
 
   let coupon = null
@@ -220,7 +237,7 @@ function useBookingData (store, formData, mandatoryJson = false, paymentData = {
 
       jsonData.couponCode = coupon && (coupon.required || (coupon.discount || coupon.deduction)) ? coupon.code : null
 
-      jsonData.notifyParticipants = settings.notifications.notifyCustomers ? 1 : 0
+      jsonData.notifyParticipants = 1
 
       let appointments = useAppointmentBookingData(store)
 
@@ -237,6 +254,10 @@ function useBookingData (store, formData, mandatoryJson = false, paymentData = {
       jsonData.recurring = appointments.slice(1)
 
       jsonData.package = []
+
+      if (store.getters['appointmentWaitingListOptions/getIsWaitingListSlot']) {
+        jsonData.bookings[0].status = 'waiting'
+      }
 
       jsonData = Object.assign(jsonData, appointments[0])
 
@@ -267,7 +288,9 @@ function useBookingData (store, formData, mandatoryJson = false, paymentData = {
 
       jsonData.bookings[0].persons = store.getters['persons/getPersons']
 
-      jsonData.bookings[0].utcOffset = settings.general.showClientTimeZone ? useUtcValueOffset(null) : null
+      jsonData.bookings[0].utcOffset = settings.general.showClientTimeZone ?
+          useUtcValueOffset(store.getters['eventEntities/getEvent'](store.getters['eventBooking/getSelectedEventId'])['periods'][0]['periodStart']) :
+          null
 
       if (store.getters['eventWaitingListOptions/getAvailability']) {
         jsonData.bookings[0].status = 'waiting'
@@ -392,7 +415,7 @@ function usePackageBookingData (store) {
           providerId: appointment.providerId,
           locationId: appointment.locationId,
           utcOffset: utcOffset,
-          notifyParticipants: settings.notifications.notifyCustomers ? 1 : 0,
+          notifyParticipants: 1,
         })
       }
     })
@@ -493,21 +516,12 @@ function useBookingError (response, store) {
       message = globalLabels['recaptcha_invalid_error']
     } else if ('packageBookingUnavailable' in response.data && response.data.packageBookingUnavailable === true) {
       message = globalLabels['package_booking_unavailable']
-    } else if ('message' in response.data) {
+    } else if ('message' in response.data && response.data.message) {
       message = response.data.message
     }
   }
 
   return message
-}
-
-function saveStats (requestData) {
-  httpClient.post(
-    '/stats',
-    requestData
-  ).catch(e => {
-    console.log(e.message)
-  })
 }
 
 function useNotify (store, response, success, error) {
@@ -638,6 +652,10 @@ function runAction (store, response) {
     {
       appointmentId: response.appointment ? response.appointment.id : null,
       payment: Object.assign(response.payment, {currency: settings.payments.currencyCode}),
+      ...(response.type === 'event' && {
+        event: response.event || null,
+        number_of_persons: response.booking ? response.booking.persons : null,
+      }),
       ...(response.isCart && {
         providerId: response.appointment ? response.appointment.providerId : null,
         locationId: response.appointment ? response.appointment.locationId : null,
@@ -971,8 +989,21 @@ function useCreateBookingSuccess (store, response, callback) {
 }
 
 function useCreateBookingError (store, response, callback) {
-  if ('data' in response) {
-    errorMessage.value = useBookingError(response, store)
+  const bookingErrorResponse = response &&
+    typeof response === 'object' &&
+    'data' in response &&
+    response.data &&
+    typeof response.data === 'object' &&
+    'data' in response.data
+    ? response.data
+    : response
+
+  if (bookingErrorResponse && typeof bookingErrorResponse === 'object') {
+    const normalizedBookingErrorResponse = 'data' in bookingErrorResponse
+      ? bookingErrorResponse
+      : {data: bookingErrorResponse}
+
+    errorMessage.value = useBookingError(normalizedBookingErrorResponse, store)
   }
 
   if (store.getters['bookableType/getType'] === 'event') {
@@ -1002,7 +1033,6 @@ export {
   getErrorMessage,
   useBookingError,
   useNotify,
-  saveStats,
   useAppointmentBookingData,
   usePackageBookingData
 }

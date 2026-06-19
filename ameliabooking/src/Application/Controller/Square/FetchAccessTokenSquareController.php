@@ -5,7 +5,7 @@ namespace AmeliaBooking\Application\Controller\Square;
 use AmeliaBooking\Application\Commands\Square\FetchAccessTokenSquareCommand;
 use AmeliaBooking\Application\Controller\Controller;
 use RuntimeException;
-use Slim\Http\Request;
+use AmeliaVendor\Psr\Http\Message\ServerRequestInterface as Request;
 
 /**
  * Class FetchAccessTokenSquareController
@@ -25,7 +25,8 @@ class FetchAccessTokenSquareController extends Controller
         'refresh_token',
         'merchant_id',
         'decrypted_access_token',
-        'decrypted_refresh_token'
+        'decrypted_refresh_token',
+        'signature',
     ];
 
     /**

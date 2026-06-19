@@ -20,7 +20,7 @@ class PeriodServiceRepository extends AbstractRepository
      * @param PeriodService $entity
      * @param int           $periodId
      *
-     * @return bool
+     * @return int
      * @throws QueryExecutionException
      */
     public function add($entity, $periodId)
@@ -39,12 +39,9 @@ class PeriodServiceRepository extends AbstractRepository
                 VALUES (:periodId, :serviceId)"
             );
 
-            $res = $statement->execute($params);
-            if (!$res) {
-                throw new QueryExecutionException('Unable to add data in ' . __CLASS__);
-            }
+            $statement->execute($params);
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to add data in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to add data in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
 
         return $this->connection->lastInsertId();
@@ -54,7 +51,7 @@ class PeriodServiceRepository extends AbstractRepository
      * @param PeriodService $entity
      * @param int           $id
      *
-     * @return int
+     * @return void
      * @throws QueryExecutionException
      */
     public function update($entity, $id)
@@ -73,14 +70,9 @@ class PeriodServiceRepository extends AbstractRepository
                 WHERE id = :id"
             );
 
-            $res = $statement->execute($params);
-            if (!$res) {
-                throw new QueryExecutionException('Unable to save data in ' . __CLASS__);
-            }
-
-            return $res;
+            $statement->execute($params);
         } catch (\Exception $e) {
-            throw new QueryExecutionException('Unable to save data in ' . __CLASS__, $e->getCode(), $e);
+            throw new QueryExecutionException('Unable to save data in ' . __CLASS__ . '. ' . $e->getMessage(), $e->getCode(), $e);
         }
     }
 }

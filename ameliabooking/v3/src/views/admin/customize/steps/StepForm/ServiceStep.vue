@@ -48,7 +48,7 @@
       :tax-excluded="false"
       :info-items="service.infoItems"
       :info-btn-visibility="amCustomize[pageRenderKey].serviceStep.options.moreBtn.visibility"
-      :packages-btn-visibility="(licence.isPro || licence.isDeveloper) && amCustomize[pageRenderKey].serviceStep.options.packagesBtn.visibility"
+      :packages-btn-visibility="features.packages && amCustomize[pageRenderKey].serviceStep.options.packagesBtn.visibility"
       :parent-width="componentWidth"
       @select-item="selectService(service)"
       @trigger-info-popup="
@@ -69,8 +69,8 @@
     :item-name="selectedService.name"
     :item="selectedService"
     :is-person="false"
-    :employees-heading="labelsDisplay('employees')"
-    :employees-data="employeesData"
+    :employees-heading="!licence.isLite ? labelsDisplay('employees') : ''"
+    :employees-data="!licence.isLite ? employeesData : []"
     :locations-heading="licence.isBasic || licence.isPro || licence.isDeveloper ? labelsDisplay('locations') : ''"
     :locations-data="licence.isBasic || licence.isPro || licence.isDeveloper ? locationsData : []"
   />
@@ -106,6 +106,9 @@ const props = defineProps({
 // * Step contains slide popups
 let inPopup = ref(true)
 provide('inPopup', {inPopup})
+
+// * Features integrations
+let features = inject('features')
 
 // * Lang key
 let langKey = inject('langKey')
